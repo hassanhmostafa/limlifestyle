@@ -199,6 +199,31 @@ export const kioskIntegrationRouter = router({
     }),
 
   /**
+   * Create a test session token for development/demo purposes.
+   * Allows testing the full kiosk login flow without a physical machine.
+   * Returns a token and the full URL to open the KioskLogin confirmation page.
+   */
+  createTestSession: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const token = crypto.randomBytes(16).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 min
+
+      // Insert a pending session — simulates what the machine would create
+      await db.insert(kioskSessions).values({
+        token,
+        deviceId: "TEST_DEVICE",
+        userId: ctx.user.id,
+        status: "active",
+        expiresAt,
+      });
+
+      return { token, expiresAt };
+    }),
+
+  /**
    * Create a kiosk session manually (used by admin test panel or direct device pairing).
    */
   createSession: protectedProcedure

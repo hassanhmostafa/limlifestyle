@@ -31,9 +31,13 @@ import {
   QrCode,
   Activity,
   User,
+  FlaskConical,
+  ArrowRight,
 } from "lucide-react";
 
 type PageState = "loading" | "confirm" | "success" | "error" | "no-token";
+
+// ── Test session mutation (no-token mode) ─────────────────────────────────────
 
 export default function KioskLogin() {
   const search = useSearch();
@@ -47,6 +51,16 @@ export default function KioskLogin() {
 
   const [pageState, setPageState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
+
+  const testSessionMutation = trpc.kioskIntegration.createTestSession.useMutation({
+    onSuccess: (data) => {
+      // Redirect to the same page with the real test token
+      navigate(`/kiosk-login?token=${data.token}`);
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
 
   const confirmMutation = trpc.kioskIntegration.confirmLogin.useMutation({
     onSuccess: () => {
@@ -98,31 +112,116 @@ export default function KioskLogin() {
     );
   }
 
-  // ── No Token ─────────────────────────────────────────────────────────────
+  // ── No Token (Test Mode) ─────────────────────────────────────────────────
 
   if (pageState === "no-token") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-lg border-0">
-          <CardContent className="pt-8 pb-8 text-center space-y-4">
-            <AlertCircle className="w-12 h-12 text-amber-400 mx-auto" />
-            <h2 className="text-xl font-semibold text-gray-800">
-              {isAr ? "رمز غير صالح" : "Invalid QR Code"}
-            </h2>
-            <p className="text-gray-500 text-sm">
-              {isAr
-                ? "لم يتم العثور على رمز الجلسة. يرجى مسح رمز QR الموجود على الجهاز مباشرةً."
-                : "No session token found. Please scan the QR code displayed on the health kiosk machine directly."}
-            </p>
-            <Button
-              variant="outline"
-              className="mt-2"
-              onClick={() => navigate("/")}
-            >
-              {isAr ? "العودة للرئيسية" : "Back to Home"}
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="w-full max-w-md space-y-4">
+
+          {/* Header */}
+          <div className="text-center mb-2">
+            <div className="inline-flex items-center gap-2 mb-2">
+              <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
+                <Heart className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+            </div>
+          </div>
+
+          <Card className="shadow-lg border-0">
+            <CardHeader className="pb-3 text-center">
+              <div className="w-14 h-14 bg-cyan-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <QrCode className="w-7 h-7 text-cyan-600" />
+              </div>
+              <CardTitle className="text-lg">
+                {isAr ? "ربط جهاز الفحص الصحي" : "Connect Health Kiosk"}
+              </CardTitle>
+              <CardDescription className="text-sm">
+                {isAr
+                  ? "امسح رمز QR الموجود على الجهاز لربط نتائجك بحسابك تلقائياً."
+                  : "Scan the QR code on the kiosk machine to automatically link your results to your account."}
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {/* How it works */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {isAr ? "كيف يعمل؟" : "How it works"}
+                </p>
+                {[
+                  isAr ? "اقترب من جهاز الفحص الصحي" : "Approach the health kiosk machine",
+                  isAr ? "امسح رمز QR على الشاشة بكاميرا هاتفك" : "Scan the QR code on the machine screen with your phone camera",
+                  isAr ? "أكّد هويتك في هذه الصفحة" : "Confirm your identity on this page",
+                  isAr ? "أجرِ القياسات — ستظهر النتائج تلقائياً في التطبيق" : "Complete measurements — results appear automatically in the app",
+                ].map((step, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="w-5 h-5 rounded-full bg-cyan-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {i + 1}
+                    </div>
+                    <p className="text-sm text-gray-600">{step}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400">{isAr ? "أو" : "or"}</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+
+              {/* Test Mode */}
+              {user ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="w-4 h-4 text-amber-600" />
+                    <p className="text-sm font-semibold text-amber-700">
+                      {isAr ? "وضع الاختبار" : "Test Mode"}
+                    </p>
+                  </div>
+                  <p className="text-xs text-amber-600 leading-relaxed">
+                    {isAr
+                      ? "لا يوجد جهاز متاح الآن؟ اختبر التجربة الكاملة بدون جهاز فعلي."
+                      : "No machine available right now? Test the full flow without a physical device."}
+                  </p>
+                  <Button
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white h-10"
+                    onClick={() => testSessionMutation.mutate()}
+                    disabled={testSessionMutation.isPending}
+                  >
+                    {testSessionMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isAr ? "جارٍ الإنشاء..." : "Creating session..."}</>
+                    ) : (
+                      <><FlaskConical className="w-4 h-4 mr-2" />{isAr ? "إنشاء جلسة اختبار" : "Start Test Session"}<ArrowRight className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2 text-center">
+                  <p className="text-sm text-blue-700">
+                    {isAr ? "سجّل دخولك لاستخدام وضع الاختبار" : "Sign in to use Test Mode"}
+                  </p>
+                  <Button
+                    className="bg-cyan-500 hover:bg-cyan-600 text-white"
+                    onClick={() => navigate("/login?redirect=/kiosk-login")}
+                  >
+                    {isAr ? "تسجيل الدخول" : "Sign In"}
+                  </Button>
+                </div>
+              )}
+
+              <Button
+                variant="ghost"
+                className="w-full text-gray-400 text-sm"
+                onClick={() => navigate("/")}
+              >
+                {isAr ? "العودة للرئيسية" : "Back to Home"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
