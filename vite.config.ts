@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
+import { VitePWA } from "vite-plugin-pwa";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -150,7 +151,56 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+  VitePWA({
+    registerType: "autoUpdate",
+    includeAssets: ["favicon.ico"],
+    manifest: {
+      name: "Tech Care",
+      short_name: "Tech Care",
+      description: "Find health kiosks near you, track your health metrics, and connect with medical experts.",
+      theme_color: "#06b6d4",
+      background_color: "#ffffff",
+      display: "standalone",
+      orientation: "portrait",
+      scope: "/",
+      start_url: "/",
+      lang: "en",
+      icons: [
+        {
+          src: "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/pwa-icon-512-Njw5mfjYVQrS2JHikUmEfa.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any maskable",
+        },
+        {
+          src: "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/pwa-icon-512-Njw5mfjYVQrS2JHikUmEfa.png",
+          sizes: "192x192",
+          type: "image/png",
+        },
+      ],
+    },
+    workbox: {
+      globPatterns: ["**/*.{js,css,html}"],
+      navigateFallback: null,
+      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB — main bundle is ~3MB
+      runtimeCaching: [
+        {
+          urlPattern: /^\/api\//,
+          handler: "NetworkOnly",
+        },
+      ],
+    },
+    devOptions: {
+      enabled: false,
+    },
+  }),
+];
 
 export default defineConfig({
   plugins,

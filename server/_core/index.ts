@@ -8,6 +8,11 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { handleKioskData, handleKioskLoginPoll } from "../routers/kioskIntegration";
+import { seedKiosks, seedHealthReadings, updateUserProfile, getUserByOpenId } from "../db";
+import { SEED_KIOSKS } from "../seed";
+import { SEED_HEALTH_READINGS } from "../seedHealth";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -29,6 +34,29 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Seed kiosk data on startup (safe to run multiple times)
+  try {
+    await seedKiosks(SEED_KIOSKS);
+  } catch (err) {
+    console.warn("[Seed] Could not seed kiosks:", err);
+  }
+  // Seed demo health readings for user id=1 (safe to run multiple times)
+  try {
+    await seedHealthReadings(SEED_HEALTH_READINGS);
+  } catch (err) {
+    console.warn("[Seed] Could not seed health readings:", err);
+  }
+  // Seed demo profile data for the owner user (gender + birthDate for BMI demo)
+  try {
+    const owner = await getUserByOpenId(ENV.ownerOpenId);
+    if (owner && (!owner.gender || !owner.birthDate)) {
+      await updateUserProfile(owner.id, { gender: "male", birthDate: "1990-05-15" });
+      console.log("[Seed] Owner profile seeded with demo gender + birthDate");
+    }
+  } catch (err) {
+    console.warn("[Seed] Could not seed owner profile:", err);
+  }
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
@@ -36,6 +64,30 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+  // Version/health check endpoint
+  app.get("/api/version", (_req, res) => {
+    res.json({
+      project: "Tech Care",
+      version: "2.0.0",
+      features: ["kiosk-integration", "expert-chat", "ai-plan", "bookings", "health-readings"],
+      kioskDataEndpoint: "/api/kiosk/data",
+      kioskLoginPollEndpoint: "/weixin/login/xcx",
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * Kiosk QR login polling endpoint.
+   * The machine generates a random token, shows it as a QR code, then polls this URL
+   * every second to check if the user has scanned and confirmed via the Tech Care app.
+   * URL format is fixed by the machine firmware (matches Henan Lejia WeChat login protocol).
+   */
+  app.get("/weixin/login/xcx", handleKioskLoginPoll);
+
+  // Kiosk data ingestion endpoint (plain HTTP POST from TRIPLEBIGHT kiosk machines)
+  app.post("/api/kiosk/data", handleKioskData);
+
   // tRPC API
   app.use(
     "/api/trpc",

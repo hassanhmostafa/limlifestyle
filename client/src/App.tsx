@@ -5,12 +5,41 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import FindStation from "./pages/FindStation";
+import StationDetail from "./pages/StationDetail";
+import Admin from "./pages/Admin";
+import HealthDashboard from "./pages/HealthDashboard";
+import Profile from "./pages/Profile";
+import AiPlan from "./pages/AiPlan";
+import MyKiosks from "./pages/MyKiosks";
+
+import MyBookings from "./pages/MyBookings";
+import FindExperts from "./pages/FindExperts";
+import ExpertInbox from "./pages/ExpertInbox";
+import ExpertRegistration from "./pages/ExpertRegistration";
+import Login from "./pages/Login";
+import KioskLogin from "./pages/KioskLogin";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"\\"} component={Home} />
+      <Route path={"/find-station"} component={FindStation} />
+      <Route path={"/station/:id"} component={StationDetail} />
+      <Route path={"/admin"} component={Admin} />
+      <Route path={"/health"} component={HealthDashboard} />
+      <Route path={"/profile"} component={Profile} />
+      <Route path={"/ai-plan"} component={AiPlan} />
+      <Route path={"/my-kiosks"} component={MyKiosks} />
+
+      <Route path={"/my-bookings"} component={MyBookings} />
+      <Route path={"/experts"} component={FindExperts} />
+      <Route path={"/expert-inbox"} component={ExpertInbox} />
+      <Route path={"/expert-registration"} component={ExpertRegistration} />
+      <Route path={"/login"} component={Login} />
+      <Route path={"/kiosk-login"} component={KioskLogin} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -33,6 +62,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <PWAInstallPrompt />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
