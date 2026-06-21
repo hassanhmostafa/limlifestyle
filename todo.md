@@ -63,8 +63,8 @@
 - [x] TypeScript check, commit, checkpoint
 
 ## Machine Simulator (QR Login Test)
-- [ ] Add server procedure: generateMachineToken (creates a kiosk_session with a random token, returns token + QR URL)
-- [ ] Add server procedure: pollSessionStatus (checks if a token has been claimed by a user, returns user info)
-- [ ] Build MachineSimulator.tsx page: shows QR code, polls every second, shows confirmed user when scanned
-- [ ] Add route /machine-simulator and link from Admin panel
-- [ ] TypeScript check, commit, checkpoint
+- [x] Add server procedure: generateMachineToken (creates a kiosk_session with a random token, returns token + QR URL)
+- [x] Add server procedure: pollSessionStatus (checks if a token has been claimed by a user, returns user info)
+- [x] Build MachineSimulator.tsx page: shows QR code, polls every second, shows confirmed user when scanned
+- [x] Add route /machine-simulator and link from Admin panel
+- [x] TypeScript check, commit, checkpoint

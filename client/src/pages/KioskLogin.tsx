@@ -149,17 +149,31 @@ export default function KioskLogin() {
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-          // The QR code on the machine contains the device ID (may be a URL or raw ID)
-          let deviceId = decodedText.trim();
-          // If the QR encodes a URL like https://example.com/kiosk-login?deviceId=DEVICE-JED-001
+          const raw = decodedText.trim();
+
+          // Case 1: QR encodes a URL with ?token= (machine simulator / real machine)
+          // e.g. https://example.com/kiosk-login?token=abc123
           try {
-            const url = new URL(decodedText);
-            const fromUrl = url.searchParams.get("deviceId") || url.searchParams.get("device_id");
-            if (fromUrl) deviceId = fromUrl;
+            const url = new URL(raw);
+            const tokenParam = url.searchParams.get("token");
+            if (tokenParam) {
+              // Navigate directly to the confirm screen — no device lookup needed
+              stopScanner();
+              navigate(`/kiosk-login?token=${tokenParam}`);
+              return;
+            }
+            // Case 2: URL with ?deviceId= (legacy static QR label on machine)
+            const deviceIdParam = url.searchParams.get("deviceId") || url.searchParams.get("device_id");
+            if (deviceIdParam) {
+              handleConnectDevice(deviceIdParam);
+              return;
+            }
           } catch {
-            // Not a URL — treat raw text as device ID
+            // Not a URL — fall through
           }
-          handleConnectDevice(deviceId);
+
+          // Case 3: Raw device ID string (e.g. DEVICE-JED-001)
+          handleConnectDevice(raw);
         },
         () => { /* ignore per-frame errors */ }
       );
