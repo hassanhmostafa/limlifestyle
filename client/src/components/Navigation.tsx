@@ -55,18 +55,7 @@ export default function Navigation() {
               </span>
             </Link>
           ))}
-          {(user?.role === "admin") && (
-            <Link href="/my-kiosks">
-              <span
-                className={`transition-colors cursor-pointer font-medium flex items-center gap-1 ${
-                  location === "/my-kiosks" ? "text-cyan-600" : "text-gray-700 hover:text-cyan-600"
-                }`}
-              >
-                <Building2 className="w-4 h-4" />
-                {language === "ar" ? "كشكاتي" : "My Kiosks"}
-              </span>
-            </Link>
-          )}
+
           {isAuthenticated && (
             <Link href="/my-bookings">
               <span
@@ -220,17 +209,7 @@ export default function Navigation() {
                 </div>
               </Link>
             ))}
-            {(user?.role === "admin") && (
-              <Link href="/my-kiosks">
-                <div
-                  className="text-gray-700 hover:text-cyan-600 py-2 cursor-pointer font-medium flex items-center gap-1"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Building2 className="w-4 h-4" />
-                  {language === "ar" ? "كشكاتي" : "My Kiosks"}
-                </div>
-              </Link>
-            )}
+
             {isAuthenticated && (
               <Link href="/kiosk-login">
                 <div

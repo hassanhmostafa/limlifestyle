@@ -2,7 +2,7 @@ import { eq, like, or, desc, and, gte, ilike } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, kiosks, InsertKiosk, healthReadings, InsertHealthReading,
-  aiPlans, InsertAiPlan, kioskRequests, InsertKioskRequest, bookings, InsertBooking
+  aiPlans, InsertAiPlan, bookings, InsertBooking
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -261,15 +261,6 @@ export async function deleteKiosk(id: string) {
 }
 
 /**
- * Get all kiosks owned by a specific user.
- */
-export async function getKiosksByOwnerId(ownerId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(kiosks).where(eq(kiosks.ownerId, ownerId));
-}
-
-/**
  * Get all users (for admin management).
  */
 export async function getAllUsers() {
@@ -440,83 +431,6 @@ export async function deleteAiPlan(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.delete(aiPlans).where(and(eq(aiPlans.id, id), eq(aiPlans.userId, userId)));
-}
-
-// ─────────────────────────────────────────────
-// Kiosk Request helpers
-// ─────────────────────────────────────────────
-
-/**
- * Submit a new kiosk request (create or delete) from a user.
- */
-export async function createKioskRequest(data: InsertKioskRequest) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.insert(kioskRequests).values(data);
-  const result = await db
-    .select()
-    .from(kioskRequests)
-    .where(eq(kioskRequests.userId, data.userId))
-    .orderBy(desc(kioskRequests.createdAt))
-    .limit(1);
-  return result[0];
-}
-
-/**
- * Get all kiosk requests, newest first (admin only).
- */
-export async function getAllKioskRequests() {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(kioskRequests).orderBy(desc(kioskRequests.createdAt));
-}
-
-/**
- * Get kiosk requests submitted by a specific user.
- */
-export async function getUserKioskRequests(userId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(kioskRequests)
-    .where(eq(kioskRequests.userId, userId))
-    .orderBy(desc(kioskRequests.createdAt));
-}
-
-/**
- * Count pending kiosk requests (for admin badge).
- */
-export async function countPendingKioskRequests() {
-  const db = await getDb();
-  if (!db) return 0;
-  const result = await db
-    .select()
-    .from(kioskRequests)
-    .where(eq(kioskRequests.status, "pending"));
-  return result.length;
-}
-
-/**
- * Update a kiosk request status (approve/reject).
- */
-export async function updateKioskRequestStatus(
-  id: number,
-  status: "approved" | "rejected",
-  adminId: number,
-  adminNote?: string
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(kioskRequests).set({
-    status,
-    processedBy: adminId,
-    processedAt: new Date(),
-    adminNote: adminNote ?? null,
-    updatedAt: new Date(),
-  }).where(eq(kioskRequests.id, id));
-  const result = await db.select().from(kioskRequests).where(eq(kioskRequests.id, id)).limit(1);
-  return result[0];
 }
 
 // ─────────────────────────────────────────────

@@ -146,10 +146,6 @@ export default function Admin() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [serviceInput, setServiceInput] = useState("");
 
-  // Owner assignment dialog state
-  const [assigningKiosk, setAssigningKiosk] = useState<{ id: string; name: string; ownerId: number | null } | null>(null);
-  const [selectedOwner, setSelectedOwner] = useState<{ id: number; name: string | null; email: string | null; role: "user" | "expert" | "admin" } | null>(null);
-
   const { data: kiosks, isLoading } = trpc.admin.listKiosks.useQuery(undefined, {
     enabled: isAuthenticated && user?.role === "admin",
   });
@@ -246,16 +242,6 @@ export default function Admin() {
     onError: (e) => toast.error(e.message),
   });
 
-  const assignOwnerMutation = trpc.admin.assignKioskOwner.useMutation({
-    onSuccess: () => {
-      utils.admin.listKiosks.invalidate();
-      utils.admin.listUsers.invalidate();
-      setAssigningKiosk(null);
-      toast.success("Owner assigned successfully");
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
   const updateUserRoleMutation = trpc.admin.updateUserRole.useMutation({
     onSuccess: () => {
       utils.admin.listUsers.invalidate();
@@ -311,22 +297,6 @@ export default function Admin() {
     setServiceInput("");
   };
 
-  const openAssignOwner = (kiosk: any) => {
-    setAssigningKiosk({ id: kiosk.id, name: kiosk.name, ownerId: kiosk.ownerId });
-    // Pre-fill current owner if one exists
-    if (kiosk.ownerId && allUsers) {
-      const existing = allUsers.find((u: any) => u.id === kiosk.ownerId);
-      setSelectedOwner(existing ?? null);
-    } else {
-      setSelectedOwner(null);
-    }
-  };
-
-  const handleAssignOwner = () => {
-    if (!assigningKiosk) return;
-    assignOwnerMutation.mutate({ kioskId: assigningKiosk.id, ownerId: selectedOwner?.id ?? null });
-  };
-
   // ── Hours helpers ────────────────────────────────────────────────────────────
   const addHourRow = () => {
     const usedDays = formData.hours.map((h) => h.day);
@@ -366,13 +336,6 @@ export default function Admin() {
   };
 
   const isBusy = createMutation.isPending || updateMutation.isPending;
-
-  // Helper: get owner name for a kiosk
-  const getOwnerName = (ownerId: number | null) => {
-    if (!ownerId || !allUsers) return null;
-    const u = allUsers.find((u) => u.id === ownerId);
-    return u ? (u.name || u.email || `User #${u.id}`) : `User #${ownerId}`;
-  };
 
   // ── Auth guard ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -762,49 +725,6 @@ export default function Admin() {
         )}
       </main>
       <Footer />
-      {/* ── Assign Owner Dialogg ──────────────────────────────────────────────── */}
-      <Dialog open={!!assigningKiosk} onOpenChange={(open) => !open && setAssigningKiosk(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserCog className="w-5 h-5 text-cyan-500" />
-              Assign Kiosk Owner
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-gray-600">
-              Kiosk: <span className="font-semibold">{assigningKiosk?.name}</span>
-            </p>
-            <div className="space-y-2">
-              <Label>Select Owner</Label>
-              <UserSearchCombobox
-                value={selectedOwner}
-                onChange={setSelectedOwner}
-                placeholder="Search by name or email…"
-              />
-              {selectedOwner === null && assigningKiosk?.ownerId && (
-                <p className="text-xs text-amber-600">
-                  Saving with no owner selected will unassign the current owner.
-                </p>
-              )}
-              <p className="text-xs text-gray-400">
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssigningKiosk(null)}>Cancel</Button>
-            <Button
-              className="bg-cyan-500 hover:bg-cyan-600"
-              onClick={handleAssignOwner}
-              disabled={assignOwnerMutation.isPending}
-            >
-              {assignOwnerMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Assign Owner
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* ── Create / Edit Dialog ─────────────────────────────────────────────── */}
       <Dialog open={showForm} onOpenChange={(open) => !open && handleCloseForm()}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

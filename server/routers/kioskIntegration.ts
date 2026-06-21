@@ -492,7 +492,7 @@ export const kioskIntegrationRouter = router({
     }),
 
   /**
-   * Admin: List all registered kiosk devices.
+   * Admin: List all registered kiosk devices (full details).
    */
   listDevices: protectedProcedure
     .query(async ({ ctx }) => {
@@ -502,6 +502,26 @@ export const kioskIntegrationRouter = router({
       const db = await getDb();
       if (!db) return [];
       return db.select().from(kioskDevices).orderBy(kioskDevices.createdAt);
+    }),
+
+  /**
+   * Any authenticated user: List active kiosk devices for device-selection UI.
+   * Returns only id, deviceId, label, kioskId for display purposes.
+   */
+  listActiveDevices: protectedProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      return db
+        .select({
+          id: kioskDevices.id,
+          deviceId: kioskDevices.deviceId,
+          label: kioskDevices.label,
+          kioskId: kioskDevices.kioskId,
+        })
+        .from(kioskDevices)
+        .where(eq(kioskDevices.isActive, "true"))
+        .orderBy(kioskDevices.label);
     }),
 
   /**

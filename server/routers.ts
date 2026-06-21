@@ -7,9 +7,7 @@ import { adminRouter } from "./routers/admin";
 import { healthRouter } from "./routers/health";
 import { profileRouter } from "./routers/profile";
 import { aiPlansRouter } from "./routers/aiPlans";
-import { kioskOwnerRouter } from "./routers/kioskOwner";
 import { bookingsRouter } from "./routers/bookings";
-import { kioskRequestsRouter } from "./routers/kioskRequests";
 import { expertRequestsRouter } from "./routers/expertRequests";
 import { chatRouter } from "./routers/chat";
 import { emailAuthRouter } from "./routers/emailAuth";
@@ -22,9 +20,7 @@ export const appRouter = router({
   health: healthRouter,
   profile: profileRouter,
   aiPlans: aiPlansRouter,
-  kioskOwner: kioskOwnerRouter,
   bookings: bookingsRouter,
-  kioskRequests: kioskRequestsRouter,
   expertRequests: expertRequestsRouter,
   chat: chatRouter,
   emailAuth: emailAuthRouter,

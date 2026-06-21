@@ -8,6 +8,13 @@
       "when": 1782026540649,
       "tag": "0000_worried_electro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1782038996067,
+      "tag": "0001_mighty_chimera",
+      "breakpoints": true
     }
   ]
 }

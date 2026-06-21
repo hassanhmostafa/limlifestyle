@@ -32,9 +32,25 @@
 ## Machine Integration (New Features — continued)
 - [x] createTestSession tRPC procedure — generates a real session token for testing without a physical machine
 - [x] KioskLogin no-token screen redesigned as Test Mode — shows how-it-works steps + Start Test Session button
+- [x] sendTestMeasurement tRPC procedure — POSTs realistic randomised health data through the exact same /api/kiosk/data endpoint the real machine uses
+- [x] KioskLogin success screen updated with amber Test Mode panel — shows Send Test Measurement button and displays the sent metrics inline
 
 ## Pending / Future
 - [ ] Configure machine to point to new Manus Space URL (requires physical access to machine settings)
 - [ ] Test end-to-end QR login flow with actual TRIPLEBIGHT hardware
 - [ ] Add push notifications for new health readings
 - [ ] Add Arabic language support for AI-generated plans
+
+## Kiosk Owner Role Refactor (Completed)
+- [x] Remove MyKiosks.tsx page and its route from App.tsx
+- [x] Remove kioskOwner and kioskRequests routers from server/routers.ts
+- [x] Remove "My Kiosks" nav links from Navigation.tsx (desktop and mobile)
+- [x] Remove legacy admin procedures: assignKioskOwner, listKioskRequests, pendingRequestCount, approveKioskRequest, rejectKioskRequest from admin.ts
+- [x] Remove legacy imports from admin.ts: getAllKioskRequests, countPendingKioskRequests, updateKioskRequestStatus
+- [x] Delete legacy files: MyKiosks.tsx, KioskRequests.tsx, server/routers/kioskOwner.ts, server/routers/kioskRequests.ts
+- [x] Remove legacy db.ts helpers: getKiosksByOwnerId, createKioskRequest, getAllKioskRequests, getUserKioskRequests, countPendingKioskRequests, updateKioskRequestStatus
+- [x] Remove assignKioskOwner mutation, state, and dialog from Admin.tsx
+- [x] Add listActiveDevices tRPC procedure (accessible to all authenticated users — returns active devices for device picker)
+- [x] Refactor KioskLogin no-token screen: replaced QR-only instructions + Start Test Session button with a device-selection dropdown (calls listActiveDevices) + Connect to Machine button (calls createSession)
+- [x] Apply DB migration: added latitude/longitude columns to kiosks, created kiosk_devices and kiosk_sessions tables, updated users role enum and added adminType/specialty/bio/gender columns
+- [x] TypeScript check: 0 errors
