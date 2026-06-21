@@ -19,6 +19,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Link } from "wouter";
+import { CheckCircle2, Stethoscope, BarChart3, Loader2, FlaskConical } from "lucide-react";
+import { toast } from "sonner";
 
 type SimulatorState = "idle" | "waiting" | "confirmed" | "expired";
 
@@ -31,6 +33,24 @@ export default function MachineSimulator() {
   const [confirmedUser, setConfirmedUser] = useState<{ name: string | null; email: string | null } | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(60);
   const [pollingEnabled, setPollingEnabled] = useState(false);
+
+  type TestMetrics = {
+    height: number; weight: number; bmi: number;
+    systolic: number; diastolic: number; heartRate: number;
+    temperature: number; spO2: number; bodyFatRate: number;
+    muscleRate: number; bloodSugar: number;
+  } | null;
+  const [testMetrics, setTestMetrics] = useState<TestMetrics>(null);
+
+  const testMeasurementMutation = trpc.kioskIntegration.sendTestMeasurement.useMutation({
+    onSuccess: (data) => {
+      setTestMetrics(data.metrics);
+      toast.success("Test measurement sent! Check the Health Dashboard.");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
 
   const generateToken = trpc.kioskIntegration.generateMachineToken.useMutation();
 
@@ -78,6 +98,7 @@ export default function MachineSimulator() {
     setConfirmedUser(null);
     setPollingEnabled(false);
     setSecondsLeft(60);
+    setTestMetrics(null);
 
     try {
       const result = await generateToken.mutateAsync({ deviceId: "SIMULATOR" });
@@ -238,15 +259,64 @@ export default function MachineSimulator() {
                 </div>
               </div>
 
-              <p className="text-gray-500 text-xs">
-                In a real machine, measurements would now begin automatically.
-                The data would be uploaded to the server tagged with this token,
-                and appear in the user's health dashboard.
-              </p>
+              {/* Test Measurement Panel */}
+              <div className="bg-gray-900 rounded-xl p-4 space-y-3 text-left border border-amber-800/40">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4 text-amber-400" />
+                  <p className="text-amber-300 text-sm font-semibold">Simulate Measurement Upload</p>
+                </div>
+                <p className="text-gray-500 text-xs leading-relaxed">
+                  Press below to simulate the machine sending health data for this user — exactly as the real device would after completing measurements.
+                </p>
+
+                {testMetrics ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Data sent successfully!
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {[
+                        { label: "Blood Pressure", value: `${testMetrics.systolic}/${testMetrics.diastolic} mmHg` },
+                        { label: "Heart Rate", value: `${testMetrics.heartRate} bpm` },
+                        { label: "Weight", value: `${testMetrics.weight} kg` },
+                        { label: "Height", value: `${testMetrics.height} cm` },
+                        { label: "BMI", value: String(testMetrics.bmi) },
+                        { label: "SpO2", value: `${testMetrics.spO2}%` },
+                        { label: "Blood Sugar", value: `${testMetrics.bloodSugar} mmol/L` },
+                        { label: "Body Fat", value: `${testMetrics.bodyFatRate}%` },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="bg-gray-800 rounded-lg p-2">
+                          <p className="text-gray-500 text-xs">{label}</p>
+                          <p className="font-semibold text-white text-sm">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <Link href="/health">
+                      <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-9 text-sm">
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        View in Health Dashboard
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white h-10"
+                    onClick={() => testMeasurementMutation.mutate({ sessionToken: token ?? undefined })}
+                    disabled={testMeasurementMutation.isPending}
+                  >
+                    {testMeasurementMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending measurement...</>
+                    ) : (
+                      <><Stethoscope className="w-4 h-4 mr-2" />Send Test Measurement</>
+                    )}
+                  </Button>
+                )}
+              </div>
 
               <Button
                 onClick={handleStart}
-                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white"
+                className="w-full bg-gray-700 hover:bg-gray-600 text-white"
               >
                 Start New Session
               </Button>

@@ -29,9 +29,6 @@ import {
   AlertCircle,
   Activity,
   User,
-  FlaskConical,
-  Stethoscope,
-  BarChart3,
   QrCode,
   Keyboard,
   Camera,
@@ -40,20 +37,6 @@ import {
 
 type PageState = "loading" | "connect" | "confirm" | "success" | "error";
 type ConnectTab = "qr" | "manual";
-
-type TestMetrics = {
-  height: number;
-  weight: number;
-  bmi: number;
-  systolic: number;
-  diastolic: number;
-  heartRate: number;
-  temperature: number;
-  spO2: number;
-  bodyFatRate: number;
-  muscleRate: number;
-  bloodSugar: number;
-} | null;
 
 export default function KioskLogin() {
   const search = useSearch();
@@ -68,8 +51,6 @@ export default function KioskLogin() {
   const [pageState, setPageState] = useState<PageState>("loading");
   const [connectTab, setConnectTab] = useState<ConnectTab>("qr");
   const [errorMessage, setErrorMessage] = useState("");
-  const [testMetrics, setTestMetrics] = useState<TestMetrics>(null);
-  const [confirmedToken, setConfirmedToken] = useState<string | null>(null);
   const [manualDeviceId, setManualDeviceId] = useState("");
   const [scannerActive, setScannerActive] = useState(false);
   const [scannerError, setScannerError] = useState("");
@@ -90,7 +71,6 @@ export default function KioskLogin() {
 
   const confirmMutation = trpc.kioskIntegration.confirmLogin.useMutation({
     onSuccess: () => {
-      setConfirmedToken(token);
       setPageState("success");
       toast.success(
         isAr
@@ -101,20 +81,6 @@ export default function KioskLogin() {
     onError: (err) => {
       setErrorMessage(err.message);
       setPageState("error");
-      toast.error(err.message);
-    },
-  });
-
-  const testMeasurementMutation = trpc.kioskIntegration.sendTestMeasurement.useMutation({
-    onSuccess: (data) => {
-      setTestMetrics(data.metrics);
-      toast.success(
-        isAr
-          ? "تم إرسال بيانات الفحص بنجاح!"
-          : "Test measurement sent! Open your Health Dashboard to see the results."
-      );
-    },
-    onError: (err) => {
       toast.error(err.message);
     },
   });
@@ -455,67 +421,7 @@ export default function KioskLogin() {
             </CardContent>
           </Card>
 
-          {/* Test Mode panel */}
-          <Card className="shadow-md border border-amber-200 bg-amber-50">
-            <CardContent className="pt-5 pb-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <FlaskConical className="w-4 h-4 text-amber-600" />
-                <p className="text-sm font-semibold text-amber-700">
-                  {isAr ? "وضع الاختبار — إرسال بيانات فحص تجريبية" : "Test Mode — Send Simulated Measurement"}
-                </p>
-              </div>
-              <p className="text-xs text-amber-600 leading-relaxed">
-                {isAr
-                  ? "اضغط على الزر أدناه لإرسال بيانات صحية واقعية عشوائية كما لو أرسلها الجهاز الفعلي."
-                  : "Press the button below to send realistic randomised health data exactly as the real machine would."}
-              </p>
 
-              {testMetrics ? (
-                <div className="bg-white rounded-xl p-3 border border-amber-100 space-y-2">
-                  <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {isAr ? "تم إرسال البيانات!" : "Data sent successfully!"}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    {[
-                      { label: isAr ? "ضغط الدم" : "Blood Pressure", value: `${testMetrics.systolic}/${testMetrics.diastolic} mmHg` },
-                      { label: isAr ? "نبض القلب" : "Heart Rate", value: `${testMetrics.heartRate} bpm` },
-                      { label: isAr ? "الوزن" : "Weight", value: `${testMetrics.weight} kg` },
-                      { label: isAr ? "الطول" : "Height", value: `${testMetrics.height} cm` },
-                      { label: "BMI", value: String(testMetrics.bmi) },
-                      { label: "SpO2", value: `${testMetrics.spO2}%` },
-                      { label: isAr ? "سكر الدم" : "Blood Sugar", value: `${testMetrics.bloodSugar} mmol/L` },
-                      { label: isAr ? "دهون الجسم" : "Body Fat", value: `${testMetrics.bodyFatRate}%` },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="bg-gray-50 rounded-lg p-2">
-                        <p className="text-gray-400">{label}</p>
-                        <p className="font-semibold text-gray-800">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-9 text-sm mt-1"
-                    onClick={() => navigate("/health")}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    {isAr ? "عرض النتائج في لوحة الصحة" : "View Results in Health Dashboard"}
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-white h-10"
-                  onClick={() => testMeasurementMutation.mutate({ sessionToken: confirmedToken ?? undefined })}
-                  disabled={testMeasurementMutation.isPending}
-                >
-                  {testMeasurementMutation.isPending ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isAr ? "جارٍ الإرسال..." : "Sending measurement..."}</>
-                  ) : (
-                    <><Stethoscope className="w-4 h-4 mr-2" />{isAr ? "إرسال بيانات فحص تجريبية" : "Send Test Measurement"}</>
-                  )}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     );
