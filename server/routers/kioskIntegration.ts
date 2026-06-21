@@ -554,6 +554,32 @@ export const kioskIntegrationRouter = router({
     }),
 
   /**
+   * Guest Mode: Generate realistic health metrics without saving to the database.
+   * Used by the machine simulator when a user chooses to measure without an account.
+   * Results are only shown on-screen and can be printed — never persisted.
+   */
+  guestMeasurement: protectedProcedure
+    .mutation(async () => {
+      // Generate realistic randomised health metrics — same ranges as sendTestMeasurement
+      const systolic  = Math.floor(Math.random() * 30 + 110);
+      const diastolic = Math.floor(Math.random() * 20 + 65);
+      const heartRate = Math.floor(Math.random() * 30 + 60);
+      const weight    = parseFloat((Math.random() * 40 + 55).toFixed(1));
+      const height    = parseFloat((Math.random() * 30 + 155).toFixed(1));
+      const bmi       = parseFloat((weight / Math.pow(height / 100, 2)).toFixed(1));
+      const temp      = parseFloat((Math.random() * 1.5 + 36.0).toFixed(1));
+      const spO2      = Math.floor(Math.random() * 4 + 96);
+      const bodyFat   = parseFloat((Math.random() * 15 + 15).toFixed(1));
+      const muscle    = parseFloat((Math.random() * 15 + 35).toFixed(1));
+      const bloodSugar = parseFloat((Math.random() * 2.5 + 4.0).toFixed(1));
+
+      // Nothing is saved to the database — caller is responsible for display/print only
+      return {
+        metrics: { height, weight, bmi, systolic, diastolic, heartRate, temperature: temp, spO2, bodyFatRate: bodyFat, muscleRate: muscle, bloodSugar },
+      };
+    }),
+
+  /**
    * Admin: List all registered kiosk devices (full details).
    */
   listDevices: protectedProcedure

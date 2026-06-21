@@ -131,7 +131,7 @@ import { Link } from "wouter";
 import { CheckCircle2, Stethoscope, Printer, Loader2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 
-type SimulatorState = "idle" | "waiting" | "confirmed" | "expired";
+type SimulatorState = "idle" | "waiting" | "confirmed" | "expired" | "guest";
 
 export default function MachineSimulator() {
   const { user, loading: authLoading } = useAuth();
@@ -155,6 +155,15 @@ export default function MachineSimulator() {
     onSuccess: (data) => {
       setTestMetrics(data.metrics);
       toast.success("Test measurement sent! Check the Health Dashboard.");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  const guestMeasurementMutation = trpc.kioskIntegration.guestMeasurement.useMutation({
+    onSuccess: (data) => {
+      setTestMetrics(data.metrics);
     },
     onError: (err) => {
       toast.error(err.message);
@@ -200,6 +209,14 @@ export default function MachineSimulator() {
     }, 500);
     return () => clearInterval(interval);
   }, [state, expiresAt]);
+
+  const handleGuestMode = () => {
+    setState("guest");
+    setToken(null);
+    setConfirmedUser(null);
+    setPollingEnabled(false);
+    setTestMetrics(null);
+  };
 
   const handleStart = async () => {
     setState("idle");
@@ -276,6 +293,23 @@ export default function MachineSimulator() {
                 {generateToken.isPending ? <Spinner className="mr-2" /> : null}
                 Touch to Start Session
               </Button>
+
+              <div className="relative flex items-center gap-3 mt-2">
+                <div className="flex-1 h-px bg-gray-700" />
+                <span className="text-gray-600 text-xs">or</span>
+                <div className="flex-1 h-px bg-gray-700" />
+              </div>
+
+              <Button
+                onClick={handleGuestMode}
+                variant="outline"
+                className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+              >
+                Measure Without Account
+              </Button>
+              <p className="text-gray-600 text-xs text-center -mt-2">
+                Results printed only — not saved to any account
+              </p>
             </CardContent>
           </Card>
         )}
@@ -429,6 +463,76 @@ export default function MachineSimulator() {
                 className="w-full bg-gray-700 hover:bg-gray-600 text-white"
               >
                 Start New Session
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── GUEST MODE ── */}
+        {state === "guest" && (
+          <Card className="bg-gray-800 border-gray-700">
+            <CardContent className="pt-10 pb-10 space-y-6 text-center">
+              <div className="text-5xl">🧾</div>
+              <div>
+                <h2 className="text-white text-2xl font-bold mb-1">Guest Measurement</h2>
+                <p className="text-gray-400 text-sm">
+                  No account linked. Results will be printed only and not saved.
+                </p>
+              </div>
+
+              {testMetrics ? (
+                <div className="space-y-4">
+                  <div className="bg-gray-900 rounded-xl p-4 space-y-2 text-left">
+                    <div className="text-gray-400 text-xs uppercase tracking-widest mb-3">Measurement Results</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {[
+                        { label: "Blood Pressure", value: `${testMetrics.systolic}/${testMetrics.diastolic} mmHg` },
+                        { label: "Heart Rate", value: `${testMetrics.heartRate} bpm` },
+                        { label: "Weight", value: `${testMetrics.weight} kg` },
+                        { label: "Height", value: `${testMetrics.height} cm` },
+                        { label: "BMI", value: String(testMetrics.bmi) },
+                        { label: "SpO2", value: `${testMetrics.spO2}%` },
+                        { label: "Blood Sugar", value: `${testMetrics.bloodSugar} mmol/L` },
+                        { label: "Body Fat", value: `${testMetrics.bodyFatRate}%` },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="bg-gray-800 rounded-lg p-2">
+                          <p className="text-gray-500 text-xs">{label}</p>
+                          <p className="font-semibold text-white text-sm">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-amber-900/20 border border-amber-800/40 rounded-xl p-3 text-xs text-amber-400">
+                    These results are not saved to any account. Print the receipt to keep a copy.
+                  </div>
+                  <Button
+                    className="w-full bg-gray-700 hover:bg-gray-600 text-white h-10"
+                    onClick={() => printHealthReceipt(testMetrics!, null)}
+                  >
+                    <Printer className="w-4 h-4 mr-2" />
+                    Print Health Receipt
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-12 text-base"
+                  onClick={() => guestMeasurementMutation.mutate()}
+                  disabled={guestMeasurementMutation.isPending}
+                >
+                  {guestMeasurementMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Running measurements...</>
+                  ) : (
+                    <><Stethoscope className="w-4 h-4 mr-2" />Start Guest Measurement</>
+                  )}
+                </Button>
+              )}
+
+              <Button
+                onClick={handleStart}
+                variant="ghost"
+                className="w-full text-gray-500 hover:text-white"
+              >
+                Back to Start
               </Button>
             </CardContent>
           </Card>

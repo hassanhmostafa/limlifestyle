@@ -68,3 +68,9 @@
 - [x] Build MachineSimulator.tsx page: shows QR code, polls every second, shows confirmed user when scanned
 - [x] Add route /machine-simulator and link from Admin panel
 - [x] TypeScript check, commit, checkpoint
+
+## Machine Simulator — Guest Mode
+- [x] Add guestMeasurement tRPC procedure: generates realistic randomised metrics without saving to DB
+- [x] Add "Measure Without Account" button to MachineSimulator idle screen
+- [x] Guest mode confirmed state: show metrics inline + Print Receipt button only (no user identity, no DB save)
+- [x] TypeScript check, commit, checkpoint
