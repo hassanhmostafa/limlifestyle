@@ -11,6 +11,115 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+
+// ── Standalone PDF receipt generator (no app branding, machine-side printout) ──
+type ReceiptMetrics = {
+  height: number; weight: number; bmi: number;
+  systolic: number; diastolic: number; heartRate: number;
+  temperature: number; spO2: number; bodyFatRate: number;
+  muscleRate: number; bloodSugar: number;
+};
+
+function printHealthReceipt(
+  metrics: ReceiptMetrics,
+  patient: { name: string | null; email: string | null } | null
+) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-SA", { year: "numeric", month: "long", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-SA", { hour: "2-digit", minute: "2-digit" });
+
+  const bmiStatus = (bmi: number) => {
+    if (bmi < 18.5) return "Underweight";
+    if (bmi < 25)   return "Normal";
+    if (bmi < 30)   return "Overweight";
+    return "Obese";
+  };
+
+  const bpStatus = (s: number, d: number) => {
+    if (s < 120 && d < 80)  return "Normal";
+    if (s < 130 && d < 80)  return "Elevated";
+    if (s < 140 || d < 90)  return "High Stage 1";
+    return "High Stage 2";
+  };
+
+  const rows = [
+    { label: "Blood Pressure",  value: `${metrics.systolic}/${metrics.diastolic} mmHg`, note: bpStatus(metrics.systolic, metrics.diastolic) },
+    { label: "Heart Rate",      value: `${metrics.heartRate} bpm`,                       note: metrics.heartRate < 60 ? "Low" : metrics.heartRate > 100 ? "High" : "Normal" },
+    { label: "Weight",          value: `${metrics.weight} kg`,                           note: "" },
+    { label: "Height",          value: `${metrics.height} cm`,                           note: "" },
+    { label: "BMI",             value: String(metrics.bmi),                              note: bmiStatus(metrics.bmi) },
+    { label: "SpO2",            value: `${metrics.spO2}%`,                               note: metrics.spO2 < 95 ? "Low" : "Normal" },
+    { label: "Body Temperature",value: `${metrics.temperature} °C`,                      note: metrics.temperature > 37.5 ? "Elevated" : "Normal" },
+    { label: "Blood Sugar",     value: `${metrics.bloodSugar} mmol/L`,                   note: metrics.bloodSugar > 6.1 ? "Elevated" : "Normal" },
+    { label: "Body Fat",        value: `${metrics.bodyFatRate}%`,                        note: "" },
+    { label: "Muscle Rate",     value: `${metrics.muscleRate}%`,                         note: "" },
+  ];
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Health Check Receipt</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #fff; color: #1a1a1a; padding: 32px; max-width: 480px; margin: 0 auto; }
+    .header { text-align: center; border-bottom: 2px solid #0ea5e9; padding-bottom: 20px; margin-bottom: 24px; }
+    .station-name { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+    .title { font-size: 22px; font-weight: 700; color: #0ea5e9; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #94a3b8; }
+    .meta { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-bottom: 20px; padding: 10px 14px; background: #f8fafc; border-radius: 8px; }
+    .patient { font-size: 13px; margin-bottom: 20px; padding: 12px 14px; background: #f0f9ff; border-left: 3px solid #0ea5e9; border-radius: 0 8px 8px 0; }
+    .patient strong { display: block; font-size: 15px; color: #0c4a6e; margin-bottom: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #94a3b8; text-align: left; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+    td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; font-size: 13px; vertical-align: middle; }
+    td:first-child { color: #475569; }
+    td:nth-child(2) { font-weight: 600; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+    .badge-normal  { background: #dcfce7; color: #166534; }
+    .badge-warn    { background: #fef9c3; color: #854d0e; }
+    .badge-high    { background: #fee2e2; color: #991b1b; }
+    .footer { text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; line-height: 1.8; }
+    @media print { body { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="station-name">Tech Care Health Station</div>
+    <div class="title">Health Check Receipt</div>
+    <div class="subtitle">Automated Screening Results</div>
+  </div>
+  <div class="meta">
+    <span>Date: ${dateStr}</span>
+    <span>Time: ${timeStr}</span>
+  </div>
+  ${patient?.name ? `<div class="patient"><strong>${patient.name}</strong>${patient.email ? `<span style="color:#64748b;font-size:11px">${patient.email}</span>` : ""}</div>` : ""}
+  <table>
+    <thead><tr><th>Measurement</th><th>Result</th><th>Status</th></tr></thead>
+    <tbody>
+      ${rows.map(r => {
+        const cls = r.note === "Normal" ? "badge-normal" : r.note === "" ? "" : "badge-warn";
+        const badge = r.note ? `<span class="badge ${cls}">${r.note}</span>` : "—";
+        return `<tr><td>${r.label}</td><td>${r.value}</td><td>${badge}</td></tr>`;
+      }).join("")}
+    </tbody>
+  </table>
+  <div class="footer">
+    This receipt is for informational purposes only.<br/>
+    Please consult a healthcare professional for medical advice.<br/>
+    <strong style="color:#0ea5e9">Tech Care · techcarev2-zgcnaa4a.manus.space</strong>
+  </div>
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank", "width=600,height=800");
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
+}
 import { QRCodeSVG } from "qrcode.react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -19,7 +128,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Link } from "wouter";
-import { CheckCircle2, Stethoscope, BarChart3, Loader2, FlaskConical } from "lucide-react";
+import { CheckCircle2, Stethoscope, Printer, Loader2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 
 type SimulatorState = "idle" | "waiting" | "confirmed" | "expired";
@@ -292,12 +401,13 @@ export default function MachineSimulator() {
                         </div>
                       ))}
                     </div>
-                    <Link href="/health">
-                      <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-9 text-sm">
-                        <BarChart3 className="w-4 h-4 mr-2" />
-                        View in Health Dashboard
-                      </Button>
-                    </Link>
+                    <Button
+                      className="w-full bg-gray-700 hover:bg-gray-600 text-white h-9 text-sm"
+                      onClick={() => printHealthReceipt(testMetrics!, confirmedUser)}
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Print Health Receipt
+                    </Button>
                   </div>
                 ) : (
                   <Button
