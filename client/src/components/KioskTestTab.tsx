@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { FlaskConical, Loader2, CheckCircle2, XCircle, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { FlaskConical, Loader2, CheckCircle2, XCircle, Zap, ChevronDown, ChevronUp, MonitorSmartphone } from "lucide-react";
+import { Link } from "wouter";
 
 interface ReadingFields {
   // Height & Weight
@@ -158,15 +159,23 @@ export function KioskTestTab() {
     <section className="py-8">
       <div className="container max-w-4xl space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <FlaskConical className="w-6 h-6 text-cyan-600" />
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Kiosk Data Test Console</h2>
-            <p className="text-sm text-gray-500">
-              Simulate a TRIPLEBIGHT kiosk submission without real hardware. Creates a session token then POSTs to{" "}
-              <code className="bg-gray-100 px-1 rounded text-xs">/api/kiosk/data</code>.
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <FlaskConical className="w-6 h-6 text-cyan-600" />
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Kiosk Data Test Console</h2>
+              <p className="text-sm text-gray-500">
+                Simulate a TRIPLEBIGHT kiosk submission without real hardware. Creates a session token then POSTs to{" "}
+                <code className="bg-gray-100 px-1 rounded text-xs">/api/kiosk/data</code>.
+              </p>
+            </div>
           </div>
+          <Link href="/machine-simulator">
+            <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors shrink-0">
+              <MonitorSmartphone className="w-4 h-4" />
+              Machine Simulator
+            </button>
+          </Link>
         </div>
 
         {/* Step 1: Device & Session */}

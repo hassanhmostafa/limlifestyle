@@ -492,6 +492,68 @@ export const kioskIntegrationRouter = router({
     }),
 
   /**
+   * Machine Simulator: Generate a fresh pending session token (simulates what the machine does
+   * when the user touches the screen). Returns the token and the QR URL to display.
+   * The token starts as "pending" — it becomes "active" once the user scans and confirms.
+   */
+  generateMachineToken: protectedProcedure
+    .input(z.object({
+      deviceId: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const token = crypto.randomBytes(8).toString("hex"); // short, like the protocol example
+      const expiresAt = new Date(Date.now() + 60 * 1000); // 60 seconds, as per protocol
+
+      await db.insert(kioskSessions).values({
+        token,
+        deviceId: input.deviceId ?? "SIMULATOR",
+        userId: 0, // placeholder — will be set when user confirms
+        status: "pending",
+        expiresAt,
+      });
+
+      return { token, expiresAt };
+    }),
+
+  /**
+   * Machine Simulator: Poll whether a token has been claimed by a user.
+   * Mirrors what the machine does by calling GET /weixin/login/xcx?token=...
+   * Returns the user info if confirmed, or null if still pending/expired.
+   */
+  pollSessionStatus: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { confirmed: false, user: null };
+
+      const [session] = await db
+        .select()
+        .from(kioskSessions)
+        .where(eq(kioskSessions.token, input.token));
+
+      if (!session) return { confirmed: false, user: null, expired: true };
+      if (new Date() > session.expiresAt) return { confirmed: false, user: null, expired: true };
+      if (session.status !== "active" || !session.userId || session.userId === 0) {
+        return { confirmed: false, user: null, expired: false };
+      }
+
+      const { users } = await import("../../drizzle/schema");
+      const [user] = await db
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, session.userId));
+
+      return {
+        confirmed: true,
+        expired: false,
+        user: user ?? null,
+      };
+    }),
+
+  /**
    * Admin: List all registered kiosk devices (full details).
    */
   listDevices: protectedProcedure

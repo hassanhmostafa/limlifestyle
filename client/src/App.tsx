@@ -18,6 +18,7 @@ import ExpertInbox from "./pages/ExpertInbox";
 import ExpertRegistration from "./pages/ExpertRegistration";
 import Login from "./pages/Login";
 import KioskLogin from "./pages/KioskLogin";
+import MachineSimulator from "./pages/MachineSimulator";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 function Router() {
@@ -37,6 +38,7 @@ function Router() {
       <Route path={"/expert-registration"} component={ExpertRegistration} />
       <Route path={"/login"} component={Login} />
       <Route path={"/kiosk-login"} component={KioskLogin} />
+      <Route path={"/machine-simulator"} component={MachineSimulator} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
