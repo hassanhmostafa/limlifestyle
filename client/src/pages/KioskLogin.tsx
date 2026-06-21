@@ -1,26 +1,26 @@
 /**
  * KioskLogin Page
  *
- * This page handles two scenarios:
+ * Handles two scenarios:
  *
  * A) Token present (machine-initiated QR scan):
- *    The machine shows a QR code: https://techcarev2-zgcnaa4a.manus.space/kiosk-login?token=<token>
- *    User scans it → lands here → confirms → machine gets notified via /weixin/login/xcx polling.
+ *    Machine shows QR → user scans → lands here with ?token=<token> → confirms.
  *
  * B) No token (user-initiated "Connect Kiosk" from nav):
- *    User selects a registered device from a list → app calls createSession with deviceId
- *    → redirects to /kiosk-login?token=<token> → same confirmation flow as (A).
- *
- * After confirmation, the machine POSTs data to /api/kiosk/data → saved to health profile.
+ *    User can either:
+ *      1. Scan the QR code printed on the machine (contains the device ID)
+ *      2. Type the device ID manually
+ *    App calls createSession(deviceId) → redirects to /kiosk-login?token=<token> → confirms.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -32,18 +32,14 @@ import {
   FlaskConical,
   Stethoscope,
   BarChart3,
-  Cpu,
-  ChevronDown,
+  QrCode,
+  Keyboard,
+  Camera,
+  ArrowRight,
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-type PageState = "loading" | "confirm" | "success" | "error" | "select-device";
+type PageState = "loading" | "connect" | "confirm" | "success" | "error";
+type ConnectTab = "qr" | "manual";
 
 type TestMetrics = {
   height: number;
@@ -70,23 +66,24 @@ export default function KioskLogin() {
   const token = params.get("token");
 
   const [pageState, setPageState] = useState<PageState>("loading");
+  const [connectTab, setConnectTab] = useState<ConnectTab>("qr");
   const [errorMessage, setErrorMessage] = useState("");
   const [testMetrics, setTestMetrics] = useState<TestMetrics>(null);
   const [confirmedToken, setConfirmedToken] = useState<string | null>(null);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [manualDeviceId, setManualDeviceId] = useState("");
+  const [scannerActive, setScannerActive] = useState(false);
+  const [scannerError, setScannerError] = useState("");
+  const scannerRef = useRef<any>(null);
+  const scannerDivId = "qr-scanner-region";
 
-  // Fetch active devices for the device-selection screen
-  const { data: activeDevices, isLoading: devicesLoading } = trpc.kioskIntegration.listActiveDevices.useQuery(
-    undefined,
-    { enabled: pageState === "select-device" && !!user }
-  );
-
-  // Create a session linked to a selected device
+  // Create a session linked to a device ID
   const createSessionMutation = trpc.kioskIntegration.createSession.useMutation({
     onSuccess: (data) => {
+      stopScanner();
       navigate(`/kiosk-login?token=${data.token}`);
     },
     onError: (err) => {
+      stopScanner();
       toast.error(err.message);
     },
   });
@@ -113,7 +110,7 @@ export default function KioskLogin() {
       setTestMetrics(data.metrics);
       toast.success(
         isAr
-          ? "تم إرسال بيانات الفحص بنجاح! افتح لوحة الصحة لرؤية نتائجك."
+          ? "تم إرسال بيانات الفحص بنجاح!"
           : "Test measurement sent! Open your Health Dashboard to see the results."
       );
     },
@@ -122,37 +119,95 @@ export default function KioskLogin() {
     },
   });
 
-  // Once auth resolves, determine what to show
+  // Determine initial page state after auth resolves
   useEffect(() => {
     if (authLoading) return;
-
     if (!user) {
-      // Redirect to login, then come back to this page after
       const redirect = token ? `/kiosk-login?token=${token}` : "/kiosk-login";
       navigate(`/login?redirect=${encodeURIComponent(redirect)}`);
       return;
     }
-
     if (!token) {
-      setPageState("select-device");
+      setPageState("connect");
       return;
     }
-
-    // User is logged in and token is present — show confirmation screen
     setPageState("confirm");
   }, [authLoading, user, token]);
+
+  // Start QR scanner
+  const startScanner = async () => {
+    setScannerError("");
+    setScannerActive(true);
+
+    // Dynamically import to avoid SSR issues
+    const { Html5Qrcode } = await import("html5-qrcode");
+    const scanner = new Html5Qrcode(scannerDivId);
+    scannerRef.current = scanner;
+
+    try {
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          // The QR code on the machine contains the device ID (may be a URL or raw ID)
+          let deviceId = decodedText.trim();
+          // If the QR encodes a URL like https://example.com/kiosk-login?deviceId=DEVICE-JED-001
+          try {
+            const url = new URL(decodedText);
+            const fromUrl = url.searchParams.get("deviceId") || url.searchParams.get("device_id");
+            if (fromUrl) deviceId = fromUrl;
+          } catch {
+            // Not a URL — treat raw text as device ID
+          }
+          handleConnectDevice(deviceId);
+        },
+        () => { /* ignore per-frame errors */ }
+      );
+    } catch (err: any) {
+      setScannerActive(false);
+      setScannerError(
+        isAr
+          ? "تعذّر الوصول إلى الكاميرا. يرجى السماح بالوصول أو استخدام الإدخال اليدوي."
+          : "Could not access camera. Please allow camera access or use manual entry."
+      );
+    }
+  };
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
+    }
+    setScannerActive(false);
+  };
+
+  // Clean up scanner on unmount
+  useEffect(() => {
+    return () => { stopScanner(); };
+  }, []);
+
+  // Stop scanner when switching tabs
+  useEffect(() => {
+    if (connectTab !== "qr") stopScanner();
+  }, [connectTab]);
+
+  const handleConnectDevice = (deviceId: string) => {
+    const id = deviceId.trim();
+    if (!id) {
+      toast.error(isAr ? "يرجى إدخال معرّف الجهاز" : "Please enter a device ID");
+      return;
+    }
+    createSessionMutation.mutate({ deviceId: id });
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleConnectDevice(manualDeviceId);
+  };
 
   const handleConfirm = () => {
     if (!token) return;
     confirmMutation.mutate({ token });
-  };
-
-  const handleConnectDevice = () => {
-    if (!selectedDeviceId) {
-      toast.error(isAr ? "يرجى اختيار جهاز أولاً" : "Please select a device first");
-      return;
-    }
-    createSessionMutation.mutate({ deviceId: selectedDeviceId });
   };
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -165,9 +220,9 @@ export default function KioskLogin() {
     );
   }
 
-  // ── Select Device (no-token, user-initiated) ─────────────────────────────
+  // ── Connect (no-token, user-initiated) ───────────────────────────────────
 
-  if (pageState === "select-device") {
+  if (pageState === "connect") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-4">
@@ -182,90 +237,145 @@ export default function KioskLogin() {
             </div>
           </div>
 
-          <Card className="shadow-lg border-0">
+          <Card className="shadow-lg border-0 overflow-hidden">
             <CardHeader className="pb-3 text-center">
-              <div className="w-14 h-14 bg-cyan-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Cpu className="w-7 h-7 text-cyan-600" />
-              </div>
               <CardTitle className="text-lg">
                 {isAr ? "ربط جهاز الفحص الصحي" : "Connect Health Kiosk"}
               </CardTitle>
               <CardDescription className="text-sm">
                 {isAr
-                  ? "اختر الجهاز الذي تقف أمامه لربط نتائجك بحسابك تلقائياً."
-                  : "Select the kiosk machine in front of you to automatically link your results to your account."}
+                  ? "امسح رمز QR الموجود على الجهاز، أو أدخل معرّف الجهاز يدوياً."
+                  : "Scan the QR code on the machine, or enter the device ID manually."}
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-5">
-              {/* Device selector */}
-              {devicesLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="w-6 h-6 animate-spin text-cyan-500" />
-                </div>
-              ) : !activeDevices || activeDevices.length === 0 ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center space-y-2">
-                  <AlertCircle className="w-6 h-6 text-amber-500 mx-auto" />
-                  <p className="text-sm text-amber-700 font-medium">
-                    {isAr ? "لا توجد أجهزة مسجّلة حالياً" : "No registered devices available"}
-                  </p>
-                  <p className="text-xs text-amber-600">
+            {/* Tab switcher */}
+            <div className="flex border-b border-gray-100 mx-6">
+              <button
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors border-b-2 ${
+                  connectTab === "qr"
+                    ? "border-cyan-500 text-cyan-600"
+                    : "border-transparent text-gray-400 hover:text-gray-600"
+                }`}
+                onClick={() => setConnectTab("qr")}
+              >
+                <QrCode className="w-4 h-4" />
+                {isAr ? "مسح QR" : "Scan QR"}
+              </button>
+              <button
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors border-b-2 ${
+                  connectTab === "manual"
+                    ? "border-cyan-500 text-cyan-600"
+                    : "border-transparent text-gray-400 hover:text-gray-600"
+                }`}
+                onClick={() => setConnectTab("manual")}
+              >
+                <Keyboard className="w-4 h-4" />
+                {isAr ? "إدخال يدوي" : "Manual Entry"}
+              </button>
+            </div>
+
+            <CardContent className="pt-5 pb-6 space-y-4">
+
+              {/* ── QR Tab ── */}
+              {connectTab === "qr" && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-500 text-center leading-relaxed">
                     {isAr
-                      ? "يرجى التواصل مع المسؤول لتسجيل الأجهزة."
-                      : "Please contact the administrator to register devices."}
+                      ? "ابحث عن ملصق QR على الجهاز واضغط على الزر أدناه لتشغيل الكاميرا."
+                      : "Find the QR label on the kiosk machine, then press the button below to activate your camera."}
+                  </p>
+
+                  {/* Scanner viewport */}
+                  <div
+                    id={scannerDivId}
+                    className={`w-full rounded-xl overflow-hidden bg-gray-900 ${scannerActive ? "min-h-[280px]" : "hidden"}`}
+                  />
+
+                  {scannerError && (
+                    <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
+                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-red-600">{scannerError}</p>
+                    </div>
+                  )}
+
+                  {createSessionMutation.isPending ? (
+                    <div className="flex items-center justify-center gap-2 py-3 text-cyan-600">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="text-sm font-medium">
+                        {isAr ? "جارٍ إنشاء الجلسة..." : "Creating session..."}
+                      </span>
+                    </div>
+                  ) : scannerActive ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={stopScanner}
+                    >
+                      {isAr ? "إيقاف الكاميرا" : "Stop Camera"}
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-11 text-base font-medium"
+                      onClick={startScanner}
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      {isAr ? "تشغيل الكاميرا لمسح QR" : "Activate Camera to Scan QR"}
+                    </Button>
+                  )}
+
+                  <p className="text-xs text-center text-gray-400">
+                    {isAr
+                      ? "تأكد من أن رمز QR مضاء جيداً وفي مركز الإطار."
+                      : "Make sure the QR code is well-lit and centred in the frame."}
                   </p>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
+              )}
+
+              {/* ── Manual Entry Tab ── */}
+              {connectTab === "manual" && (
+                <form onSubmit={handleManualSubmit} className="space-y-4">
+                  <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">
-                      {isAr ? "اختر الجهاز" : "Select Device"}
+                      {isAr ? "معرّف الجهاز" : "Device ID"}
                     </label>
-                    <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
-                      <SelectTrigger className="w-full h-11">
-                        <SelectValue
-                          placeholder={isAr ? "اختر جهاز الكشك..." : "Choose a kiosk machine..."}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeDevices.map((device) => (
-                          <SelectItem key={device.deviceId} value={device.deviceId}>
-                            <div className="flex items-center gap-2">
-                              <Cpu className="w-4 h-4 text-cyan-500 flex-shrink-0" />
-                              <span>
-                                {device.label
-                                  ? `${device.label} (${device.deviceId})`
-                                  : device.deviceId}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      placeholder={isAr ? "مثال: DEVICE-JED-001" : "e.g. DEVICE-JED-001"}
+                      value={manualDeviceId}
+                      onChange={(e) => setManualDeviceId(e.target.value.trim())}
+                      className="h-11 font-mono text-sm"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      dir="ltr"
+                    />
+                    <p className="text-xs text-gray-400">
+                      {isAr
+                        ? "ستجد معرّف الجهاز مطبوعاً على ملصق في الجهاز."
+                        : "The device ID is printed on a label attached to the kiosk machine."}
+                    </p>
                   </div>
 
                   <Button
+                    type="submit"
                     className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-11 text-base font-medium"
-                    onClick={handleConnectDevice}
-                    disabled={!selectedDeviceId || createSessionMutation.isPending}
+                    disabled={!manualDeviceId || createSessionMutation.isPending}
                   >
                     {createSessionMutation.isPending ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isAr ? "جارٍ الإنشاء..." : "Creating session..."}</>
                     ) : (
-                      <><CheckCircle2 className="w-4 h-4 mr-2" />{isAr ? "ربط الجهاز" : "Connect to Machine"}</>
+                      <><ArrowRight className="w-4 h-4 mr-2" />{isAr ? "ربط الجهاز" : "Connect to Machine"}</>
                     )}
                   </Button>
-                </div>
+                </form>
               )}
 
               {/* How it works */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3 mt-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                   {isAr ? "كيف يعمل؟" : "How it works"}
                 </p>
                 {[
-                  isAr ? "اختر الجهاز الذي تقف أمامه من القائمة" : "Select the machine you are standing in front of",
-                  isAr ? "اضغط على \"ربط الجهاز\" لإنشاء جلسة" : "Press \"Connect to Machine\" to create a session",
+                  isAr ? "امسح QR أو أدخل معرّف الجهاز" : "Scan the QR or enter the device ID",
                   isAr ? "أكّد هويتك في الشاشة التالية" : "Confirm your identity on the next screen",
                   isAr ? "أجرِ القياسات — ستظهر النتائج تلقائياً في التطبيق" : "Complete measurements — results appear automatically in the app",
                 ].map((step, i) => (
@@ -276,21 +386,6 @@ export default function KioskLogin() {
                     <p className="text-sm text-gray-600">{step}</p>
                   </div>
                 ))}
-              </div>
-
-              {/* Test Mode — for testing without a physical machine */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <FlaskConical className="w-4 h-4 text-amber-600" />
-                  <p className="text-sm font-semibold text-amber-700">
-                    {isAr ? "وضع الاختبار" : "Test Mode"}
-                  </p>
-                </div>
-                <p className="text-xs text-amber-600 leading-relaxed">
-                  {isAr
-                    ? "لا يوجد جهاز متاح الآن؟ اختر أي جهاز مسجّل واضغط \"ربط الجهاز\" لاختبار التجربة الكاملة."
-                    : "No physical machine available? Select any registered device and press \"Connect to Machine\" to test the full flow."}
-                </p>
               </div>
 
               <Button
@@ -346,7 +441,7 @@ export default function KioskLogin() {
             </CardContent>
           </Card>
 
-          {/* Test Mode panel — send simulated machine data */}
+          {/* Test Mode panel */}
           <Card className="shadow-md border border-amber-200 bg-amber-50">
             <CardContent className="pt-5 pb-5 space-y-3">
               <div className="flex items-center gap-2">
@@ -357,8 +452,8 @@ export default function KioskLogin() {
               </div>
               <p className="text-xs text-amber-600 leading-relaxed">
                 {isAr
-                  ? "اضغط على الزر أدناه لإرسال بيانات صحية واقعية عشوائية كما لو أرسلها الجهاز الفعلي. ستظهر في لوحة الصحة."
-                  : "Press the button below to send realistic randomised health data exactly as the real machine would. It will appear in your Health Dashboard."}
+                  ? "اضغط على الزر أدناه لإرسال بيانات صحية واقعية عشوائية كما لو أرسلها الجهاز الفعلي."
+                  : "Press the button below to send realistic randomised health data exactly as the real machine would."}
               </p>
 
               {testMetrics ? (
@@ -460,7 +555,7 @@ export default function KioskLogin() {
         <Card className="shadow-lg border-0">
           <CardHeader className="pb-3 text-center">
             <div className="w-14 h-14 bg-cyan-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Cpu className="w-7 h-7 text-cyan-600" />
+              <QrCode className="w-7 h-7 text-cyan-600" />
             </div>
             <CardTitle className="text-lg">
               {isAr ? "ربط الجهاز بحسابك" : "Link Machine to Your Account"}

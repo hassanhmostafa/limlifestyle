@@ -54,3 +54,10 @@
 - [x] Refactor KioskLogin no-token screen: replaced QR-only instructions + Start Test Session button with a device-selection dropdown (calls listActiveDevices) + Connect to Machine button (calls createSession)
 - [x] Apply DB migration: added latitude/longitude columns to kiosks, created kiosk_devices and kiosk_sessions tables, updated users role enum and added adminType/specialty/bio/gender columns
 - [x] TypeScript check: 0 errors
+
+## KioskLogin QR + Manual Entry Redesign
+- [x] Seed demo kiosk devices into the database (linked to existing kiosk locations)
+- [x] Redesign KioskLogin no-token screen: QR scan option + manual device ID entry option
+- [x] Install html5-qrcode for in-browser QR scanning
+- [x] On scan/submit, call createSession(deviceId) and redirect to /kiosk-login?token=...
+- [x] TypeScript check, commit, checkpoint
