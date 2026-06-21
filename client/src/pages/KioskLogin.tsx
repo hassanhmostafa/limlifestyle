@@ -33,9 +33,25 @@ import {
   User,
   FlaskConical,
   ArrowRight,
+  Stethoscope,
+  BarChart3,
 } from "lucide-react";
 
 type PageState = "loading" | "confirm" | "success" | "error" | "no-token";
+
+type TestMetrics = {
+  height: number;
+  weight: number;
+  bmi: number;
+  systolic: number;
+  diastolic: number;
+  heartRate: number;
+  temperature: number;
+  spO2: number;
+  bodyFatRate: number;
+  muscleRate: number;
+  bloodSugar: number;
+} | null;
 
 // ── Test session mutation (no-token mode) ─────────────────────────────────────
 
@@ -51,6 +67,8 @@ export default function KioskLogin() {
 
   const [pageState, setPageState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [testMetrics, setTestMetrics] = useState<TestMetrics>(null);
+  const [confirmedToken, setConfirmedToken] = useState<string | null>(null);
 
   const testSessionMutation = trpc.kioskIntegration.createTestSession.useMutation({
     onSuccess: (data) => {
@@ -64,6 +82,7 @@ export default function KioskLogin() {
 
   const confirmMutation = trpc.kioskIntegration.confirmLogin.useMutation({
     onSuccess: () => {
+      setConfirmedToken(token);
       setPageState("success");
       toast.success(
         isAr
@@ -74,6 +93,20 @@ export default function KioskLogin() {
     onError: (err) => {
       setErrorMessage(err.message);
       setPageState("error");
+      toast.error(err.message);
+    },
+  });
+
+  const testMeasurementMutation = trpc.kioskIntegration.sendTestMeasurement.useMutation({
+    onSuccess: (data) => {
+      setTestMetrics(data.metrics);
+      toast.success(
+        isAr
+          ? "تم إرسال بيانات الفحص بنجاح! افتح لوحة الصحة لرؤية نتائجك."
+          : "Test measurement sent! Open your Health Dashboard to see the results."
+      );
+    },
+    onError: (err) => {
       toast.error(err.message);
     },
   });
@@ -231,40 +264,102 @@ export default function KioskLogin() {
   if (pageState === "success") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-lg border-0">
-          <CardContent className="pt-8 pb-8 text-center space-y-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
-            </div>
-            <h2 className="text-xl font-semibold text-gray-800">
-              {isAr ? "تم الربط بنجاح!" : "Session Confirmed!"}
-            </h2>
-            <p className="text-gray-500 text-sm leading-relaxed">
-              {isAr
-                ? "تم ربط حسابك بالجهاز. يمكنك الآن وضع هاتفك جانباً وإجراء القياسات على الجهاز. ستظهر النتائج تلقائياً في تطبيقك بعد الانتهاء."
-                : "Your account has been linked to the machine. You can now put your phone aside and proceed with the health measurements. Your results will appear automatically in the app once finished."}
-            </p>
-
-            <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4 text-left space-y-2 mt-2">
-              <div className="flex items-center gap-2 text-cyan-700 font-medium text-sm">
-                <Activity className="w-4 h-4" />
-                {isAr ? "الخطوات التالية:" : "Next steps:"}
+        <div className="w-full max-w-md space-y-4">
+          <Card className="shadow-lg border-0">
+            <CardContent className="pt-8 pb-6 text-center space-y-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-8 h-8 text-green-500" />
               </div>
-              <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                <li>{isAr ? "ضع هاتفك جانباً" : "Put your phone aside"}</li>
-                <li>{isAr ? "أجرِ القياسات على الجهاز" : "Complete the measurements on the machine"}</li>
-                <li>{isAr ? "افتح التطبيق لرؤية نتائجك" : "Open the app to see your results"}</li>
-              </ol>
-            </div>
+              <h2 className="text-xl font-semibold text-gray-800">
+                {isAr ? "تم الربط بنجاح!" : "Session Confirmed!"}
+              </h2>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                {isAr
+                  ? "تم ربط حسابك بالجهاز. يمكنك الآن وضع هاتفك جانباً وإجراء القياسات على الجهاز. ستظهر النتائج تلقائياً في تطبيقك بعد الانتهاء."
+                  : "Your account has been linked to the machine. You can now put your phone aside and proceed with the health measurements. Your results will appear automatically in the app once finished."}
+              </p>
+              <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4 text-left space-y-2">
+                <div className="flex items-center gap-2 text-cyan-700 font-medium text-sm">
+                  <Activity className="w-4 h-4" />
+                  {isAr ? "الخطوات التالية:" : "Next steps:"}
+                </div>
+                <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                  <li>{isAr ? "ضع هاتفك جانباً" : "Put your phone aside"}</li>
+                  <li>{isAr ? "أجرِ القياسات على الجهاز" : "Complete the measurements on the machine"}</li>
+                  <li>{isAr ? "افتح التطبيق لرؤية نتائجك" : "Open the app to see your results"}</li>
+                </ol>
+              </div>
+              <Button
+                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white"
+                onClick={() => navigate("/health")}
+              >
+                {isAr ? "الذهاب إلى لوحة الصحة" : "Go to Health Dashboard"}
+              </Button>
+            </CardContent>
+          </Card>
 
-            <Button
-              className="w-full bg-cyan-500 hover:bg-cyan-600 text-white mt-2"
-              onClick={() => navigate("/health")}
-            >
-              {isAr ? "الذهاب إلى لوحة الصحة" : "Go to Health Dashboard"}
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Test Mode panel — send simulated machine data */}
+          <Card className="shadow-md border border-amber-200 bg-amber-50">
+            <CardContent className="pt-5 pb-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="w-4 h-4 text-amber-600" />
+                <p className="text-sm font-semibold text-amber-700">
+                  {isAr ? "وضع الاختبار — إرسال بيانات فحص تجريبية" : "Test Mode — Send Simulated Measurement"}
+                </p>
+              </div>
+              <p className="text-xs text-amber-600 leading-relaxed">
+                {isAr
+                  ? "اضغط على الزر أدناه لإرسال بيانات صحية واقعية عشوائية كما لو أرسلها الجهاز الفعلي. ستظهر في لوحة الصحة."
+                  : "Press the button below to send realistic randomised health data exactly as the real machine would. It will appear in your Health Dashboard."}
+              </p>
+
+              {testMetrics ? (
+                <div className="bg-white rounded-xl p-3 border border-amber-100 space-y-2">
+                  <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
+                    <CheckCircle2 className="w-4 h-4" />
+                    {isAr ? "تم إرسال البيانات!" : "Data sent successfully!"}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {[
+                      { label: isAr ? "ضغط الدم" : "Blood Pressure", value: `${testMetrics.systolic}/${testMetrics.diastolic} mmHg` },
+                      { label: isAr ? "نبض القلب" : "Heart Rate", value: `${testMetrics.heartRate} bpm` },
+                      { label: isAr ? "الوزن" : "Weight", value: `${testMetrics.weight} kg` },
+                      { label: isAr ? "الطول" : "Height", value: `${testMetrics.height} cm` },
+                      { label: "BMI", value: String(testMetrics.bmi) },
+                      { label: "SpO2", value: `${testMetrics.spO2}%` },
+                      { label: isAr ? "سكر الدم" : "Blood Sugar", value: `${testMetrics.bloodSugar} mmol/L` },
+                      { label: isAr ? "دهون الجسم" : "Body Fat", value: `${testMetrics.bodyFatRate}%` },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-gray-50 rounded-lg p-2">
+                        <p className="text-gray-400">{label}</p>
+                        <p className="font-semibold text-gray-800">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-9 text-sm mt-1"
+                    onClick={() => navigate("/health")}
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    {isAr ? "عرض النتائج في لوحة الصحة" : "View Results in Health Dashboard"}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white h-10"
+                  onClick={() => testMeasurementMutation.mutate({ sessionToken: confirmedToken ?? undefined })}
+                  disabled={testMeasurementMutation.isPending}
+                >
+                  {testMeasurementMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isAr ? "جارٍ الإرسال..." : "Sending measurement..."}</>
+                  ) : (
+                    <><Stethoscope className="w-4 h-4 mr-2" />{isAr ? "إرسال بيانات فحص تجريبية" : "Send Test Measurement"}</>
+                  )}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

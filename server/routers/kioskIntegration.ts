@@ -39,6 +39,127 @@ import crypto from "crypto";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * Core logic for saving a kiosk measurement payload to the database.
+ * Shared between the real machine HTTP handler and the test measurement tRPC procedure.
+ */
+async function saveKioskMeasurement(
+  data: z.infer<typeof KioskDataSchema>,
+  db: Awaited<ReturnType<typeof getDb>>
+): Promise<{ success: boolean; userId: number | null }> {
+  if (!db) return { success: false, userId: null };
+
+  const sessionToken = data.sessionToken;
+  const deviceId = data.deviceID;
+
+  let userId: number | null = null;
+  let resolvedKioskId: string | null = null;
+
+  if (sessionToken) {
+    const [session] = await db
+      .select()
+      .from(kioskSessions)
+      .where(and(
+        eq(kioskSessions.token, sessionToken),
+        eq(kioskSessions.status, "active"),
+        gt(kioskSessions.expiresAt, new Date())
+      ));
+
+    if (!session) return { success: false, userId: null };
+    userId = session.userId;
+    await db.update(kioskSessions).set({ status: "used" }).where(eq(kioskSessions.id, session.id));
+  }
+
+  if (deviceId) {
+    const [device] = await db.select().from(kioskDevices).where(eq(kioskDevices.deviceId, deviceId));
+    if (device?.kioskId) resolvedKioskId = device.kioskId;
+    if (!userId) {
+      const [latestSession] = await db
+        .select()
+        .from(kioskSessions)
+        .where(and(
+          eq(kioskSessions.deviceId, deviceId),
+          eq(kioskSessions.status, "active"),
+          gt(kioskSessions.expiresAt, new Date())
+        ));
+      if (latestSession) {
+        userId = latestSession.userId;
+        await db.update(kioskSessions).set({ status: "used" }).where(eq(kioskSessions.id, latestSession.id));
+      }
+    }
+  }
+
+  if (!userId) return { success: false, userId: null };
+
+  const hw = data.hw;
+  const blood = data.blood;
+  const spo2 = data.spo2;
+
+  const systolic   = parseIntOrNull(blood?.high)  ?? parseIntOrNull(blood?.rhigh);
+  const diastolic  = parseIntOrNull(blood?.low)   ?? parseIntOrNull(blood?.rlow);
+  const heartRate  = parseIntOrNull(blood?.rate);
+  const weight     = parseFloatOrNull(hw?.weight);
+  const height     = parseFloatOrNull(hw?.height);
+  const bmi        = parseFloatOrNull(hw?.bmi);
+  const temperature = parseFloatOrNull(data.tiwen);
+
+  const extraMetrics: string[] = [];
+  const spO2val = parseFloatOrNull(spo2?.sp);
+  if (spO2val !== null)                                   extraMetrics.push(`SpO2: ${spO2val}%`);
+  const bodyFatRate = parseFloatOrNull(data.fat?.zflv);
+  if (bodyFatRate !== null)                               extraMetrics.push(`Body Fat: ${bodyFatRate}%`);
+  const muscleRate = parseFloatOrNull(data.fat?.jrlv);
+  if (muscleRate !== null)                                extraMetrics.push(`Muscle Rate: ${muscleRate}%`);
+  const visceralFat = parseFloatOrNull(data.fat?.nzzf);
+  if (visceralFat !== null)                               extraMetrics.push(`Visceral Fat Grade: ${visceralFat}`);
+  const basalMetab = parseFloatOrNull(data.fat?.jcdx);
+  if (basalMetab !== null)                                extraMetrics.push(`Basal Metabolism: ${basalMetab} kcal`);
+  const bodyWaterRate = parseFloatOrNull(data.fat?.tsflv);
+  if (bodyWaterRate !== null)                             extraMetrics.push(`Body Water Rate: ${bodyWaterRate}%`);
+  const proteinRate = parseFloatOrNull(data.fat?.dbzlv);
+  if (proteinRate !== null)                               extraMetrics.push(`Protein Rate: ${proteinRate}%`);
+  const boneMass = parseFloatOrNull(data.fat?.gl);
+  if (boneMass !== null)                                  extraMetrics.push(`Bone Mass: ${boneMass} kg`);
+  const bloodSugar = parseFloatOrNull(data.xt?.value);
+  if (bloodSugar !== null)                                extraMetrics.push(`Blood Sugar: ${bloodSugar} mmol/L`);
+  const uricAcid = parseFloatOrNull(data.ns);
+  if (uricAcid !== null)                                  extraMetrics.push(`Uric Acid: ${uricAcid} mmol/L`);
+  const cholesterol = parseFloatOrNull(data.dgc);
+  if (cholesterol !== null)                               extraMetrics.push(`Cholesterol: ${cholesterol} mmol/L`);
+  const whr = parseFloatOrNull(data.ytb?.whr);
+  if (whr !== null)                                       extraMetrics.push(`Waist-Hip Ratio: ${whr}`);
+  const waist = parseFloatOrNull(data.ytb?.waist);
+  if (waist !== null)                                     extraMetrics.push(`Waist: ${waist} cm`);
+  const hip = parseFloatOrNull(data.ytb?.hip);
+  if (hip !== null)                                       extraMetrics.push(`Hip: ${hip} cm`);
+  const pef = parseFloatOrNull(data.fgn?.pef);
+  if (pef !== null)                                       extraMetrics.push(`PEF: ${pef} L/min`);
+  const fev1 = parseFloatOrNull(data.fgn?.fev1);
+  if (fev1 !== null)                                      extraMetrics.push(`FEV1: ${fev1} L`);
+  const fvc = parseFloatOrNull(data.fgn?.fvc);
+  if (fvc !== null)                                       extraMetrics.push(`FVC: ${fvc} L`);
+  if (data.examNo)                                        extraMetrics.push(`Exam No: ${data.examNo}`);
+  if (deviceId)                                           extraMetrics.push(`Device: ${deviceId}`);
+
+  const notes = extraMetrics.length > 0 ? extraMetrics.join(" | ") : null;
+
+  await db.insert(healthReadings).values({
+    userId,
+    kioskId: resolvedKioskId ?? (deviceId ?? "unknown"),
+    bloodPressureSystolic:  systolic    ?? undefined,
+    bloodPressureDiastolic: diastolic   ?? undefined,
+    heartRate:              heartRate   ?? undefined,
+    weight:      weight      !== null ? String(weight)      : undefined,
+    height:      height      !== null ? String(height)      : undefined,
+    bmi:         bmi         !== null ? String(bmi)         : undefined,
+    temperature: temperature !== null ? String(temperature) : undefined,
+    notes:       notes       ?? undefined,
+    recordedAt:  new Date(),
+  });
+
+  return { success: true, userId };
+}
+
 function parseFloatOrNull(val: string | undefined): number | null {
   if (!val) return null;
   // Machine sends values as "value#result_prompt#reference_range" — take first part
@@ -221,6 +342,113 @@ export const kioskIntegrationRouter = router({
       });
 
       return { token, expiresAt };
+    }),
+
+  /**
+   * Send a simulated machine measurement for the current user.
+   * Generates realistic fake health data and posts it directly to the data-upload handler,
+   * exactly as a real TRIPLEBIGHT machine would. Useful for testing the full flow without hardware.
+   */
+  sendTestMeasurement: protectedProcedure
+    .input(z.object({
+      /** Optional: provide a confirmed session token to use. If omitted, a fresh one is created. */
+      sessionToken: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      // If no token provided, create a fresh active session for this user
+      let token = input.sessionToken;
+      if (!token) {
+        token = crypto.randomBytes(16).toString("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+        await db.insert(kioskSessions).values({
+          token,
+          deviceId: "TEST_DEVICE",
+          userId: ctx.user.id,
+          status: "active",
+          expiresAt,
+        });
+      }
+
+      // Generate realistic randomised health metrics within normal ranges
+      const systolic  = Math.floor(Math.random() * 30 + 110);  // 110–140 mmHg
+      const diastolic = Math.floor(Math.random() * 20 + 65);   // 65–85 mmHg
+      const heartRate = Math.floor(Math.random() * 30 + 60);   // 60–90 bpm
+      const weight    = (Math.random() * 40 + 55).toFixed(1);  // 55–95 kg
+      const height    = (Math.random() * 30 + 155).toFixed(1); // 155–185 cm
+      const bmi       = (parseFloat(weight) / Math.pow(parseFloat(height) / 100, 2)).toFixed(1);
+      const temp      = (Math.random() * 1.5 + 36.0).toFixed(1); // 36.0–37.5 °C
+      const spO2      = Math.floor(Math.random() * 4 + 96);    // 96–100%
+      const bodyFat   = (Math.random() * 15 + 15).toFixed(1);  // 15–30%
+      const muscle    = (Math.random() * 15 + 35).toFixed(1);  // 35–50%
+      const bloodSugar = (Math.random() * 2.5 + 4.0).toFixed(1); // 4.0–6.5 mmol/L
+
+      // Build the exact payload the machine would send
+      const machinePayload = {
+        sessionToken: token,
+        deviceID: "TEST_DEVICE",
+        examNo: `TEST-${Date.now()}`,
+        hw: {
+          height: String(height),
+          weight: String(weight),
+          bmi: String(bmi),
+        },
+        blood: {
+          high: String(systolic),
+          low: String(diastolic),
+          rate: String(heartRate),
+        },
+        spo2: { sp: String(spO2) },
+        tiwen: String(temp),
+        fat: {
+          zflv: String(bodyFat),
+          jrlv: String(muscle),
+          nzzf: String(Math.floor(Math.random() * 5 + 5)),
+          jcdx: String(Math.floor(Math.random() * 400 + 1400)),
+          tsflv: String((Math.random() * 10 + 50).toFixed(1)),
+          dbzlv: String((Math.random() * 5 + 15).toFixed(1)),
+          gl: String((Math.random() * 1 + 2.5).toFixed(1)),
+        },
+        xt: { value: String(bloodSugar) },
+        ytb: {
+          waist: String((Math.random() * 20 + 70).toFixed(1)),
+          hip: String((Math.random() * 15 + 85).toFixed(1)),
+          whr: String((Math.random() * 0.15 + 0.75).toFixed(2)),
+        },
+      };
+
+      // Parse and save via the shared core logic (same path as the real machine)
+      const parsed = KioskDataSchema.safeParse(machinePayload);
+      if (!parsed.success) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to build test payload" });
+      }
+
+      const result = await saveKioskMeasurement(parsed.data, db);
+      if (!result.success) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to save test measurement — session may have expired",
+        });
+      }
+
+      return {
+        success: true,
+        metrics: {
+          height: parseFloat(height),
+          weight: parseFloat(weight),
+          bmi: parseFloat(bmi),
+          systolic,
+          diastolic,
+          heartRate,
+          temperature: parseFloat(temp),
+          spO2,
+          bodyFatRate: parseFloat(bodyFat),
+          muscleRate: parseFloat(muscle),
+          bloodSugar: parseFloat(bloodSugar),
+        },
+      };
     }),
 
   /**
@@ -459,152 +687,21 @@ export async function handleKioskData(req: any, res: any) {
     }
 
     const data = parsed.data;
-    const sessionToken = data.sessionToken;
-    const deviceId = data.deviceID;
 
-    if (!sessionToken && !deviceId) {
+    if (!data.sessionToken && !data.deviceID) {
       return res.status(400).json({ code: "0", msg: "sessionToken or deviceID required" });
     }
 
     const db = await getDb();
     if (!db) return res.status(500).json({ code: "0", msg: "Database unavailable" });
 
-    // ── Resolve userId from session token ──────────────────────────────────
+    const result = await saveKioskMeasurement(data, db);
 
-    let userId: number | null = null;
-    let resolvedKioskId: string | null = null;
-
-    if (sessionToken) {
-      const [session] = await db
-        .select()
-        .from(kioskSessions)
-        .where(and(
-          eq(kioskSessions.token, sessionToken),
-          eq(kioskSessions.status, "active"),
-          gt(kioskSessions.expiresAt, new Date())
-        ));
-
-      if (!session) {
-        return res.status(401).json({ code: "0", msg: "Invalid or expired session token" });
-      }
-
-      userId = session.userId;
-
-      // Mark session as used so it cannot be reused
-      await db
-        .update(kioskSessions)
-        .set({ status: "used" })
-        .where(eq(kioskSessions.id, session.id));
+    if (!result.success) {
+      return res.status(401).json({ code: "0", msg: "Invalid or expired session token" });
     }
 
-    // Resolve kiosk location from device ID
-    if (deviceId) {
-      const [device] = await db
-        .select()
-        .from(kioskDevices)
-        .where(eq(kioskDevices.deviceId, deviceId));
-
-      if (device?.kioskId) resolvedKioskId = device.kioskId;
-
-      // If no session token was provided, try to find the most recent active session
-      // for this device as a fallback (useful if machine sends deviceID but not token)
-      if (!userId) {
-        const [latestSession] = await db
-          .select()
-          .from(kioskSessions)
-          .where(and(
-            eq(kioskSessions.deviceId, deviceId),
-            eq(kioskSessions.status, "active"),
-            gt(kioskSessions.expiresAt, new Date())
-          ));
-
-        if (latestSession) {
-          userId = latestSession.userId;
-          await db
-            .update(kioskSessions)
-            .set({ status: "used" })
-            .where(eq(kioskSessions.id, latestSession.id));
-        }
-      }
-    }
-
-    if (!userId) {
-      return res.status(401).json({ code: "0", msg: "Could not identify user from session" });
-    }
-
-    // ── Map machine fields to health_readings schema ───────────────────────
-
-    const hw = data.hw;
-    const blood = data.blood;
-    const spo2 = data.spo2;
-
-    // Blood pressure: prefer left arm (high/low), fallback to right arm (rhigh/rlow)
-    const systolic   = parseIntOrNull(blood?.high)  ?? parseIntOrNull(blood?.rhigh);
-    const diastolic  = parseIntOrNull(blood?.low)   ?? parseIntOrNull(blood?.rlow);
-    const heartRate  = parseIntOrNull(blood?.rate);
-    const weight     = parseFloatOrNull(hw?.weight);
-    const height     = parseFloatOrNull(hw?.height);
-    const bmi        = parseFloatOrNull(hw?.bmi);
-    const temperature = parseFloatOrNull(data.tiwen);
-
-    // Collect extended metrics into the notes field
-    const extraMetrics: string[] = [];
-    const spO2 = parseFloatOrNull(spo2?.sp);
-    if (spO2 !== null)                                   extraMetrics.push(`SpO2: ${spO2}%`);
-    const bodyFatRate = parseFloatOrNull(data.fat?.zflv);
-    if (bodyFatRate !== null)                            extraMetrics.push(`Body Fat: ${bodyFatRate}%`);
-    const muscleRate = parseFloatOrNull(data.fat?.jrlv);
-    if (muscleRate !== null)                             extraMetrics.push(`Muscle Rate: ${muscleRate}%`);
-    const visceralFat = parseFloatOrNull(data.fat?.nzzf);
-    if (visceralFat !== null)                            extraMetrics.push(`Visceral Fat Grade: ${visceralFat}`);
-    const basalMetab = parseFloatOrNull(data.fat?.jcdx);
-    if (basalMetab !== null)                             extraMetrics.push(`Basal Metabolism: ${basalMetab} kcal`);
-    const bodyWaterRate = parseFloatOrNull(data.fat?.tsflv);
-    if (bodyWaterRate !== null)                          extraMetrics.push(`Body Water Rate: ${bodyWaterRate}%`);
-    const proteinRate = parseFloatOrNull(data.fat?.dbzlv);
-    if (proteinRate !== null)                            extraMetrics.push(`Protein Rate: ${proteinRate}%`);
-    const boneMass = parseFloatOrNull(data.fat?.gl);
-    if (boneMass !== null)                               extraMetrics.push(`Bone Mass: ${boneMass} kg`);
-    const bloodSugar = parseFloatOrNull(data.xt?.value);
-    if (bloodSugar !== null)                             extraMetrics.push(`Blood Sugar: ${bloodSugar} mmol/L`);
-    const uricAcid = parseFloatOrNull(data.ns);
-    if (uricAcid !== null)                               extraMetrics.push(`Uric Acid: ${uricAcid} mmol/L`);
-    const cholesterol = parseFloatOrNull(data.dgc);
-    if (cholesterol !== null)                            extraMetrics.push(`Cholesterol: ${cholesterol} mmol/L`);
-    const whr = parseFloatOrNull(data.ytb?.whr);
-    if (whr !== null)                                    extraMetrics.push(`Waist-Hip Ratio: ${whr}`);
-    const waist = parseFloatOrNull(data.ytb?.waist);
-    if (waist !== null)                                  extraMetrics.push(`Waist: ${waist} cm`);
-    const hip = parseFloatOrNull(data.ytb?.hip);
-    if (hip !== null)                                    extraMetrics.push(`Hip: ${hip} cm`);
-    const pef = parseFloatOrNull(data.fgn?.pef);
-    if (pef !== null)                                    extraMetrics.push(`PEF: ${pef} L/min`);
-    const fev1 = parseFloatOrNull(data.fgn?.fev1);
-    if (fev1 !== null)                                   extraMetrics.push(`FEV1: ${fev1} L`);
-    const fvc = parseFloatOrNull(data.fgn?.fvc);
-    if (fvc !== null)                                    extraMetrics.push(`FVC: ${fvc} L`);
-    if (data.examNo)                                     extraMetrics.push(`Exam No: ${data.examNo}`);
-    if (deviceId)                                        extraMetrics.push(`Device: ${deviceId}`);
-
-    const notes = extraMetrics.length > 0 ? extraMetrics.join(" | ") : null;
-
-    // ── Insert health reading ──────────────────────────────────────────────
-
-    await db.insert(healthReadings).values({
-      userId,
-      kioskId: resolvedKioskId ?? (deviceId ?? "unknown"),
-      bloodPressureSystolic:  systolic    ?? undefined,
-      bloodPressureDiastolic: diastolic   ?? undefined,
-      heartRate:              heartRate   ?? undefined,
-      weight:      weight      !== null ? String(weight)      : undefined,
-      height:      height      !== null ? String(height)      : undefined,
-      bmi:         bmi         !== null ? String(bmi)         : undefined,
-      temperature: temperature !== null ? String(temperature) : undefined,
-      notes:       notes       ?? undefined,
-      recordedAt:  new Date(),
-    });
-
-    console.log(`[KioskData] Saved reading for userId=${userId}, device=${deviceId ?? "n/a"}`);
+    console.log(`[KioskData] Saved reading for userId=${result.userId}, device=${data.deviceID ?? "n/a"}`);
     return res.json({ code: "1", msg: "successful" });
 
   } catch (err) {

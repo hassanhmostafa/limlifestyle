@@ -29,6 +29,10 @@
 - [x] KioskLogin page at /kiosk-login — QR scan landing page for users to confirm identity
 - [x] kioskSessions table with 'pending' status for machine-initiated tokens
 
+## Machine Integration (New Features — continued)
+- [x] createTestSession tRPC procedure — generates a real session token for testing without a physical machine
+- [x] KioskLogin no-token screen redesigned as Test Mode — shows how-it-works steps + Start Test Session button
+
 ## Pending / Future
 - [ ] Configure machine to point to new Manus Space URL (requires physical access to machine settings)
 - [ ] Test end-to-end QR login flow with actual TRIPLEBIGHT hardware
