@@ -312,10 +312,12 @@ export const kioskIntegrationRouter = router({
       }),
     }))
     .mutation(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const [session] = await db.select().from(kioskSessions).where(and(eq(kioskSessions.token, input.sessionToken), eq(kioskSessions.status, "active"), gt(kioskSessions.expiresAt, new Date())));
-      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found or expired." });
+     const db = await getDb();
+     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      // Look up the session by token regardless of status — it may already be "used" because
+      // saveKioskMeasurement consumes it. We only need the userId and deviceId.
+      const [session] = await db.select().from(kioskSessions).where(eq(kioskSessions.token, input.sessionToken));
+      if (!session || !session.userId) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
       const resultsToken = crypto.randomBytes(8).toString("hex");
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await db.insert(kioskSessions).values({ token: `results:${resultsToken}`, deviceId: session.deviceId, userId: session.userId, status: "pending", expiresAt });
