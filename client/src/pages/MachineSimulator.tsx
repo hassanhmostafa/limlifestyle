@@ -410,37 +410,61 @@ export default function MachineSimulator() {
                 </p>
 
                 {testMetrics ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Data sent successfully!
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      {[
-                        { label: "Blood Pressure", value: `${testMetrics.systolic}/${testMetrics.diastolic} mmHg` },
-                        { label: "Heart Rate", value: `${testMetrics.heartRate} bpm` },
-                        { label: "Weight", value: `${testMetrics.weight} kg` },
-                        { label: "Height", value: `${testMetrics.height} cm` },
-                        { label: "BMI", value: String(testMetrics.bmi) },
-                        { label: "SpO2", value: `${testMetrics.spO2}%` },
-                        { label: "Blood Sugar", value: `${testMetrics.bloodSugar} mmol/L` },
-                        { label: "Body Fat", value: `${testMetrics.bodyFatRate}%` },
-                      ].map(({ label, value }) => (
-                        <div key={label} className="bg-gray-800 rounded-lg p-2">
-                          <p className="text-gray-500 text-xs">{label}</p>
-                          <p className="font-semibold text-white text-sm">{value}</p>
+                 <div className="space-y-3">
+                   <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
+                     <CheckCircle2 className="w-4 h-4" />
+                     Data sent successfully!
+                   </div>
+                   <div className="grid grid-cols-2 gap-2 text-xs">
+                     {[
+                       { label: "Blood Pressure", value: `${testMetrics.systolic}/${testMetrics.diastolic} mmHg` },
+                       { label: "Heart Rate", value: `${testMetrics.heartRate} bpm` },
+                       { label: "Weight", value: `${testMetrics.weight} kg` },
+                       { label: "Height", value: `${testMetrics.height} cm` },
+                       { label: "BMI", value: String(testMetrics.bmi) },
+                       { label: "SpO2", value: `${testMetrics.spO2}%` },
+                       { label: "Blood Sugar", value: `${testMetrics.bloodSugar} mmol/L` },
+                       { label: "Body Fat", value: `${testMetrics.bodyFatRate}%` },
+                     ].map(({ label, value }) => (
+                       <div key={label} className="bg-gray-800 rounded-lg p-2">
+                         <p className="text-gray-500 text-xs">{label}</p>
+                         <p className="font-semibold text-white text-sm">{value}</p>
+                       </div>
+                     ))}
+                   </div>
+                    {/* Results QR — phone scans this to receive results */}
+                    <div className="border-t border-gray-700 pt-3 space-y-3">
+                      <p className="text-white text-sm font-semibold text-center">
+                        امسح رمز الاستجابة السريعة لإرساله إلى هاتفك المحمول
+                      </p>
+                      <p className="text-gray-400 text-xs text-center">
+                        Scan this QR with the Tech Care app to receive your results
+                      </p>
+                      {storeResultsMutation.isPending ? (
+                        <div className="flex items-center justify-center gap-2 text-cyan-400 py-4">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span className="text-sm">Generating results QR…</span>
                         </div>
-                      ))}
+                      ) : resultsToken ? (
+                        <div className="space-y-2">
+                          <div className="flex justify-center">
+                            <div className="bg-white p-3 rounded-xl inline-block shadow-lg">
+                              <QRCodeSVG value={resultsQrUrl} size={200} level="M" includeMargin={false} />
+                            </div>
+                          </div>
+                          <p className="text-gray-600 text-xs break-all text-center">{resultsQrUrl}</p>
+                        </div>
+                      ) : null}
+                      <Button
+                        className="w-full bg-gray-700 hover:bg-gray-600 text-white h-9 text-sm"
+                        onClick={() => printHealthReceipt(testMetrics!, confirmedUser)}
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Print Health Receipt
+                      </Button>
                     </div>
-                    <Button
-                      className="w-full bg-gray-700 hover:bg-gray-600 text-white h-9 text-sm"
-                      onClick={() => printHealthReceipt(testMetrics!, confirmedUser)}
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Print Health Receipt
-                    </Button>
-                  </div>
-                ) : (
+                 </div>
+               ) : (
                   <Button
                     className="w-full bg-amber-500 hover:bg-amber-600 text-white h-10"
                     onClick={() => testMeasurementMutation.mutate({ sessionToken: token ?? undefined })}
