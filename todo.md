@@ -74,3 +74,15 @@
 - [x] Add "Measure Without Account" button to MachineSimulator idle screen
 - [x] Guest mode confirmed state: show metrics inline + Print Receipt button only (no user identity, no DB save)
 - [x] TypeScript check, commit, checkpoint
+
+## Two-Scan Flow Redesign
+- [x] Phone QR display page: show a QR code the machine can scan to identify the user (encodes userId or a short login token)
+- [x] Server: generateUserQR procedure — creates a short-lived login token tied to the user, returns it for display
+- [x] Server: claimUserQR procedure — machine calls this with the token to get the user identity (replaces old WeChat polling)
+- [x] Machine simulator: replace manual entry with QR scanner UI at the start (simulates machine scanning phone QR)
+- [x] Machine simulator: after results, display a QR code the phone can scan to receive results (encodes a results token)
+- [x] Server: storeResults procedure — saves measurement results under a results token (called by simulator after measurement)
+- [x] Server: claimResults procedure — phone calls this with the results token to fetch and save the data to the user's account
+- [x] Phone results-receive page: /kiosk-results?token=... — scans or opens the results QR, fetches data, saves to account, shows summary
+- [x] Update Connect Kiosk nav link to "My QR Code" pointing to /kiosk-qr
+- [x] TypeScript check, commit, checkpoint

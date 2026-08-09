@@ -266,7 +266,96 @@ const KioskDataSchema = z.object({
 export const kioskIntegrationRouter = router({
 
   /**
-   * Called by the Tech Care app after the user scans the machine's QR code.
+   * TWO-SCAN FLOW — Step 1a (Phone → App):
+   * Generates a short-lived login token for the user to display as a QR on their phone.
+   * The machine scans this QR and calls claimUserQR to get the user identity.
+   */
+  generateUserQR: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const token = crypto.randomBytes(8).toString("hex");
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+      await db.insert(kioskSessions).values({ token, deviceId: "PHONE_QR", userId: ctx.user.id, status: "active", expiresAt });
+      return { token, expiresAt };
+    }),
+
+  /**
+   * TWO-SCAN FLOW — Step 1b (Machine → Server):
+   * Machine calls this after scanning the phone QR. Returns user identity.
+   */
+  claimUserQR: publicProcedure
+    .input(z.object({ token: z.string().min(1), deviceId: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [session] = await db.select().from(kioskSessions).where(and(eq(kioskSessions.token, input.token), eq(kioskSessions.status, "active"), gt(kioskSessions.expiresAt, new Date())));
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Token not found or expired." });
+      if (input.deviceId) await db.update(kioskSessions).set({ deviceId: input.deviceId }).where(eq(kioskSessions.id, session.id));
+      const { users } = await import("../../drizzle/schema");
+      const [user] = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, session.userId));
+      return { success: true, user: user ?? null, sessionToken: session.token };
+    }),
+
+  /**
+   * TWO-SCAN FLOW — Step 3a (Simulator → Server after measurements):
+   * Stores measurement results under a results token. Machine displays QR with this token.
+   */
+  storeResults: publicProcedure
+    .input(z.object({
+      sessionToken: z.string().min(1),
+      metrics: z.object({
+        height: z.number().optional(), weight: z.number().optional(), bmi: z.number().optional(),
+        systolic: z.number().optional(), diastolic: z.number().optional(), heartRate: z.number().optional(),
+        temperature: z.number().optional(), spO2: z.number().optional(),
+        bodyFatRate: z.number().optional(), muscleRate: z.number().optional(), bloodSugar: z.number().optional(),
+      }),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [session] = await db.select().from(kioskSessions).where(and(eq(kioskSessions.token, input.sessionToken), eq(kioskSessions.status, "active"), gt(kioskSessions.expiresAt, new Date())));
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found or expired." });
+      const resultsToken = crypto.randomBytes(8).toString("hex");
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      await db.insert(kioskSessions).values({ token: `results:${resultsToken}`, deviceId: session.deviceId, userId: session.userId, status: "pending", expiresAt });
+      const m = input.metrics;
+      await db.insert(healthReadings).values({
+        userId: session.userId,
+        kioskId: `RESULTS_PENDING:${resultsToken}`,
+        bloodPressureSystolic: m.systolic ?? undefined,
+        bloodPressureDiastolic: m.diastolic ?? undefined,
+        heartRate: m.heartRate ?? undefined,
+        weight: m.weight !== undefined ? String(m.weight) : undefined,
+        height: m.height !== undefined ? String(m.height) : undefined,
+        bmi: m.bmi !== undefined ? String(m.bmi) : undefined,
+        temperature: m.temperature !== undefined ? String(m.temperature) : undefined,
+        notes: [m.spO2 !== undefined ? `SpO2: ${m.spO2}%` : null, m.bodyFatRate !== undefined ? `Body Fat: ${m.bodyFatRate}%` : null, m.muscleRate !== undefined ? `Muscle Rate: ${m.muscleRate}%` : null, m.bloodSugar !== undefined ? `Blood Sugar: ${m.bloodSugar} mmol/L` : null].filter(Boolean).join(" | ") || undefined,
+        recordedAt: new Date(),
+      });
+      return { resultsToken };
+    }),
+
+  /**
+   * TWO-SCAN FLOW — Step 3b (Phone → Server after scanning machine QR):
+   * Phone calls this with the results token. Marks reading as claimed, returns data.
+   */
+  claimResults: protectedProcedure
+    .input(z.object({ resultsToken: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const { healthReadings: hr } = await import("../../drizzle/schema");
+      const [reading] = await db.select().from(hr).where(eq(hr.kioskId, `RESULTS_PENDING:${input.resultsToken}`));
+      if (!reading) throw new TRPCError({ code: "NOT_FOUND", message: "Results not found or already claimed." });
+      if (reading.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "These results belong to a different account." });
+      await db.update(hr).set({ kioskId: "KIOSK_DEVICE" }).where(eq(hr.id, reading.id));
+      await db.update(kioskSessions).set({ status: "used" }).where(eq(kioskSessions.token, `results:${input.resultsToken}`));
+      return { success: true, reading: { id: reading.id, bloodPressureSystolic: reading.bloodPressureSystolic, bloodPressureDiastolic: reading.bloodPressureDiastolic, heartRate: reading.heartRate, weight: reading.weight, height: reading.height, bmi: reading.bmi, temperature: reading.temperature, notes: reading.notes, recordedAt: reading.recordedAt } };
+    }),
+
+  /**
+   * LEGACY — Called by the Tech Care app after the user scans the machine's QR code.
    * Links the machine's random token to the logged-in user's account.
    * After this, the machine's polling endpoint (/weixin/login/xcx) will return success.
    */

@@ -10,7 +10,7 @@
  * Open this page on a laptop/desktop. Scan the QR with your phone.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 // ── Standalone PDF receipt generator (no app branding, machine-side printout) ──
 type ReceiptMetrics = {
@@ -127,21 +127,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { Link } from "wouter";
-import { CheckCircle2, Stethoscope, Printer, Loader2, FlaskConical } from "lucide-react";
+import { CheckCircle2, Stethoscope, Printer, Loader2, FlaskConical, Camera } from "lucide-react";
 import { toast } from "sonner";
 
-type SimulatorState = "idle" | "waiting" | "confirmed" | "expired" | "guest";
+import { useRef } from "react";
+import { Link } from "wouter";
+
+type SimulatorState = "idle" | "scanning" | "confirmed" | "results" | "guest";
 
 export default function MachineSimulator() {
   const { user, loading: authLoading } = useAuth();
 
   const [state, setState] = useState<SimulatorState>("idle");
   const [token, setToken] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [confirmedUser, setConfirmedUser] = useState<{ name: string | null; email: string | null } | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(60);
-  const [pollingEnabled, setPollingEnabled] = useState(false);
+  const [resultsToken, setResultsToken] = useState<string | null>(null);
+  const [scannerActive, setScannerActive] = useState(false);
+  const [scannerError, setScannerError] = useState("");
+  const scannerRef = useRef<any>(null);
+  const scannerDivId = "machine-qr-scanner";
 
   type TestMetrics = {
     height: number; weight: number; bmi: number;
@@ -151,10 +155,35 @@ export default function MachineSimulator() {
   } | null;
   const [testMetrics, setTestMetrics] = useState<TestMetrics>(null);
 
+  const claimUserQRMutation = trpc.kioskIntegration.claimUserQR.useMutation({
+    onSuccess: (data) => {
+      stopScanner();
+      if (data.user) {
+        setConfirmedUser(data.user as { name: string | null; email: string | null });
+        setToken(data.sessionToken);
+        setState("confirmed");
+        toast.success(`User identified: ${data.user.name ?? data.user.email}`);
+      } else {
+        toast.error("User not found for this token.");
+        setState("scanning");
+      }
+    },
+    onError: (err) => {
+      stopScanner();
+      toast.error(err.message);
+      setState("scanning");
+    },
+  });
+
+  const storeResultsMutation = trpc.kioskIntegration.storeResults.useMutation({
+    onSuccess: (data) => { setResultsToken(data.resultsToken); setState("results"); },
+    onError: (err) => { toast.error(err.message); },
+  });
+
   const testMeasurementMutation = trpc.kioskIntegration.sendTestMeasurement.useMutation({
     onSuccess: (data) => {
       setTestMetrics(data.metrics);
-      toast.success("Test measurement sent! Check the Health Dashboard.");
+      if (token) storeResultsMutation.mutate({ sessionToken: token, metrics: data.metrics });
     },
     onError: (err) => {
       toast.error(err.message);
@@ -164,81 +193,64 @@ export default function MachineSimulator() {
   const guestMeasurementMutation = trpc.kioskIntegration.guestMeasurement.useMutation({
     onSuccess: (data) => {
       setTestMetrics(data.metrics);
+      setState("results");
     },
     onError: (err) => {
       toast.error(err.message);
     },
   });
 
-  const generateToken = trpc.kioskIntegration.generateMachineToken.useMutation();
-
-  // Poll every second when we have a token
-  const pollQuery = trpc.kioskIntegration.pollSessionStatus.useQuery(
-    { token: token ?? "" },
-    {
-      enabled: pollingEnabled && !!token,
-      refetchInterval: 1000,
-      refetchIntervalInBackground: true,
+  const startScanner = async () => {
+    setScannerError("");
+    setScannerActive(true);
+    const { Html5Qrcode } = await import("html5-qrcode");
+    const scanner = new Html5Qrcode(scannerDivId);
+    scannerRef.current = scanner;
+    try {
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText: string) => {
+          const raw = decodedText.trim();
+          let loginToken = raw;
+          try { const url = new URL(raw); loginToken = url.searchParams.get("token") ?? raw; } catch { /* not a URL */ }
+          stopScanner();
+          claimUserQRMutation.mutate({ token: loginToken, deviceId: "SIMULATOR" });
+        },
+        () => {}
+      );
+    } catch {
+      setScannerActive(false);
+      setScannerError("Could not access camera. Please allow camera access.");
     }
-  );
+  };
 
-  // React to poll results
-  useEffect(() => {
-    if (!pollQuery.data) return;
-    if (pollQuery.data.confirmed && pollQuery.data.user) {
-      setConfirmedUser(pollQuery.data.user as { name: string | null; email: string | null });
-      setState("confirmed");
-      setPollingEnabled(false);
-    } else if (pollQuery.data.expired) {
-      setState("expired");
-      setPollingEnabled(false);
-    }
-  }, [pollQuery.data]);
+  const stopScanner = () => {
+    if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
+    setScannerActive(false);
+  };
 
-  // Countdown timer
-  useEffect(() => {
-    if (state !== "waiting" || !expiresAt) return;
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.round((expiresAt.getTime() - Date.now()) / 1000));
-      setSecondsLeft(remaining);
-      if (remaining === 0) {
-        setState("expired");
-        setPollingEnabled(false);
-        clearInterval(interval);
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [state, expiresAt]);
+  useEffect(() => { return () => { stopScanner(); }; }, []);
 
   const handleGuestMode = () => {
     setState("guest");
     setToken(null);
     setConfirmedUser(null);
-    setPollingEnabled(false);
     setTestMetrics(null);
+    setResultsToken(null);
   };
 
   const handleStart = async () => {
     setState("idle");
     setToken(null);
     setConfirmedUser(null);
-    setPollingEnabled(false);
-    setSecondsLeft(60);
     setTestMetrics(null);
-
-    try {
-      const result = await generateToken.mutateAsync({ deviceId: "SIMULATOR" });
-      setToken(result.token);
-      setExpiresAt(new Date(result.expiresAt));
-      setState("waiting");
-      setPollingEnabled(true);
-    } catch (e) {
-      console.error(e);
-    }
+    setResultsToken(null);
+    setScannerError("");
   };
 
-  const qrUrl = token
-    ? `${window.location.origin}/kiosk-login?token=${token}`
+  const resultsQrUrl = resultsToken
+    ? `${window.location.origin}/kiosk-results?token=${resultsToken}`
     : "";
 
   if (authLoading) {
@@ -282,17 +294,15 @@ export default function MachineSimulator() {
                 <h2 className="text-white text-2xl font-bold mb-2">Health Kiosk Ready</h2>
                 <p className="text-gray-400 text-sm">
                   Press the button below to simulate the machine generating a session QR code.
-                  Then scan it with your phone to test the full login flow.
-                </p>
-              </div>
-              <Button
-                onClick={handleStart}
-                disabled={generateToken.isPending}
-                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white text-lg py-6"
-              >
-                {generateToken.isPending ? <Spinner className="mr-2" /> : null}
-                Touch to Start Session
-              </Button>
+                  The machine will scan the QR code displayed on the user's phone.
+              </p>
+            </div>
+            <Button
+              onClick={() => setState("scanning")}
+              className="w-full bg-cyan-500 hover:bg-cyan-600 text-white text-lg py-6"
+            >
+              Touch to Start Session
+            </Button>
 
               <div className="relative flex items-center gap-3 mt-2">
                 <div className="flex-1 h-px bg-gray-700" />
@@ -314,63 +324,50 @@ export default function MachineSimulator() {
           </Card>
         )}
 
-        {/* ── WAITING FOR SCAN ── */}
-        {state === "waiting" && token && (
+        {/* ── SCANNING (machine reads phone QR) ── */}
+        {state === "scanning" && (
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="pt-8 pb-8 space-y-6 text-center">
               <div>
-                <h2 className="text-white text-xl font-bold mb-1">Scan with Tech Care App</h2>
+                <h2 className="text-white text-xl font-bold mb-1">Scan User's Phone QR</h2>
                 <p className="text-gray-400 text-sm">
-                  Open the Tech Care app on your phone and scan this QR code.
+                  Ask the user to open the Tech Care app → "My QR Code" and hold their phone up to this camera.
                 </p>
               </div>
 
-              {/* QR Code */}
-              <div className="flex justify-center">
-                <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
-                  <QRCodeSVG
-                    value={qrUrl}
-                    size={220}
-                    level="M"
-                    includeMargin={false}
-                  />
+              {/* Camera viewport */}
+              <div id={scannerDivId} className={`w-full rounded-xl overflow-hidden bg-gray-900 ${scannerActive ? "min-h-[280px]" : "hidden"}`} />
+
+              {scannerError && (
+                <div className="bg-red-900/30 border border-red-800/40 rounded-xl p-3 text-red-400 text-xs">{scannerError}</div>
+              )}
+
+              {claimUserQRMutation.isPending ? (
+                <div className="flex items-center justify-center gap-2 text-cyan-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Identifying user…</span>
                 </div>
+              ) : scannerActive ? (
+                <Button variant="outline" className="w-full border-gray-600 text-gray-300" onClick={stopScanner}>
+                  Stop Camera
+                </Button>
+              ) : (
+                <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-12 text-base" onClick={startScanner}>
+                  <Camera className="w-5 h-5 mr-2" />
+                  Activate Camera to Scan
+                </Button>
+              )}
+
+              <div className="bg-gray-900 rounded-xl p-3 text-xs text-gray-500 text-left space-y-1">
+                <p className="font-medium text-gray-400">How it works:</p>
+                <p>1. User opens Tech Care app on their phone</p>
+                <p>2. User goes to "My QR Code" page</p>
+                <p>3. User holds phone up to this machine camera</p>
+                <p>4. Machine identifies the user automatically</p>
               </div>
 
-              {/* Token display — like the machine's screen label */}
-              <div className="font-mono text-xs text-gray-500 space-y-1">
-                <div>Token: <span className="text-cyan-400">{token}</span></div>
-                <div className="text-gray-600 text-xs break-all">{qrUrl}</div>
-              </div>
-
-              {/* Countdown */}
-              <div className="flex items-center justify-center gap-3">
-                <div
-                  className={`w-12 h-12 rounded-full border-4 flex items-center justify-center text-lg font-bold font-mono transition-colors ${
-                    secondsLeft > 20
-                      ? "border-cyan-500 text-cyan-400"
-                      : secondsLeft > 10
-                      ? "border-yellow-500 text-yellow-400"
-                      : "border-red-500 text-red-400"
-                  }`}
-                >
-                  {secondsLeft}
-                </div>
-                <div className="text-gray-400 text-sm">seconds remaining</div>
-              </div>
-
-              {/* Polling indicator */}
-              <div className="flex items-center justify-center gap-2 text-gray-500 text-xs">
-                <span className="inline-block w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                Polling for confirmation every second…
-              </div>
-
-              <Button
-                variant="ghost"
-                onClick={handleStart}
-                className="text-gray-500 hover:text-white text-sm"
-              >
-                Regenerate QR
+              <Button variant="ghost" onClick={handleStart} className="text-gray-500 hover:text-white text-sm">
+                Cancel
               </Button>
             </CardContent>
           </Card>
@@ -539,22 +536,50 @@ export default function MachineSimulator() {
         )}
 
         {/* ── EXPIRED ── */}
-        {state === "expired" && (
+        {/* ── RESULTS QR (machine shows QR for phone to scan) ── */}
+        {state === "results" && (
           <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="pt-10 pb-10 space-y-6 text-center">
-              <div className="text-5xl">⏱️</div>
+            <CardContent className="pt-8 pb-8 space-y-6 text-center">
+              <div className="text-5xl">📊</div>
               <div>
-                <h2 className="text-white text-xl font-bold mb-1">Session Expired</h2>
+                <h2 className="text-white text-xl font-bold mb-1">Scan to Get Your Results</h2>
                 <p className="text-gray-400 text-sm">
-                  The 60-second window passed without a scan. Start a new session.
+                  Open the Tech Care app on your phone and scan this QR code to receive your results.
                 </p>
               </div>
-              <Button
-                onClick={handleStart}
-                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white"
-              >
-                Try Again
-              </Button>
+
+              {resultsToken ? (
+                <>
+                  <div className="flex justify-center">
+                    <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
+                      <QRCodeSVG value={resultsQrUrl} size={220} level="M" includeMargin={false} />
+                    </div>
+                  </div>
+                  <div className="font-mono text-xs text-gray-500 space-y-1">
+                    <div>امسح رمز الاستجابة السريعة لإرساله إلى هاتفك المحمول</div>
+                    <div className="text-gray-600 text-xs break-all">{resultsQrUrl}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    {testMetrics && (
+                      <Button
+                        className="flex-1 bg-gray-700 hover:bg-gray-600 text-white h-9 text-sm"
+                        onClick={() => printHealthReceipt(testMetrics!, confirmedUser)}
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Print Receipt
+                      </Button>
+                    )}
+                    <Button onClick={handleStart} className={`${testMetrics ? "flex-1" : "w-full"} bg-cyan-500 hover:bg-cyan-600 text-white h-9 text-sm`}>
+                      New Session
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-cyan-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Generating results QR…</span>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

@@ -1,0 +1,320 @@
+/**
+ * KioskResults Page — Step 2 of the two-scan flow
+ *
+ * After the machine finishes measurements it displays a QR code.
+ * The user opens this page (or scans the QR which links here) to claim their results.
+ * Route: /kiosk-results?token=<resultsToken>
+ */
+
+import { useEffect, useState } from "react";
+import { useLocation, useSearch } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Loader2, Heart, CheckCircle2, AlertCircle, Activity,
+  Camera, Keyboard, ArrowRight, QrCode,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useRef } from "react";
+import { getLoginUrl } from "@/const";
+
+type PageState = "loading" | "scan" | "claiming" | "success" | "error";
+type ScanTab = "qr" | "manual";
+
+export default function KioskResults() {
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const { user, loading: authLoading } = useAuth();
+  const { language } = useLanguage();
+  const isAr = language === "ar";
+
+  const params = new URLSearchParams(search);
+  const tokenFromUrl = params.get("token");
+
+  const [pageState, setPageState] = useState<PageState>("loading");
+  const [scanTab, setScanTab] = useState<ScanTab>("qr");
+  const [manualToken, setManualToken] = useState(tokenFromUrl ?? "");
+  const [scannerActive, setScannerActive] = useState(false);
+  const [scannerError, setScannerError] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [claimedReading, setClaimedReading] = useState<any>(null);
+  const scannerRef = useRef<any>(null);
+  const scannerDivId = "results-qr-scanner";
+
+  const claimMutation = trpc.kioskIntegration.claimResults.useMutation({
+    onSuccess: (data) => {
+      stopScanner();
+      setClaimedReading(data.reading);
+      setPageState("success");
+      toast.success(isAr ? "تم استلام نتائجك بنجاح!" : "Results received successfully!");
+    },
+    onError: (err) => {
+      stopScanner();
+      setErrorMessage(err.message);
+      setPageState("error");
+      toast.error(err.message);
+    },
+  });
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      const redirect = tokenFromUrl ? `/kiosk-results?token=${tokenFromUrl}` : "/kiosk-results";
+      navigate(`/login?redirect=${encodeURIComponent(redirect)}`);
+      return;
+    }
+    // If token is in URL, claim immediately
+    if (tokenFromUrl) {
+      claimMutation.mutate({ resultsToken: tokenFromUrl });
+      setPageState("claiming");
+      return;
+    }
+    setPageState("scan");
+  }, [authLoading, user, tokenFromUrl]);
+
+  const startScanner = async () => {
+    setScannerError("");
+    setScannerActive(true);
+    const { Html5Qrcode } = await import("html5-qrcode");
+    const scanner = new Html5Qrcode(scannerDivId);
+    scannerRef.current = scanner;
+    try {
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText: string) => {
+          const raw = decodedText.trim();
+          // Try to extract token from URL
+          try {
+            const url = new URL(raw);
+            const t = url.searchParams.get("token") || url.searchParams.get("resultsToken");
+            if (t) { stopScanner(); claimMutation.mutate({ resultsToken: t }); setPageState("claiming"); return; }
+          } catch { /* not a URL */ }
+          // Raw token string
+          stopScanner();
+          claimMutation.mutate({ resultsToken: raw });
+          setPageState("claiming");
+        },
+        () => {}
+      );
+    } catch {
+      setScannerActive(false);
+      setScannerError(isAr ? "تعذّر الوصول إلى الكاميرا." : "Could not access camera. Please allow camera access.");
+    }
+  };
+
+  const stopScanner = () => {
+    if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
+    setScannerActive(false);
+  };
+
+  useEffect(() => { return () => { stopScanner(); }; }, []);
+  useEffect(() => { if (scanTab !== "qr") stopScanner(); }, [scanTab]);
+
+  const handleManualClaim = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualToken.trim()) return;
+    claimMutation.mutate({ resultsToken: manualToken.trim() });
+    setPageState("claiming");
+  };
+
+  if (pageState === "loading" || pageState === "claiming") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-10 h-10 animate-spin text-cyan-500 mx-auto" />
+          <p className="text-gray-500 text-sm">
+            {isAr ? "جارٍ استلام نتائجك..." : "Receiving your results..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (pageState === "success" && claimedReading) {
+    const r = claimedReading;
+    const metrics = [
+      { label: isAr ? "ضغط الدم" : "Blood Pressure", value: r.bloodPressureSystolic && r.bloodPressureDiastolic ? `${r.bloodPressureSystolic}/${r.bloodPressureDiastolic} mmHg` : "—" },
+      { label: isAr ? "معدل ضربات القلب" : "Heart Rate", value: r.heartRate ? `${r.heartRate} bpm` : "—" },
+      { label: isAr ? "الوزن" : "Weight", value: r.weight ? `${r.weight} kg` : "—" },
+      { label: isAr ? "الطول" : "Height", value: r.height ? `${r.height} cm` : "—" },
+      { label: isAr ? "مؤشر كتلة الجسم" : "BMI", value: r.bmi ?? "—" },
+      { label: isAr ? "درجة الحرارة" : "Temperature", value: r.temperature ? `${r.temperature} °C` : "—" },
+    ];
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-4">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 mb-1">
+              <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
+                <Heart className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+            </div>
+          </div>
+          <Card className="shadow-lg border-0">
+            <CardContent className="pt-6 pb-6 space-y-4">
+              <div className="text-center space-y-2">
+                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-7 h-7 text-green-500" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {isAr ? "تم استلام نتائجك!" : "Results Received!"}
+                </h2>
+                <p className="text-gray-500 text-sm">
+                  {isAr ? "تم حفظ نتائجك في حسابك." : "Your results have been saved to your account."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {metrics.map(({ label, value }) => (
+                  <div key={label} className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-400">{label}</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {r.notes && (
+                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-3">
+                  <div className="flex items-center gap-2 text-cyan-700 text-xs font-medium mb-1">
+                    <Activity className="w-3 h-3" />
+                    {isAr ? "مقاييس إضافية" : "Additional metrics"}
+                  </div>
+                  <p className="text-xs text-gray-600">{r.notes}</p>
+                </div>
+              )}
+
+              <Button
+                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white"
+                onClick={() => navigate("/health")}
+              >
+                {isAr ? "عرض لوحة الصحة الكاملة" : "View Full Health Dashboard"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (pageState === "error") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-lg border-0">
+          <CardContent className="pt-8 pb-8 text-center space-y-4">
+            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle className="w-7 h-7 text-red-500" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800">{isAr ? "حدث خطأ" : "Something went wrong"}</h2>
+            <p className="text-gray-500 text-sm">{errorMessage}</p>
+            <Button variant="outline" onClick={() => setPageState("scan")}>{isAr ? "حاول مجدداً" : "Try Again"}</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Scan screen ──
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-4">
+        <div className="text-center">
+          <div className="inline-flex items-center gap-2 mb-1">
+            <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
+              <Heart className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+          </div>
+        </div>
+
+        <Card className="shadow-lg border-0 overflow-hidden">
+          <CardHeader className="pb-3 text-center">
+            <CardTitle className="text-lg">
+              {isAr ? "استلام نتائج القياسات" : "Receive Measurement Results"}
+            </CardTitle>
+            <CardDescription className="text-sm">
+              {isAr
+                ? "امسح رمز QR المعروض على الجهاز لاستلام نتائجك."
+                : "Scan the QR code displayed on the machine to receive your results."}
+            </CardDescription>
+          </CardHeader>
+
+          {/* Tab switcher */}
+          <div className="flex border-b border-gray-100 mx-6">
+            <button
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors border-b-2 ${scanTab === "qr" ? "border-cyan-500 text-cyan-600" : "border-transparent text-gray-400 hover:text-gray-600"}`}
+              onClick={() => setScanTab("qr")}
+            >
+              <QrCode className="w-4 h-4" />
+              {isAr ? "مسح QR" : "Scan QR"}
+            </button>
+            <button
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors border-b-2 ${scanTab === "manual" ? "border-cyan-500 text-cyan-600" : "border-transparent text-gray-400 hover:text-gray-600"}`}
+              onClick={() => setScanTab("manual")}
+            >
+              <Keyboard className="w-4 h-4" />
+              {isAr ? "إدخال يدوي" : "Manual Entry"}
+            </button>
+          </div>
+
+          <CardContent className="pt-5 pb-6 space-y-4">
+            {scanTab === "qr" && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-500 text-center">
+                  {isAr ? "وجّه الكاميرا نحو رمز QR المعروض على شاشة الجهاز." : "Point your camera at the QR code shown on the machine screen."}
+                </p>
+                <div id={scannerDivId} className={`w-full rounded-xl overflow-hidden bg-gray-900 ${scannerActive ? "min-h-[280px]" : "hidden"}`} />
+                {scannerError && (
+                  <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-600">{scannerError}</p>
+                  </div>
+                )}
+                {scannerActive ? (
+                  <Button variant="outline" className="w-full" onClick={stopScanner}>
+                    {isAr ? "إيقاف الكاميرا" : "Stop Camera"}
+                  </Button>
+                ) : (
+                  <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-11 text-base" onClick={startScanner}>
+                    <Camera className="w-4 h-4 mr-2" />
+                    {isAr ? "تشغيل الكاميرا لمسح QR" : "Activate Camera to Scan QR"}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {scanTab === "manual" && (
+              <form onSubmit={handleManualClaim} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">{isAr ? "رمز النتائج" : "Results Token"}</label>
+                  <input
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    placeholder={isAr ? "أدخل رمز النتائج" : "Enter results token"}
+                    value={manualToken}
+                    onChange={(e) => setManualToken(e.target.value.trim())}
+                    autoComplete="off"
+                    dir="ltr"
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-11" disabled={!manualToken || claimMutation.isPending}>
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  {isAr ? "استلام النتائج" : "Receive Results"}
+                </Button>
+              </form>
+            )}
+
+            <Button variant="ghost" className="w-full text-gray-400 text-sm" onClick={() => navigate("/")}>
+              {isAr ? "العودة للرئيسية" : "Back to Home"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+

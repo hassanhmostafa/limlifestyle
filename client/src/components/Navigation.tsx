@@ -70,14 +70,14 @@ export default function Navigation() {
           )}
 
           {isAuthenticated && (
-            <Link href="/kiosk-login">
+            <Link href="/kiosk-qr">
               <span
                 className={`transition-colors cursor-pointer font-medium flex items-center gap-1 ${
-                  location === "/kiosk-login" ? "text-cyan-600" : "text-gray-700 hover:text-cyan-600"
+                  location === "/kiosk-qr" ? "text-cyan-600" : "text-gray-700 hover:text-cyan-600"
                 }`}
               >
                 <QrCode className="w-4 h-4" />
-                {language === "ar" ? "ربط الجهاز" : "Connect Kiosk"}
+                {language === "ar" ? "رمز QR الخاص بي" : "My QR Code"}
               </span>
             </Link>
           )}
@@ -211,13 +211,13 @@ export default function Navigation() {
             ))}
 
             {isAuthenticated && (
-              <Link href="/kiosk-login">
+              <Link href="/kiosk-qr">
                 <div
                   className="text-gray-700 hover:text-cyan-600 py-2 cursor-pointer font-medium flex items-center gap-1"
                   onClick={() => setIsOpen(false)}
                 >
                   <QrCode className="w-4 h-4" />
-                  {language === "ar" ? "ربط الجهاز" : "Connect Kiosk"}
+                  {language === "ar" ? "رمز QR الخاص بي" : "My QR Code"}
                 </div>
               </Link>
             )}
