@@ -78,28 +78,23 @@ export default function KioskResults() {
   const startScanner = async () => {
     setScannerError("");
     setScannerActive(true);
-    const { Html5Qrcode } = await import("html5-qrcode");
-    const scanner = new Html5Qrcode(scannerDivId);
-    scannerRef.current = scanner;
+    const videoEl = document.getElementById(scannerDivId) as HTMLVideoElement | null;
+    if (!videoEl) { setScannerActive(false); return; }
     try {
-      await scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText: string) => {
-          const raw = decodedText.trim();
-          // Try to extract token from URL
-          try {
-            const url = new URL(raw);
-            const t = url.searchParams.get("token") || url.searchParams.get("resultsToken");
-            if (t) { stopScanner(); claimMutation.mutate({ resultsToken: t }); setPageState("claiming"); return; }
-          } catch { /* not a URL */ }
-          // Raw token string
-          stopScanner();
-          claimMutation.mutate({ resultsToken: raw });
-          setPageState("claiming");
-        },
-        () => {}
-      );
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
+      const reader = new BrowserQRCodeReader();
+      scannerRef.current = reader;
+      const controls = await reader.decodeFromVideoDevice(undefined, videoEl, (result, err) => {
+        if (!result) return;
+        const raw = result.getText().trim();
+        let token = raw;
+        try { const url = new URL(raw); token = url.searchParams.get("token") || url.searchParams.get("resultsToken") || raw; } catch { /* not a URL */ }
+        stopScanner();
+        claimMutation.mutate({ resultsToken: token });
+        setPageState("claiming");
+      });
+      // Store controls so we can stop the stream
+      (scannerRef.current as any).__controls = controls;
     } catch {
       setScannerActive(false);
       setScannerError(isAr ? "تعذّر الوصول إلى الكاميرا." : "Could not access camera. Please allow camera access.");
@@ -107,7 +102,8 @@ export default function KioskResults() {
   };
 
   const stopScanner = () => {
-    if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
+    if (scannerRef.current?.__controls) { try { scannerRef.current.__controls.stop(); } catch { /* ignore */ } }
+    if (scannerRef.current) { scannerRef.current = null; }
     setScannerActive(false);
   };
 
@@ -268,7 +264,7 @@ export default function KioskResults() {
                 <p className="text-sm text-gray-500 text-center">
                   {isAr ? "وجّه الكاميرا نحو رمز QR المعروض على شاشة الجهاز." : "Point your camera at the QR code shown on the machine screen."}
                 </p>
-                <div id={scannerDivId} className={`w-full rounded-xl overflow-hidden bg-gray-900 ${scannerActive ? "min-h-[280px]" : "hidden"}`} />
+                <video id={scannerDivId} className={`w-full rounded-xl overflow-hidden bg-gray-900 object-cover ${scannerActive ? "min-h-[280px]" : "hidden"}`} playsInline muted autoPlay />
                 {scannerError && (
                   <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
                     <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -317,4 +313,3 @@ export default function KioskResults() {
     </div>
   );
 }
-
