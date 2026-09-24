@@ -9,9 +9,9 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleKioskData, handleKioskLoginPoll } from "../routers/kioskIntegration";
-import { seedKiosks, seedHealthReadings, updateUserProfile, getUserByOpenId } from "../db";
+import { handleClinicianParticipantResults, handleClinicianParticipants, handleEventMyResults, handleEventPhoneLogin } from "../routers/eventApi";
+import { seedKiosks, updateUserProfile, getUserByOpenId } from "../db";
 import { SEED_KIOSKS } from "../seed";
-import { SEED_HEALTH_READINGS } from "../seedHealth";
 import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -40,12 +40,9 @@ async function startServer() {
   } catch (err) {
     console.warn("[Seed] Could not seed kiosks:", err);
   }
-  // Seed demo health readings for user id=1 (safe to run multiple times)
-  try {
-    await seedHealthReadings(SEED_HEALTH_READINGS);
-  } catch (err) {
-    console.warn("[Seed] Could not seed health readings:", err);
-  }
+  // Health demo fixtures are intentionally not seeded at runtime. Historic demo
+  // rows remain preserved with source="demo", but repeated server restarts must
+  // never create additional readings in participant histories.
   // Seed demo profile data for the owner user (gender + birthDate for BMI demo)
   try {
     const owner = await getUserByOpenId(ENV.ownerOpenId);
@@ -99,6 +96,24 @@ async function startServer() {
 
   // Kiosk data ingestion endpoint (plain HTTP POST from TRIPLEBIGHT kiosk machines)
   app.post("/api/kiosk/data", handleKioskData);
+
+  // Event applications authenticate a participant by their LIM phone account,
+  // then fetch only that participant's readings with a short-lived Bearer token.
+  app.use(["/api/event", "/api/event-auth"], (_req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Vary", "Origin");
+    next();
+  });
+  app.options("/api/event-auth/phone-login", (_req, res) => res.sendStatus(204));
+  app.options("/api/event/health-readings", (_req, res) => res.sendStatus(204));
+  app.options("/api/event/clinician/participants", (_req, res) => res.sendStatus(204));
+  app.options("/api/event/clinician/participants/:participantUserId/readings", (_req, res) => res.sendStatus(204));
+  app.post("/api/event-auth/phone-login", handleEventPhoneLogin);
+  app.get("/api/event/health-readings", handleEventMyResults);
+  app.get("/api/event/clinician/participants", handleClinicianParticipants);
+  app.get("/api/event/clinician/participants/:participantUserId/readings", handleClinicianParticipantResults);
 
   // tRPC API
   app.use(

@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Cpu, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Cpu, Loader2, ToggleLeft, ToggleRight, KeyRound, Copy } from "lucide-react";
 
 interface DeviceForm {
   deviceId: string;
@@ -42,11 +42,13 @@ export function KioskDevicesTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<DeviceForm>(emptyForm);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [issuedCredential, setIssuedCredential] = useState<{ deviceId: string; apiKey: string } | null>(null);
 
   const registerMutation = trpc.kioskIntegration.registerDevice.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.kioskIntegration.listDevices.invalidate();
-      toast.success("Device registered successfully");
+      setIssuedCredential({ deviceId: form.deviceId, apiKey: data.apiKey });
+      toast.success("Device registered. Copy the upload key now.");
       setShowForm(false);
       setForm(emptyForm);
     },
@@ -60,6 +62,14 @@ export function KioskDevicesTab() {
       setShowForm(false);
       setEditingId(null);
       setForm(emptyForm);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const rotateKeyMutation = trpc.kioskIntegration.rotateDeviceApiKey.useMutation({
+    onSuccess: (data) => {
+      setIssuedCredential({ deviceId: data.deviceId, apiKey: data.apiKey });
+      toast.success("A new upload key was issued. Copy it now.");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -113,6 +123,16 @@ export function KioskDevicesTab() {
   }
 
   const isBusy = registerMutation.isPending || updateMutation.isPending;
+
+  async function copyCredential() {
+    if (!issuedCredential) return;
+    try {
+      await navigator.clipboard.writeText(issuedCredential.apiKey);
+      toast.success("Upload key copied");
+    } catch {
+      toast.error("Copy failed. Select and copy the key manually.");
+    }
+  }
 
   return (
     <section className="py-8">
@@ -202,6 +222,16 @@ export function KioskDevicesTab() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="text-gray-500 hover:text-amber-600"
+                      onClick={() => rotateKeyMutation.mutate({ id: device.id })}
+                      disabled={rotateKeyMutation.isPending}
+                      title="Rotate upload key"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="text-gray-500 hover:text-cyan-600"
                       onClick={() => openEdit(device)}
                     >
@@ -276,6 +306,32 @@ export function KioskDevicesTab() {
             >
               {isBusy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {editingId !== null ? "Save Changes" : "Register Device"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credential shown exactly once after registration or rotation. */}
+      <Dialog open={!!issuedCredential} onOpenChange={(open) => !open && setIssuedCredential(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Device Upload Key — Copy Now</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-gray-600">
+              Use this key only for <span className="font-mono">{issuedCredential?.deviceId}</span>. LIM stores it only as a hash and cannot show it again.
+            </p>
+            <code className="block w-full break-all rounded-lg bg-slate-950 p-3 text-xs text-cyan-300 font-mono">
+              {issuedCredential?.apiKey}
+            </code>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
+              Configure the machine as <span className="font-mono">https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_KEY</span>. Rotating the key disables the previous one immediately.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIssuedCredential(null)}>I copied it</Button>
+            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={copyCredential}>
+              <Copy className="w-4 h-4 mr-2" /> Copy Key
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -50,6 +50,15 @@ export const phoneAuthRouter = router({
       const phone = normalizeInputPhone(input.phone);
       const existing = await db.getUserByPhone(phone);
       if (existing) {
+        if (existing.loginMethod === "machine_phone_pending") {
+          const activated = await db.activateMachinePhoneUser(existing.id, {
+            name: input.name,
+            passwordHash: await bcrypt.hash(input.password, BCRYPT_ROUNDS),
+          });
+          if (!activated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to activate the machine-created account." });
+          await signInUser(ctx, activated);
+          return { success: true, activatedExistingAccount: true, user: { id: activated.id, name: activated.name, phone: activated.phone, role: activated.role } };
+        }
         throw new TRPCError({ code: "CONFLICT", message: "An account with this phone number already exists." });
       }
 

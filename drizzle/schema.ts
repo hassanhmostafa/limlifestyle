@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, json, date } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, json, date, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -90,6 +90,8 @@ export const healthReadings = mysqlTable("health_readings", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   kioskId: varchar("kioskId", { length: 64 }).notNull(),
+  /** Origin separates real X18 measurements from simulator, demo, and manual data. */
+  source: mysqlEnum("source", ["x18", "legacy", "simulator", "manual", "demo"]).default("manual").notNull(),
   /** Vendor-native X18 field names, retained for protocol clarity. */
   sbp: int("sbp"),
   dbp: int("dbp"),
@@ -110,6 +112,23 @@ export const healthReadings = mysqlTable("health_readings", {
 
 export type HealthReading = typeof healthReadings.$inferSelect;
 export type InsertHealthReading = typeof healthReadings.$inferInsert;
+
+/**
+ * A participant grants a specific clinician (expert account) access to their
+ * readings. There is no broad clinician search over health data.
+ */
+export const clinicianParticipantAccess = mysqlTable("clinician_participant_access", {
+  id: int("id").autoincrement().primaryKey(),
+  clinicianUserId: int("clinicianUserId").notNull(),
+  participantUserId: int("participantUserId").notNull(),
+  status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+  grantedAt: timestamp("grantedAt").defaultNow().notNull(),
+  revokedAt: timestamp("revokedAt"),
+}, (table) => [
+  uniqueIndex("clinician_participant_access_unique").on(table.clinicianUserId, table.participantUserId),
+]);
+
+export type ClinicianParticipantAccess = typeof clinicianParticipantAccess.$inferSelect;
 
 /**
  * AI-generated health and diet plans.
@@ -242,6 +261,8 @@ export const kioskDevices = mysqlTable("kiosk_devices", {
   id: int("id").autoincrement().primaryKey(),
   /** Hardware device ID from the kiosk (e.g. "2CFDA15B9372") */
   deviceId: varchar("deviceId", { length: 64 }).notNull().unique(),
+  /** SHA-256 hash of this device's dedicated X18 upload key; plaintext is never stored. */
+  apiKeyHash: varchar("apiKeyHash", { length: 64 }),
   /** Human-readable label for this device */
   label: varchar("label", { length: 255 }),
   /** FK to kiosks table — which kiosk location this device belongs to */

@@ -1,32 +1,26 @@
 # LIM — Project TODO
 
-## Core Platform
-- [x] Migrate the original health-kiosk application to the current LIM project.
-- [x] Preserve bilingual Arabic/English support and RTL layout.
-- [x] Replace user-facing Tech Care branding with **LIM** in primary navigation, login, health reports, kiosk screens, PWA manifest, and machine simulator.
-- [x] Move primary account sign-in and registration to Saudi mobile number plus password.
-- [ ] Add SMS OTP verification and recovery for mobile-number accounts.
+## Implemented in this checkpoint
+- [x] Rebrand the primary LIM application and phone sign-in around Saudi mobile numbers.
+- [x] Accept native X18_5 `datas` uploads and merge all posts with the same `deviceNo` and `recordNo` into one measurement.
+- [x] Persist native core values (`sbp`, `dbp`, `hr`, `height`, `weight`, `bmi`) and preserve all X18 body-composition values in `machineMetrics`.
+- [x] Link a QR-scanned LIM session or a manual Saudi mobile number to a participant account.
+- [x] Create a pending LIM account automatically when a valid Saudi mobile number has no account; activating that number later exposes the saved readings.
+- [x] Remove the phone-scans-machine-results workflow. X18 uploads results directly and the participant opens **My Health**.
+- [x] Require an active registered device and dedicated per-device upload key, stored only as a hash.
+- [x] Add event-app Bearer-token endpoints for a participant to view only their own readings and complete `machineMetrics`.
+- [x] Add consent-gated clinician endpoints; an expert only sees participants who have explicitly authorized them.
+- [x] Mark and hide historical demo/simulator readings from participant and event health histories without deleting them; stop runtime demo seeding.
+- [x] Add non-secret integration documentation and unit/API validation.
 
-## Physical X18_5 Machine Integration
-- [x] Preserve the existing firmware paths: `GET /weixin/login/xcx` and `POST /api/kiosk/data`.
-- [x] Register physical device `G260820131014906` as active.
-- [x] Accept native X18_5 payloads using `deviceNo`, `recordNo`, `userID`, and `datas`.
-- [x] Align dashboard vital fields with the X18 JSON: `sbp`, `dbp`, and `hr`.
-- [x] Preserve native body-composition names such as `fatRate`, `skeletalMuscle`, `waterRate`, `bmr`, and `vfal` in `machineMetrics`.
-- [x] Merge separate height/weight, body-composition, and blood-pressure uploads with the same `recordNo` into one reading.
-- [x] Document the production data-upload configuration at `https://limlifestyle.com/api/kiosk/data`.
-- [ ] Enter the LIM data-upload URL in the physical X18_5 settings and perform a real measurement using an existing LIM phone account.
-- [ ] Confirm whether updated firmware can submit a **mobile-app QR scan** to a configurable LIM callback. The observed scan currently writes the raw QR value as the local user name; it does not identify the LIM account by itself.
-- [ ] Obtain/document the manufacturer API for its final report QR. The current physical QR links to the manufacturer report, not a LIM result-transfer token.
+## Required field verification after deployment
+- [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.
+- [ ] Complete one real X18 measurement using a LIM QR or a registered Saudi phone number; confirm the device receives `{ "code": "1", "msg": "successful" }`.
+- [ ] Confirm the new real reading appears in the correct participant's **My Health** page and event API, including `machineMetrics`.
+- [ ] Verify pending-account activation: measure with a valid Saudi phone that has no LIM account, then register the same phone and confirm the historic measurement appears.
+- [ ] Verify consent: participant grants one expert access, expert can see only that participant, then participant revokes and expert receives `403`.
 
-## Two-Scan Simulator
-- [x] Phone QR page creates a short-lived LIM login token for the simulator.
-- [x] Simulator scans the phone QR, identifies the account, generates a test measurement, and displays one LIM results QR.
-- [x] Stage a simulator result once, then finalize it once when the phone claims the QR; no duplicate health reading is created.
-- [x] Keep guest measurements receipt-only and out of the account database.
-- [x] Use an iOS-compatible native video element with ZXing for the LIM results scanner.
-- [ ] Validate camera scanning on an iPhone after publishing the current checkpoint and clearing the PWA cache.
-
-## Future Product Work
-- [ ] Add push notifications for newly received health readings.
+## Deferred product work
+- [ ] Replace mobile password verification with SMS OTP and recovery.
+- [ ] Add push notification when a real X18 reading is received.
 - [ ] Add Arabic language generation for AI wellness plans.

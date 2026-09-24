@@ -63,6 +63,7 @@ export const healthRouter = router({
       return createHealthReading({
         userId: ctx.user.id,
         kioskId: input.kioskId,
+        source: "manual",
         sbp: input.sbp ?? null,
         dbp: input.dbp ?? null,
         hr: input.hr ?? null,

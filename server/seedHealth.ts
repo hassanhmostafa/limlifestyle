@@ -40,6 +40,7 @@ export const SEED_HEALTH_READINGS: InsertHealthReading[] = timeline.map(
     return {
       userId: 1,
       kioskId: `kiosk-${String((index % 6) + 1).padStart(3, "0")}`,
+      source: "demo",
       sbp,
       dbp,
       hr,

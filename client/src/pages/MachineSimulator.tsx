@@ -120,7 +120,6 @@ function printHealthReceipt(
     win.document.close();
   }
 }
-import { QRCodeSVG } from "qrcode.react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -133,7 +132,7 @@ import { toast } from "sonner";
 import { useRef } from "react";
 import { Link } from "wouter";
 
-type SimulatorState = "idle" | "scanning" | "confirmed" | "results" | "guest";
+type SimulatorState = "idle" | "scanning" | "confirmed" | "guest";
 
 export default function MachineSimulator() {
   const { user, loading: authLoading } = useAuth();
@@ -141,7 +140,6 @@ export default function MachineSimulator() {
   const [state, setState] = useState<SimulatorState>("idle");
   const [token, setToken] = useState<string | null>(null);
   const [confirmedUser, setConfirmedUser] = useState<{ name: string | null; phone: string | null } | null>(null);
-  const [resultsToken, setResultsToken] = useState<string | null>(null);
   const [scannerActive, setScannerActive] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const scannerRef = useRef<any>(null);
@@ -175,15 +173,10 @@ export default function MachineSimulator() {
     },
   });
 
-  const storeResultsMutation = trpc.kioskIntegration.storeResults.useMutation({
-    onSuccess: (data) => { setResultsToken(data.resultsToken); setState("results"); },
-    onError: (err) => { toast.error(err.message); },
-  });
-
   const testMeasurementMutation = trpc.kioskIntegration.sendTestMeasurement.useMutation({
     onSuccess: (data) => {
       setTestMetrics(data.metrics);
-      if (token) storeResultsMutation.mutate({ sessionToken: token, metrics: data.metrics });
+      toast.success("Test measurement saved as simulator data.");
     },
     onError: (err) => {
       toast.error(err.message);
@@ -237,7 +230,6 @@ export default function MachineSimulator() {
     setToken(null);
     setConfirmedUser(null);
     setTestMetrics(null);
-    setResultsToken(null);
   };
 
   const handleStart = async () => {
@@ -245,13 +237,8 @@ export default function MachineSimulator() {
     setToken(null);
     setConfirmedUser(null);
     setTestMetrics(null);
-    setResultsToken(null);
     setScannerError("");
   };
-
-  const resultsQrUrl = resultsToken
-    ? `${window.location.origin}/kiosk-results?token=${resultsToken}`
-    : "";
 
   if (authLoading) {
     return (
@@ -432,12 +419,11 @@ export default function MachineSimulator() {
                        </div>
                      ))}
                    </div>
-                    {storeResultsMutation.isPending && (
-                      <div className="flex items-center justify-center gap-2 border-t border-gray-700 pt-4 text-cyan-400">
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span className="text-sm">Preparing the results QR…</span>
-                      </div>
-                    )}
+                   <Link href="/health" className="block">
+                     <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white">
+                       View in My Health
+                     </Button>
+                   </Link>
                  </div>
                ) : (
                   <Button
@@ -534,54 +520,6 @@ export default function MachineSimulator() {
           </Card>
         )}
 
-        {/* ── EXPIRED ── */}
-        {/* ── RESULTS QR (machine shows QR for phone to scan) ── */}
-        {state === "results" && (
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="pt-8 pb-8 space-y-6 text-center">
-              <div className="text-5xl">📊</div>
-              <div>
-                <h2 className="text-white text-xl font-bold mb-1">Scan to Get Your Results</h2>
-                <p className="text-gray-400 text-sm">
-                  Open the LIM app on your phone and scan this QR code to receive your results.
-                </p>
-              </div>
-
-              {resultsToken ? (
-                <>
-                  <div className="flex justify-center">
-                    <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
-                      <QRCodeSVG value={resultsQrUrl} size={220} level="M" includeMargin={false} />
-                    </div>
-                  </div>
-                  <div className="font-mono text-xs text-gray-500 space-y-1">
-                    <div>امسح رمز الاستجابة السريعة لإرساله إلى هاتفك المحمول</div>
-                    <div className="text-gray-600 text-xs break-all">{resultsQrUrl}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    {testMetrics && (
-                      <Button
-                        className="flex-1 bg-gray-700 hover:bg-gray-600 text-white h-9 text-sm"
-                        onClick={() => printHealthReceipt(testMetrics!, confirmedUser)}
-                      >
-                        <Printer className="w-4 h-4 mr-2" />
-                        Print Receipt
-                      </Button>
-                    )}
-                    <Button onClick={handleStart} className={`${testMetrics ? "flex-1" : "w-full"} bg-cyan-500 hover:bg-cyan-600 text-white h-9 text-sm`}>
-                      New Session
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center gap-2 text-cyan-400">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm">Generating results QR…</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Footer */}

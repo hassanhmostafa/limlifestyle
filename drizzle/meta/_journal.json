@@ -22,6 +22,20 @@
       "when": 1790274781536,
       "tag": "0002_lim_phone_x18",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1790279899779,
+      "tag": "0003_living_api_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1790280491473,
+      "tag": "0004_secure_readings_access",
+      "breakpoints": true
     }
   ]
 }

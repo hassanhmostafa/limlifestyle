@@ -1,8 +1,8 @@
-import { eq, like, or, desc, and, gte, ilike } from "drizzle-orm";
+import { eq, like, or, desc, and, gte, ilike, notInArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, kiosks, InsertKiosk, healthReadings, InsertHealthReading,
-  aiPlans, InsertAiPlan, bookings, InsertBooking
+  aiPlans, InsertAiPlan, bookings, InsertBooking, clinicianParticipantAccess
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -150,6 +150,34 @@ export async function createPhoneUser(data: {
     lastSignedIn: new Date(),
   });
   return getUserByPhone(data.phone);
+}
+
+/** A physical machine can create a result-holding account by phone without a
+ * usable password. The participant later activates it from the phone flow. */
+export async function createMachinePhoneUser(data: { name: string | null; phone: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(users).values({
+    openId: `phone:${data.phone}`,
+    name: data.name,
+    phone: data.phone,
+    loginMethod: "machine_phone_pending",
+    role: "user",
+    lastSignedIn: new Date(),
+  });
+  return getUserByPhone(data.phone);
+}
+
+export async function activateMachinePhoneUser(userId: number, data: { name: string; passwordHash: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({
+    name: data.name,
+    passwordHash: data.passwordHash,
+    loginMethod: "phone_password",
+    updatedAt: new Date(),
+  }).where(eq(users.id, userId));
+  return getUserById(userId);
 }
 
 export async function updatePasswordHash(userId: number, passwordHash: string) {
@@ -364,7 +392,7 @@ export async function getUserReadings(userId: number) {
   return db
     .select()
     .from(healthReadings)
-    .where(eq(healthReadings.userId, userId))
+    .where(and(eq(healthReadings.userId, userId), notInArray(healthReadings.source, ["demo", "simulator"])))
     .orderBy(desc(healthReadings.recordedAt));
 }
 
@@ -379,13 +407,17 @@ export async function getUserReadingsSince(userId: number, since: Date | null) {
     return db
       .select()
       .from(healthReadings)
-      .where(eq(healthReadings.userId, userId))
+      .where(and(eq(healthReadings.userId, userId), notInArray(healthReadings.source, ["demo", "simulator"])))
       .orderBy(desc(healthReadings.recordedAt));
   }
   return db
     .select()
     .from(healthReadings)
-    .where(and(eq(healthReadings.userId, userId), gte(healthReadings.recordedAt, since)))
+    .where(and(
+      eq(healthReadings.userId, userId),
+      notInArray(healthReadings.source, ["demo", "simulator"]),
+      gte(healthReadings.recordedAt, since),
+    ))
     .orderBy(desc(healthReadings.recordedAt));
 }
 
@@ -434,6 +466,77 @@ export async function deleteHealthReading(id: number, userId: number) {
   await db
     .delete(healthReadings)
     .where(eq(healthReadings.id, id));
+}
+
+// ─────────────────────────────────────────────
+// Participant-controlled clinician access
+// ─────────────────────────────────────────────
+
+export async function grantClinicianHealthAccess(participantUserId: number, clinicianUserId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(clinicianParticipantAccess).values({
+    clinicianUserId,
+    participantUserId,
+    status: "active",
+    revokedAt: null,
+  }).onDuplicateKeyUpdate({
+    set: { status: "active", grantedAt: new Date(), revokedAt: null },
+  });
+}
+
+export async function revokeClinicianHealthAccess(participantUserId: number, clinicianUserId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(clinicianParticipantAccess).set({ status: "revoked", revokedAt: new Date() })
+    .where(and(
+      eq(clinicianParticipantAccess.participantUserId, participantUserId),
+      eq(clinicianParticipantAccess.clinicianUserId, clinicianUserId),
+    ));
+}
+
+export async function hasClinicianHealthAccess(clinicianUserId: number, participantUserId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: clinicianParticipantAccess.id }).from(clinicianParticipantAccess).where(and(
+    eq(clinicianParticipantAccess.clinicianUserId, clinicianUserId),
+    eq(clinicianParticipantAccess.participantUserId, participantUserId),
+    eq(clinicianParticipantAccess.status, "active"),
+  )).limit(1);
+  return rows.length > 0;
+}
+
+export async function getParticipantClinicians(participantUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: users.id,
+    name: users.name,
+    phone: users.phone,
+    specialty: users.specialty,
+    grantedAt: clinicianParticipantAccess.grantedAt,
+  }).from(clinicianParticipantAccess)
+    .innerJoin(users, eq(clinicianParticipantAccess.clinicianUserId, users.id))
+    .where(and(
+      eq(clinicianParticipantAccess.participantUserId, participantUserId),
+      eq(clinicianParticipantAccess.status, "active"),
+    ));
+}
+
+export async function getClinicianParticipants(clinicianUserId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: users.id,
+    name: users.name,
+    phone: users.phone,
+    grantedAt: clinicianParticipantAccess.grantedAt,
+  }).from(clinicianParticipantAccess)
+    .innerJoin(users, eq(clinicianParticipantAccess.participantUserId, users.id))
+    .where(and(
+      eq(clinicianParticipantAccess.clinicianUserId, clinicianUserId),
+      eq(clinicianParticipantAccess.status, "active"),
+    ));
 }
 
 // ─────────────────────────────────────────────

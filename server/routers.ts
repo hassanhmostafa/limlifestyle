@@ -13,6 +13,7 @@ import { chatRouter } from "./routers/chat";
 import { emailAuthRouter } from "./routers/emailAuth";
 import { phoneAuthRouter } from "./routers/phoneAuth";
 import { kioskIntegrationRouter } from "./routers/kioskIntegration";
+import { healthAccessRouter } from "./routers/healthAccess";
 
 export const appRouter = router({
   system: systemRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   emailAuth: emailAuthRouter,
   phoneAuth: phoneAuthRouter,
   kioskIntegration: kioskIntegrationRouter,
+  healthAccess: healthAccessRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

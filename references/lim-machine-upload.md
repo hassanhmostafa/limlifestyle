@@ -1,68 +1,236 @@
-# LIM X18_5 Machine Upload Configuration
+# دليل تكامل LIM لجهاز X18_5 وتطبيق الفعاليات
 
-## URLs to enter in the machine
+> **ملخص المسار:** الجهاز يرسل القياس إلى LIM في الخلفية، وLIM يربط القياس بالمشارك عبر رمز QR مؤقت أو رقم الجوال. رمز QR الذي يظهر في نهاية شاشة X18 هو تقرير الشركة المصنّعة، وليس رابط نقل نتائج LIM.
 
-Use the **custom LIM domain** in the machine’s network or cloud configuration.
+## 1. إعداد رفع النتائج من جهاز تحليل الجسم
 
-| Machine setting | Value |
+### عنوان الرفع
+
+الجهاز يجب أن يرسل طلب **HTTPS POST** إلى:
+
+```text
+https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_DEVICE_KEY
+```
+
+استبدل `YOUR_DEVICE_KEY` بمفتاح الجهاز الذي تم إنشاؤه له فقط. المفتاح مختلف لكل جهاز ولا يُحفظ في قاعدة البيانات كنص صريح؛ LIM يحفظ بصمته المشفّرة فقط.
+
+| الإعداد | القيمة |
 |---|---|
-| **Data upload URL** | `https://limlifestyle.com/api/kiosk/data` |
-| **Legacy QR login base URL** | `https://limlifestyle.com` |
-| **Legacy QR login polling path** | `/weixin/login/xcx` (the machine appends `?token=...`) |
+| الطريقة | `POST` |
+| نوع المحتوى | `application/json` |
+| تعريف الجهاز | `deviceNo` في جسم JSON |
+| مصادقة الجهاز المفضلة | رأس `X-LIM-Device-Key: YOUR_DEVICE_KEY` |
+| بديل لأجهزة X18 التي لا تدعم الرؤوس | `?apiKey=YOUR_DEVICE_KEY` في عنوان الرفع |
+| الجهاز المسجّل حاليًا | `G260820131014906` |
 
-The data-upload route accepts HTTPS `POST` requests with `Content-Type: application/json` and returns the machine-compatible acknowledgement:
+لا تفتح هذا الرابط في المتصفح لاختبار الإرسال؛ فتحه ينفّذ طلب `GET` فقط ولا يرسل قياسًا. الاختبار الصحيح هو `POST` من الجهاز بعد انتهاء القياس.
+
+### ربط المشارك
+
+يوجد مساران مدعومان:
+
+1. **QR من LIM (الموصى به):** يعرض المشارك رمز LIM المؤقت في صفحة **My QR Code**، ويمسحه X18. القيمة الخام ذات 16 حرفًا التي يضعها الجهاز في `userID` أو `name` تُطابق جلسة LIM المؤقتة. لا تظهر بيانات النتائج إلا في حساب المشارك نفسه.
+2. **رقم جوال يدوي:** يرسل الجهاز في `userID` رقمًا سعوديًا مثل `0563817217`. يطبع LIM الرقم إلى الصيغة `+966563817217` ويطابقه مع حساب LIM. إذا لم يوجد حساب، ينشئ LIM حساب نتائج معلّقًا بهذا الرقم ويحفظ القراءة فيه؛ عندما يسجّل صاحب الرقم لاحقًا بالرقم نفسه، يُفعَّل الحساب وتظهر له القراءة المحفوظة.
+
+كل طلبات أجزاء تقرير واحد يجب أن تستخدم نفس `recordNo`. يرسل X18 عادة ارتفاع/وزن، تركيب جسم، وضغط الدم كطلبات مستقلة؛ LIM يدمجها في **سجل واحد** بدل تكرار القياسات.
+
+## 2. مثال JSON تجريبي يقبله الرابط
+
+هذا مثال كامل لطلب ارتفاع/وزن وضغط. يمكن للجهاز إرسال التركيب الجسدي في طلب لاحق بنفس `recordNo` و`userID`.
+
+```json
+{
+  "unitNo": "000000",
+  "unitName": "LIM Event",
+  "deviceModel": "X18_5",
+  "deviceNo": "G260820131014906",
+  "macAddr": "68:8f:c9:a3:84:0f",
+  "datas": [
+    {
+      "userID": "0563817217",
+      "recordNo": "20260924225100",
+      "name": "Hassan",
+      "sex": "1",
+      "age": "25",
+      "measureTime": "2026-09-24 22:51:00",
+      "height": "174.5",
+      "weight": "76.6",
+      "bmi": "25.2",
+      "weight_s": "2",
+      "weight_n": "56.2 - 75.9",
+      "bmi_s": "2",
+      "bmi_n": "18.5 - 24.9",
+      "sbp": "128",
+      "dbp": "83",
+      "hr": "72",
+      "sbp_s": "1",
+      "sbp_n": "90 - 139",
+      "dbp_s": "1",
+      "dbp_n": "60 - 89",
+      "hr_s": "1",
+      "hr_n": "60 - 100"
+    }
+  ]
+}
+```
+
+مثال `curl` للتشخيص فقط:
+
+```bash
+curl -X POST 'https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_DEVICE_KEY' \
+  -H 'Content-Type: application/json' \
+  --data @x18-sample.json
+```
+
+### رد النجاح
+
+عند قبول وحفظ الجزء المرسل، يكون رد الجهاز المتوافق:
 
 ```json
 { "code": "1", "msg": "successful" }
 ```
 
-## Registered physical device
+| الحالة | رمز HTTP | مثال الرد |
+|---|---:|---|
+| محفوظ بنجاح | `200` | `{ "code": "1", "msg": "successful" }` |
+| مفتاح الجهاز غائب أو غير صحيح | `401` | `{ "code": "0", "msg": "Invalid device upload credential." }` |
+| جهاز غير مسجل أو غير مفعل | `401` | `{ "code": "0", "msg": "Device not registered or inactive." }` |
+| QR مؤقت منتهي أو رقم جوال غير صالح | `401` | `{ "code": "0", "msg": "...uploaded userID." }` |
+| JSON غير صحيح | `400` | `{ "code": "0", "msg": "Invalid data format" }` |
 
-The current machine is registered and active in LIM:
+## 3. API لتطبيق الفعاليات: نتائج المشارك
 
-| Machine property | Registered value |
-|---|---|
-| Model | `X18_5` |
-| Device number | `G260820131014906` |
-| MAC address observed | `68:8f:c9:a3:84:0f` |
+لا توجد واجهة يمكن فيها إرسال رقم جوال لشخص آخر وقراءة نتائجه. التطبيق يحصل أولًا على رمز دخول للمشارك نفسه، ثم يطلب النتائج **بدون** تمرير `phone` أو `userId`. الخادم يستنتج المستخدم من رمز الدخول فقط.
 
-LIM rejects uploads from an unregistered or inactive `deviceNo`.
+### (أ) دخول المشارك بالهاتف
 
-## User matching
-
-LIM uses the account’s Saudi mobile number as the machine identity key.
-
-1. The LIM app stores the number canonically as E.164, for example `+966563817217`.
-2. The machine continues to send its native `userID` value, for example `0563817217`.
-3. LIM normalizes both forms and links the measurement only when they represent the same mobile number.
-
-This means the mobile number entered or returned to the machine must be the same number used for the person’s LIM account.
-
-## Supported real X18_5 payloads
-
-The actual machine sends separate JSON posts with the same `recordNo` and `deviceNo`. LIM merges those posts into one health reading rather than creating duplicates.
-
-| Payload category | Native examples retained by LIM |
-|---|---|
-| Height and weight | `height`, `weight`, `bmi`, `weight_s`, `weight_n`, `bmi_s`, `bmi_n` |
-| Blood pressure | `sbp`, `dbp`, `hr`, `sbp_s`, `sbp_n`, `dbp_s`, `dbp_n`, `hr_s`, `hr_n` |
-| Body composition | `fatRate`, `skeletalMuscle`, `muscle`, `waterRate`, `protein`, `bone`, `bmr`, `vfal`, `whr`, segmental measurements, and vendor activity estimates |
-
-LIM preserves vendor-native body-composition fields in the reading’s `machineMetrics` record. The core dashboard fields use the same native vital names:
+```text
+POST https://limlifestyle.com/api/event-auth/phone-login
+Content-Type: application/json
+```
 
 ```json
 {
-  "sbp": 128,
-  "dbp": 93,
-  "hr": 83,
-  "height": "174.5",
-  "weight": "76.6",
-  "bmi": "25.2"
+  "phone": "0563817217",
+  "password": "participant-password"
 }
 ```
 
-## Important first-scan limitation
+> حاليًا تستخدم الواجهة كلمة المرور للهاتف. عند تفعيل OTP لاحقًا، يستبدل تحقق كلمة المرور فقط؛ تبقى هوية الهاتف، رمز Bearer، ورابط النتائج كما هي.
 
-The currently observed physical machine decodes a QR value and places the raw value in its local name field. That behavior alone does **not** call LIM to resolve a phone QR into a user.
+رد النجاح:
 
-The legacy URL above supports the documented machine-generated QR polling flow. The newer “machine scans a QR shown by the LIM app” flow still requires a firmware/vendor callback configuration that sends the scanned QR value to LIM. The upload endpoint configured here is sufficient for transferring a completed result when the machine sends the correct `userID` phone number.
+```json
+{
+  "accessToken": "<JWT>",
+  "tokenType": "Bearer",
+  "expiresIn": 28800,
+  "participant": {
+    "name": "Hassan",
+    "phone": "0563817217"
+  }
+}
+```
+
+الرمز صالح لمدة **8 ساعات**. لا تحفظه في عنوان URL أو سجلات التطبيق؛ خزّنه في مخزن آمن للتطبيق وأرسله فقط في رأس الطلب.
+
+### (ب) جلب سجل الشخص الحالي
+
+```text
+GET https://limlifestyle.com/api/event/health-readings
+Authorization: Bearer <accessToken>
+```
+
+رد نموذجي:
+
+```json
+{
+  "participant": {
+    "name": "Hassan",
+    "phone": "0563817217"
+  },
+  "readings": [
+    {
+      "id": 42,
+      "recordNo": "20260924225100",
+      "deviceNo": "G260820131014906",
+      "source": "x18",
+      "measuredAt": "2026-09-24T19:51:00.000Z",
+      "vitals": {
+        "sbp": 128,
+        "dbp": 83,
+        "hr": 72,
+        "height": "174.5",
+        "weight": "76.6",
+        "bmi": "25.2",
+        "temperature": null
+      },
+      "bodyComposition": {
+        "fatRate": "22.9",
+        "skeletalMuscle": "33.3",
+        "waterRate": "56.4"
+      }
+    }
+  ]
+}
+```
+
+### حماية الخصوصية
+
+- رابط النتائج لا يقبل `phone` أو `userId` كوسيط؛ لا يمكن تبديل هوية المشارك في الطلب.
+- يتم التحقق من JWT وتحديد مستخدم LIM من `openId` داخله، ثم تستعلم قاعدة البيانات بـ `userId` الداخلي لهذا الشخص فقط.
+- رقم الهاتف موحّد بصيغة سعودية، ولا يُعاد في الرد إلا بصيغته المحلية المقنّعة وظيفيًا (`05XXXXXXXX`).
+- نقطة الرفع تتحقق من `deviceNo` المسجّل والمفعّل **ومن مفتاح الجهاز المنفصل**.
+- لا يُحفظ مفتاح الجهاز كنص صريح؛ عند التسجيل أو تدوير المفتاح لا يُعرض النص إلا مرة واحدة.
+
+## 4. وصول الطبيب المصرّح له فقط
+
+المشارك هو من يمنح الطبيب/الخبير وصولًا صريحًا من حساب LIM. لا يستطيع الطبيب البحث في كل المشاركين أو قراءة نتائج شخص بالرقم فقط. عند منح الوصول يُنشأ تفويض نشط بين حساب المشارك وحساب خبير LIM؛ ويمكن للمشارك إلغاؤه في أي وقت.
+
+للتطبيق الخارجي، يسجل الطبيب الدخول بنفس رابط الهاتف السابق ثم يستدعي:
+
+```text
+GET https://limlifestyle.com/api/event/clinician/participants
+Authorization: Bearer <clinicianAccessToken>
+```
+
+يعيد الرابط قائمة المشاركين الذين منحوا هذا الطبيب الوصول فقط. وبعد اختيار مشارك من هذه القائمة:
+
+```text
+GET https://limlifestyle.com/api/event/clinician/participants/{participantUserId}/readings
+Authorization: Bearer <clinicianAccessToken>
+```
+
+يتحقق الخادم من دور الخبير ومن تفويض ذلك المشارك قبل إعادة النتائج، بما فيها `machineMetrics`/`bodyComposition`. أي محاولة للوصول إلى مشارك بلا تفويض تعيد `403`.
+
+## 5. الحقول اللازمة في تدفق X18 الجديد
+
+لا نحذف أعمدة `health_readings` القديمة أو نتائج فعلية حالية. بدلاً من ذلك، أصبح تدفق X18 يكتب فقط الحقول التالية باعتبارها البيانات السريرية الأساسية، ويحفظ بقية متغيرات المصنع كما وردت في `machineMetrics`:
+
+| الفئة | الحقول المستخدمة في تدفق X18 |
+|---|---|
+| هوية وربط | `userId` داخليًا، `deviceNo`، `recordNo`، `recordedAt`، `source` |
+| مؤشرات حيوية أساسية | `sbp`، `dbp`، `hr`، `height`، `weight`، `bmi`، `temperature` عند توفره |
+| تفاصيل تركيب الجسم | `machineMetrics` ويحفظ المفاتيح الأصلية مثل `fatRate` و`skeletalMuscle` و`waterRate` و`bmr` و`vfal` والقياسات القطاعية والنطاقات والحالات |
+| التتبع الداخلي | `kioskId` و`notes` |
+
+أعمدة المصدر القديمة لا تُستخدم لتفسير تقرير X18 الجديد. كما أن `source` يفصل سجلات `x18` الحقيقية عن `legacy` و`manual` و`simulator` و`demo`. تبقى السجلات التجريبية موجودة تقنيًا لأغراض المراجعة، لكن لا تظهر في سجل صحة المشارك أو API الفعاليات.
+
+## 6. إلغاء خطوة مسح QR للنتيجة
+
+بعد القياس، لا يمسح المشارك رمز QR الأخير في شاشة الجهاز. هذا الرمز تابع لتقرير المصنع. جهاز X18 يرفع النتيجة مباشرةً إلى LIM عبر عنوان الرفع، ثم يفتح المشارك **My Health** لمشاهدة النتيجة المرتبطة بحسابه.
+
+## 7. حالة التنفيذ والاختبار
+
+| الجزء | الحالة | ما تم اختباره |
+|---|---|---|
+| تحليل `datas` في X18 وحقول القياس الأصلية | منفذ | اختبارات وحدات على عينات X18 الحقيقية المرفقة |
+| دمج طلبات التقرير ذات `recordNo` الواحد | منفذ | اختبار mapper ووحدة الدمج |
+| مطابقة QR/الجوال بالسجل | منفذ | اختبار توحيد أرقام الجوال واكتشاف رمز QR المؤقت |
+| رفض جهاز غير مسجّل أو مفتاح جهاز خاطئ | منفذ | اختبارات وحدات لمقارنة المفتاح واستخراج الرأس/الرابط؛ اختبار ميداني مطلوب بعد النشر |
+| حساب معلّق تلقائي لرقم لا يملك حسابًا | منفذ | مراجعة منطقية واختبار ميداني مطلوب بعد النشر |
+| تسجيل دخول تطبيق فعاليات وجلب سجل الشخص نفسه | منفذ | اختبارات وحدات للتمثيل والاستجابات؛ يحتاج اختبار حساب فعلي بعد النشر |
+| صلاحيات الطبيب بموافقة المشارك | منفذ | تحقق على مستوى قاعدة البيانات وAPI؛ يحتاج اختبار حسابي مستخدم/خبير بعد النشر |
+| إرسال فعلي من جهاز X18 إلى LIM بالمفتاح الجديد | **غير مؤكد بعد** | يتطلب قياسًا جديدًا على الجهاز الفعلي بعد وضع المفتاح والنشر |
+
+لا نعتبر الربط الميداني مكتملًا حتى يظهر `200 / {"code":"1","msg":"successful"}` من الجهاز وتظهر نتيجة القياس الجديد في **My Health** للحساب الصحيح.
