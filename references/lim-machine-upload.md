@@ -156,6 +156,11 @@ Authorization: Bearer <accessToken>
       "deviceNo": "G260820131014906",
       "source": "x18",
       "measuredAt": "2026-09-24T19:51:00.000Z",
+      "deviceReportedIdentity": {
+        "name": "Hassan",
+        "age": 25,
+        "sex": "1"
+      },
       "vitals": {
         "sbp": 128,
         "dbp": 83,
@@ -209,12 +214,12 @@ Authorization: Bearer <clinicianAccessToken>
 
 | الفئة | الحقول المستخدمة في تدفق X18 |
 |---|---|
-| هوية وربط | `userId` داخليًا، `deviceNo`، `recordNo`، `recordedAt`، `source` |
+| هوية وربط | `userId` داخليًا للخصوصية، `patientName` و`patientAge` و`patientSex` كما أرسلها X18 للتقرير، `deviceNo`، `recordNo`، `recordedAt`، `source` |
 | مؤشرات حيوية أساسية | `sbp`، `dbp`، `hr`، `height`، `weight`، `bmi`، `temperature` عند توفره |
 | تفاصيل تركيب الجسم | `machineMetrics` ويحفظ المفاتيح الأصلية مثل `fatRate` و`skeletalMuscle` و`waterRate` و`bmr` و`vfal` والقياسات القطاعية والنطاقات والحالات |
 | التتبع الداخلي | `kioskId` و`notes` |
 
-أعمدة المصدر القديمة لا تُستخدم لتفسير تقرير X18 الجديد. كما أن `source` يفصل سجلات `x18` الحقيقية عن `legacy` و`manual` و`simulator` و`demo`. تبقى السجلات التجريبية موجودة تقنيًا لأغراض المراجعة، لكن لا تظهر في سجل صحة المشارك أو API الفعاليات.
+أعمدة المصدر القديمة لا تُستخدم لتفسير تقرير X18 الجديد. أما الاسم والعمر والجنس الظاهرة في **My Health** وفي تفاصيل تقرير X18 فهي حقول التقرير (`patientName` و`patientAge` و`patientSex`) التي يرسلها الجهاز، وليست بيانات ملف LIM. كما أن `source` يفصل سجلات `x18` الحقيقية عن `legacy` و`manual` و`simulator` و`demo`. تبقى السجلات التجريبية موجودة تقنيًا لأغراض المراجعة، لكن لا تظهر في سجل صحة المشارك أو API الفعاليات.
 
 ## 6. إلغاء خطوة مسح QR للنتيجة
 

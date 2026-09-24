@@ -7,6 +7,12 @@ export type EventHealthReading = {
   deviceNo: string | null;
   source: "x18" | "legacy" | "simulator" | "manual" | "demo";
   measuredAt: string;
+  /** Identity reported by the device for this specific measurement. */
+  deviceReportedIdentity: {
+    name: string | null;
+    age: number | null;
+    sex: string | null;
+  };
   vitals: {
     sbp: number | null;
     dbp: number | null;
@@ -26,6 +32,11 @@ export function toEventHealthReading(reading: HealthReading): EventHealthReading
     deviceNo: reading.deviceNo,
     source: reading.source,
     measuredAt: reading.recordedAt.toISOString(),
+    deviceReportedIdentity: {
+      name: reading.patientName,
+      age: reading.patientAge,
+      sex: reading.patientSex,
+    },
     vitals: {
       sbp: reading.sbp,
       dbp: reading.dbp,

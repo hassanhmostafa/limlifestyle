@@ -6,7 +6,7 @@
 - [x] Persist native core values (`sbp`, `dbp`, `hr`, `height`, `weight`, `bmi`) and preserve all X18 body-composition values in `machineMetrics`.
 - [x] Link a QR-scanned LIM session or a manual Saudi mobile number to a participant account.
 - [x] Encode the participant's Saudi mobile number in **My QR Code**, so X18 displays that number in its ID field exactly like manual phone entry.
-- [x] Display the participant's name, calculated age, and gender in **My Health** and each detailed X18 body-composition report.
+- [x] Store and display the name, age, and sex that X18 submitted with each specific report in **My Health**, the detailed X18 report, PDF output, and event API; do not substitute LIM account-profile details.
 - [x] Create a pending LIM account automatically when a valid Saudi mobile number has no account; activating that number later exposes the saved readings.
 - [x] Remove the phone-scans-machine-results workflow. X18 uploads results directly and the participant opens **My Health**.
 - [x] Require an active registered device and one shared LIM fleet upload key, stored only as a hash.

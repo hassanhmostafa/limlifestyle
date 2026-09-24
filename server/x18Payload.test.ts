@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractX18Metrics, mergeX18Metrics, X18MachinePayloadSchema } from "./lib/x18Payload";
+import { extractX18ReportedIdentity, formatX18Sex } from "./lib/x18Identity";
 
 const heightWeightPayload = {
   deviceModel: "X18_5",
@@ -77,5 +78,25 @@ describe("X18_5 payload mapping", () => {
       muscleRightArm: "2.2", muscleLeftArm: "2.3", muscleTrunk: "20.6", muscleRightLeg: "6.9", muscleLeftLeg: "7.1",
       fatRightArm: "1.6", fatLeftArm: "1.6", fatTrunk: "15.3", fatRightLeg: "4.1", fatLeftLeg: "4.1",
     });
+  });
+
+  it("keeps X18 name, age, and sex with the report rather than treating them as account data", () => {
+    const item = X18MachinePayloadSchema.parse({
+      deviceNo: "G260820131014906",
+      datas: [{ userID: "0563817217", recordNo: "identity-report", name: "Hassan", age: "25", sex: "1" }],
+    }).datas[0];
+
+    expect(extractX18ReportedIdentity(item)).toEqual({ patientName: "Hassan", patientAge: 25, patientSex: "1" });
+    expect(formatX18Sex("1", "en")).toBe("Male");
+    expect(formatX18Sex("2", "ar")).toBe("أنثى");
+  });
+
+  it("does not display a phone QR value as a person name", () => {
+    const item = X18MachinePayloadSchema.parse({
+      deviceNo: "G260820131014906",
+      datas: [{ userID: "0563817217", recordNo: "identity-phone", name: "0563817217", age: "", sex: "" }],
+    }).datas[0];
+
+    expect(extractX18ReportedIdentity(item)).toEqual({ patientName: null, patientAge: null, patientSex: null });
   });
 });

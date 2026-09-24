@@ -44,6 +44,7 @@ import {
   X18MachinePayloadSchema,
   type X18MachinePayload,
 } from "../lib/x18Payload";
+import { extractX18ReportedIdentity } from "../lib/x18Identity";
 import { apiKeysMatch, createDeviceApiKey, hashApiKey, readDeviceApiKey } from "../lib/apiSecurity";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -347,6 +348,7 @@ async function saveX18MachinePayload(
     }
 
     const incoming = extractX18Metrics(item);
+    const incomingIdentity = extractX18ReportedIdentity(item);
     const recordNo = item.recordNo ?? `${payload.deviceNo}:${item.measureTime ?? Date.now()}`;
     const [existing] = await db
       .select()
@@ -377,6 +379,11 @@ async function saveX18MachinePayload(
       height: metrics.height ?? null,
       bmi: metrics.bmi ?? null,
       machineMetrics: metrics.raw,
+      // Keep the name, age, and sex exactly with the physical report that
+      // submitted them. Never substitute the LIM account profile here.
+      patientName: incomingIdentity.patientName ?? existing?.patientName ?? null,
+      patientAge: incomingIdentity.patientAge ?? existing?.patientAge ?? null,
+      patientSex: incomingIdentity.patientSex ?? existing?.patientSex ?? null,
       recordNo,
       deviceNo: payload.deviceNo,
       notes: `X18_5 measurement${payload.deviceModel ? ` (${payload.deviceModel})` : ""}`,

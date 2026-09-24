@@ -16,6 +16,9 @@ describe("event health response mapping", () => {
       bmi: "25.2",
       temperature: null,
       machineMetrics: { fatRate: "22.9", skeletalMuscle: "33.3" },
+      patientName: "Hassan",
+      patientAge: 25,
+      patientSex: "1",
       recordNo: "20260924225100",
       deviceNo: "G260820131014906",
       notes: "X18_5 measurement",
@@ -29,6 +32,7 @@ describe("event health response mapping", () => {
       deviceNo: "G260820131014906",
       source: "x18",
       measuredAt: "2026-09-24T19:51:00.000Z",
+      deviceReportedIdentity: { name: "Hassan", age: 25, sex: "1" },
       vitals: { sbp: 128, dbp: 83, hr: 72, height: "174.5", weight: "76.6", bmi: "25.2", temperature: null },
       bodyComposition: { fatRate: "22.9", skeletalMuscle: "33.3" },
     });

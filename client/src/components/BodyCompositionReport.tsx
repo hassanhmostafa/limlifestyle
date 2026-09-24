@@ -12,13 +12,10 @@ export type DashboardReading = {
   machineMetrics?: unknown;
   recordNo?: string | null;
   deviceNo?: string | null;
+  patientName?: string | null;
+  patientAge?: number | null;
+  patientSex?: string | null;
   source?: string;
-};
-
-export type PatientIdentity = {
-  name?: string | null;
-  age?: number | null;
-  gender?: "male" | "female" | null;
 };
 
 type Language = "en" | "ar";
@@ -119,6 +116,15 @@ function metricLabel(metric: MetricDefinition, language: Language) {
   return language === "ar" ? metric.ar : metric.en;
 }
 
+/** Observed X18_5 payloads use sex: "1" for male and "2" for female. */
+function formatX18Sex(value: string | null | undefined, language: Language): string {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return "—";
+  if (["1", "male", "m", "男"].includes(normalized)) return language === "ar" ? "ذكر" : "Male";
+  if (["2", "female", "f", "女"].includes(normalized)) return language === "ar" ? "أنثى" : "Female";
+  return value!.trim();
+}
+
 function ReportMetricCard({ metric, reading, language, icon }: { metric: MetricDefinition; reading: DashboardReading; language: Language; icon?: React.ReactNode }) {
   const ref = referenceRange(reading, metric.key);
   return (
@@ -197,7 +203,7 @@ function BodySilhouette({ mode }: { mode: "muscle" | "fat" }) {
   );
 }
 
-export function BodyCompositionReport({ readings, language, patient }: { readings: DashboardReading[]; language: Language; patient?: PatientIdentity }) {
+export function BodyCompositionReport({ readings, language }: { readings: DashboardReading[]; language: Language }) {
   const reports = readings.filter((reading) => Object.keys(recordMetrics(reading)).length > 0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mode, setMode] = useState<"muscle" | "fat">("muscle");
@@ -211,11 +217,7 @@ export function BodyCompositionReport({ readings, language, patient }: { reading
   const compositionKeys = ["fat", "waterRate", "skeletalMuscle", "muscle"];
   const additionKeys = ["bmr", "vfal", "fatFree", "bone", "protein", "waterICW", "waterECW", "mineral", "whr", "fatSubCutRate", "idealWeight", "dci", "bodyAge", "obesity"];
   const segments = segmentDefinitions[mode];
-  const genderLabel = patient?.gender === "male"
-    ? (language === "ar" ? "ذكر" : "Male")
-    : patient?.gender === "female"
-      ? (language === "ar" ? "أنثى" : "Female")
-      : "—";
+  const genderLabel = formatX18Sex(report.patientSex, language);
   const segmentColor = mode === "muscle" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950";
   const allSegments = [...segmentDefinitions.muscle, ...segmentDefinitions.fat];
   const trendMetrics = [...metrics, ...allSegments.map((segment) => ({ key: segment.key, en: segment.en, ar: segment.ar, unit: "kg", color: segment.key.startsWith("muscle") ? "#25855e" : "#ef836f" }))]
@@ -232,8 +234,8 @@ export function BodyCompositionReport({ readings, language, patient }: { reading
               <h2 className="text-2xl font-extrabold">{language === "ar" ? "نتائج تحليل الجسم" : "Body Analysis Results"}</h2>
               <p className="mt-1 text-sm text-emerald-100">{new Date(report.recordedAt).toLocaleDateString(language === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "الاسم" : "Name"}:</span><span className="font-bold">{patient?.name || "—"}</span></div>
-                <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><CalendarDays className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "العمر" : "Age"}:</span><span className="font-bold">{patient?.age ?? "—"}{patient?.age !== null && patient?.age !== undefined ? (language === "ar" ? " سنة" : " yrs") : ""}</span></div>
+                <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "الاسم" : "Name"}:</span><span className="font-bold">{report.patientName || "—"}</span></div>
+                <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><CalendarDays className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "العمر" : "Age"}:</span><span className="font-bold">{report.patientAge ?? "—"}{report.patientAge !== null && report.patientAge !== undefined ? (language === "ar" ? " سنة" : " yrs") : ""}</span></div>
                 <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "الجنس" : "Gender"}:</span><span className="font-bold">{genderLabel}</span></div>
               </div>
             </div>

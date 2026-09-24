@@ -102,6 +102,10 @@ export const healthReadings = mysqlTable("health_readings", {
   temperature: decimal("temperature", { precision: 4, scale: 1 }),
   /** Full X18 body-composition payload, stored using the vendor's variable names. */
   machineMetrics: json("machineMetrics").$type<Record<string, string>>(),
+  /** Patient identity exactly as submitted by the X18 for this measurement. */
+  patientName: varchar("patientName", { length: 255 }),
+  patientAge: int("patientAge"),
+  patientSex: varchar("patientSex", { length: 32 }),
   /** X18 report identifier shared by the device's multiple upload posts. */
   recordNo: varchar("recordNo", { length: 64 }),
   deviceNo: varchar("deviceNo", { length: 64 }),

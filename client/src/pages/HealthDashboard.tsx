@@ -64,7 +64,6 @@ import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { downloadHealthScoresPDF } from "@/lib/pdfExport";
 import { BodyCompositionReport } from "@/components/BodyCompositionReport";
-import { computeAge } from "@shared/bmi";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -105,6 +104,15 @@ function Trend({ values }: { values: (number | null | undefined)[] }) {
   if (last > prev) return <TrendingUp className="w-4 h-4 text-red-500" />;
   if (last < prev) return <TrendingDown className="w-4 h-4 text-green-500" />;
   return <Minus className="w-4 h-4 text-gray-400" />;
+}
+
+/** Observed X18_5 payloads use sex: "1" for male and "2" for female. */
+function formatDeviceSex(value: string | null | undefined, language: "en" | "ar"): string {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return "—";
+  if (["1", "male", "m", "男"].includes(normalized)) return language === "ar" ? "ذكر" : "Male";
+  if (["2", "female", "f", "女"].includes(normalized)) return language === "ar" ? "أنثى" : "Female";
+  return value!.trim();
 }
 
 // ─── Health Score Banner ──────────────────────────────────────────────────
@@ -499,10 +507,6 @@ export default function HealthDashboard() {
     { enabled: isAuthenticated }
   );
 
-  const { data: profile } = trpc.profile.get.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-
   const { data: bmiData, isLoading: bmiLoading } = trpc.health.bmiComparison.useQuery(
     undefined,
     { enabled: isAuthenticated }
@@ -557,13 +561,12 @@ export default function HealthDashboard() {
 
   // Latest values for summary cards
   const latest = readings?.[0];
-  const participantAge = profile?.birthDate ? computeAge(profile.birthDate) : null;
-  const participantIdentity = {
-    name: profile?.name ?? user?.name ?? null,
-    age: participantAge,
-    gender: profile?.gender ?? null,
+  const latestX18Report = readings?.find((reading) => reading.source === "x18");
+  const deviceIdentity = {
+    name: latestX18Report?.patientName ?? null,
+    age: latestX18Report?.patientAge ?? null,
+    sex: latestX18Report?.patientSex ?? null,
   };
-  const profileNeedsDetails = !participantIdentity.name || participantIdentity.age === null || !participantIdentity.gender;
   const bpSystolicValues = (readings ?? []).map((r) => r.sbp ?? null);
   const hrValues = (readings ?? []).map((r) => r.hr ?? null);
   const weightValues = (readings ?? []).map((r) => (r.weight ? parseFloat(r.weight) : null));
@@ -576,7 +579,7 @@ export default function HealthDashboard() {
     try {
       const doc = new jsPDF({ unit: "mm", format: "a4" });
       const now = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      const name = user?.name ?? "Patient";
+      const name = latestX18Report?.patientName ?? "Patient";
 
       // Header
       doc.setFillColor(8, 145, 178);
@@ -763,7 +766,7 @@ export default function HealthDashboard() {
     } finally {
       setDownloading(false);
     }
-  }, [readings, healthScore, user]);
+  }, [readings, healthScore, latestX18Report?.patientName]);
 
   if (loading) {
     return (
@@ -808,7 +811,7 @@ export default function HealthDashboard() {
           <div className="container flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-1">{t.health_title}</h1>
-              <p className="text-cyan-100">{t.health_welcome}, {user?.name?.split(" ")[0]}</p>
+              <p className="text-cyan-100">{language === "ar" ? "راجع نتائج القياس التي أرسلها جهاز X18" : "Review the measurement details submitted by the X18 device"}</p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -829,20 +832,20 @@ export default function HealthDashboard() {
         </section>
 
         <div className="container py-8 space-y-8">
-          {/* Participant identity is sourced from the LIM profile, not from a
-              transient machine scan, so it stays consistent across reports. */}
+          {/* This is the identity that X18 transmitted with the latest physical
+              measurement. It is intentionally independent from the LIM account profile. */}
           <Card className="border-0 bg-gradient-to-r from-emerald-50 to-cyan-50 p-5 shadow-sm" dir={language === "ar" ? "rtl" : "ltr"}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{language === "ar" ? "بيانات المشارك" : "Participant details"}</p>
-                <h2 className="mt-1 text-xl font-extrabold text-slate-900">{participantIdentity.name || (language === "ar" ? "أكمل بياناتك الشخصية" : "Complete your personal details")}</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{language === "ar" ? "بيانات القياس من الجهاز" : "Device-submitted measurement details"}</p>
+                <h2 className="mt-1 text-xl font-extrabold text-slate-900">{deviceIdentity.name || (language === "ar" ? "لم يرسل الجهاز اسمًا" : "The device did not send a name")}</h2>
               </div>
-              <Link href="/profile"><Button variant="outline" size="sm" className="border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50">{profileNeedsDetails ? (language === "ar" ? "إكمال الملف الشخصي" : "Complete Profile") : (language === "ar" ? "تعديل الملف الشخصي" : "Edit Profile")}</Button></Link>
+              {latestX18Report && <span className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800">{language === "ar" ? "أحدث تحليل X18" : "Latest X18 analysis"}</span>}
             </div>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الاسم" : "Name"}</p><p className="font-bold text-slate-800">{participantIdentity.name || "—"}</p></div></div>
-              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700"><CalendarDays className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "العمر" : "Age"}</p><p className="font-bold text-slate-800">{participantIdentity.age ?? "—"}{participantIdentity.age !== null ? (language === "ar" ? " سنة" : " years") : ""}</p></div></div>
-              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الجنس" : "Gender"}</p><p className="font-bold text-slate-800">{participantIdentity.gender === "male" ? (language === "ar" ? "ذكر" : "Male") : participantIdentity.gender === "female" ? (language === "ar" ? "أنثى" : "Female") : "—"}</p></div></div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الاسم المرسل من الجهاز" : "Name sent by device"}</p><p className="font-bold text-slate-800">{deviceIdentity.name || "—"}</p></div></div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700"><CalendarDays className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "العمر المرسل من الجهاز" : "Age sent by device"}</p><p className="font-bold text-slate-800">{deviceIdentity.age ?? "—"}{deviceIdentity.age !== null ? (language === "ar" ? " سنة" : " years") : ""}</p></div></div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الجنس المرسل من الجهاز" : "Gender sent by device"}</p><p className="font-bold text-slate-800">{formatDeviceSex(deviceIdentity.sex, language)}</p></div></div>
             </div>
           </Card>
 
@@ -876,7 +879,7 @@ export default function HealthDashboard() {
 
           {/* Full X18_5 body-composition report. Rendered only when the machine
               supplied native machineMetrics; manual readings remain unchanged. */}
-          <BodyCompositionReport readings={readings ?? []} language={language} patient={participantIdentity} />
+          <BodyCompositionReport readings={readings ?? []} language={language} />
 
           {/* Chart toggle pills */}
           <div className="flex flex-wrap items-center gap-2">
