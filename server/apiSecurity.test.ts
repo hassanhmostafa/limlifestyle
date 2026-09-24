@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { apiKeysMatch, hashApiKey, readBearerToken, readDeviceApiKey } from "./lib/apiSecurity";
+import { apiKeysMatch, createDeviceApiKey, hashApiKey, readBearerToken, readDeviceApiKey } from "./lib/apiSecurity";
 
 describe("LIM API credentials", () => {
+  it("generates a compact alpha-numeric key suitable for X18 settings", () => {
+    const key = createDeviceApiKey();
+    expect(key).toMatch(/^lim_x18_[A-Za-z0-9]{16}$/);
+    expect(key).toHaveLength("lim_x18_".length + 16);
+  });
+
   it("matches only the correct hashed device key", () => {
     const key = "lim_x18_test_device_key";
     const hash = hashApiKey(key);

@@ -5,7 +5,11 @@ import crypto from "crypto";
  * database; show the plaintext key only while configuring the physical device.
  */
 export function createDeviceApiKey(): string {
-  return `lim_x18_${crypto.randomBytes(24).toString("hex")}`;
+  // 16 random alpha-numeric characters = ~95 bits of entropy. This is much
+  // easier to enter in the X18 configuration UI while remaining far beyond
+  // practical online guessing resistance for a per-device upload credential.
+  const suffix = crypto.randomBytes(24).toString("base64url").replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+  return `lim_x18_${suffix}`;
 }
 
 export function hashApiKey(apiKey: string): string {
