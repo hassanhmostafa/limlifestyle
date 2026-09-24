@@ -50,6 +50,13 @@
       "when": 1790286645888,
       "tag": "0006_x18_report_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1790292736410,
+      "tag": "0007_unified_event_sessions",
+      "breakpoints": true
     }
   ]
 }

@@ -118,6 +118,32 @@ export type HealthReading = typeof healthReadings.$inferSelect;
 export type InsertHealthReading = typeof healthReadings.$inferInsert;
 
 /**
+ * A privacy-safe event check-in. Health results stay exclusively in
+ * `health_readings`; this table stores only the event form and the linkage to
+ * the participant's LIM account.
+ */
+export const eventParticipantSessions = mysqlTable("event_participant_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  eventCode: varchar("eventCode", { length: 64 }).notNull().default("lim-events"),
+  displayName: varchar("displayName", { length: 255 }),
+  age: int("age"),
+  sex: mysqlEnum("sex", ["male", "female"]),
+  city: varchar("city", { length: 128 }),
+  consent: mysqlEnum("consent", ["true", "false"]).default("false").notNull(),
+  answers: json("answers").$type<Record<string, string | number | string[]>>(),
+  status: mysqlEnum("status", ["checked_in", "measured"]).default("checked_in").notNull(),
+  latestRecordNo: varchar("latestRecordNo", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("event_participant_sessions_user_event_unique").on(table.userId, table.eventCode),
+]);
+
+export type EventParticipantSession = typeof eventParticipantSessions.$inferSelect;
+export type InsertEventParticipantSession = typeof eventParticipantSessions.$inferInsert;
+
+/**
  * A participant grants a specific clinician (expert account) access to their
  * readings. There is no broad clinician search over health data.
  */

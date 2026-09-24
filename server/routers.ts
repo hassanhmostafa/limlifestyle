@@ -14,6 +14,7 @@ import { emailAuthRouter } from "./routers/emailAuth";
 import { phoneAuthRouter } from "./routers/phoneAuth";
 import { kioskIntegrationRouter } from "./routers/kioskIntegration";
 import { healthAccessRouter } from "./routers/healthAccess";
+import { eventsRouter } from "./routers/events";
 
 export const appRouter = router({
   system: systemRouter,
@@ -29,6 +30,7 @@ export const appRouter = router({
   phoneAuth: phoneAuthRouter,
   kioskIntegration: kioskIntegrationRouter,
   healthAccess: healthAccessRouter,
+  events: eventsRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

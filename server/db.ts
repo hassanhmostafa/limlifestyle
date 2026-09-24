@@ -2,7 +2,8 @@ import { eq, like, or, desc, and, gte, ilike, notInArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, kiosks, InsertKiosk, healthReadings, InsertHealthReading,
-  aiPlans, InsertAiPlan, bookings, InsertBooking, clinicianParticipantAccess
+  aiPlans, InsertAiPlan, bookings, InsertBooking, clinicianParticipantAccess,
+  eventParticipantSessions, InsertEventParticipantSession
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -466,6 +467,52 @@ export async function deleteHealthReading(id: number, userId: number) {
   await db
     .delete(healthReadings)
     .where(eq(healthReadings.id, id));
+}
+
+// ─────────────────────────────────────────────
+// Event participant journey helpers
+// ─────────────────────────────────────────────
+
+export async function getEventParticipantSession(userId: number, eventCode = "lim-events") {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(eventParticipantSessions).where(and(
+    eq(eventParticipantSessions.userId, userId),
+    eq(eventParticipantSessions.eventCode, eventCode),
+  )).limit(1);
+  return rows[0];
+}
+
+export async function upsertEventParticipantSession(data: InsertEventParticipantSession) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(eventParticipantSessions).values(data).onDuplicateKeyUpdate({
+    set: {
+      displayName: data.displayName ?? null,
+      age: data.age ?? null,
+      sex: data.sex ?? null,
+      city: data.city ?? null,
+      consent: data.consent,
+      answers: data.answers ?? null,
+      status: "checked_in",
+      updatedAt: new Date(),
+    },
+  });
+  return getEventParticipantSession(data.userId, data.eventCode);
+}
+
+/** Marks a participant's active LIM event check-in as measured without copying health data. */
+export async function markEventParticipantMeasured(userId: number, recordNo: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(eventParticipantSessions).set({
+    status: "measured",
+    latestRecordNo: recordNo,
+    updatedAt: new Date(),
+  }).where(and(
+    eq(eventParticipantSessions.userId, userId),
+    eq(eventParticipantSessions.eventCode, "lim-events"),
+  ));
 }
 
 // ─────────────────────────────────────────────
