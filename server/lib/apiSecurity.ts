@@ -1,13 +1,13 @@
 import crypto from "crypto";
 
 /**
- * Creates an opaque per-device credential. Store only its SHA-256 hash in the
- * database; show the plaintext key only while configuring the physical device.
+ * Creates the opaque shared LIM fleet credential. Store only its SHA-256 hash
+ * in the database; show the plaintext key only while configuring devices.
  */
 export function createDeviceApiKey(): string {
   // 16 random alpha-numeric characters = ~95 bits of entropy. This is much
   // easier to enter in the X18 configuration UI while remaining far beyond
-  // practical online guessing resistance for a per-device upload credential.
+  // practical online guessing resistance for the shared fleet credential.
   const suffix = crypto.randomBytes(24).toString("base64url").replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
   return `lim_x18_${suffix}`;
 }

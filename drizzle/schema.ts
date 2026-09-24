@@ -261,7 +261,7 @@ export const kioskDevices = mysqlTable("kiosk_devices", {
   id: int("id").autoincrement().primaryKey(),
   /** Hardware device ID from the kiosk (e.g. "2CFDA15B9372") */
   deviceId: varchar("deviceId", { length: 64 }).notNull().unique(),
-  /** SHA-256 hash of this device's dedicated X18 upload key; plaintext is never stored. */
+  /** Legacy per-device hash retained for backwards-compatible migration only. */
   apiKeyHash: varchar("apiKeyHash", { length: 64 }),
   /** Human-readable label for this device */
   label: varchar("label", { length: 255 }),
@@ -275,6 +275,19 @@ export const kioskDevices = mysqlTable("kiosk_devices", {
 
 export type KioskDevice = typeof kioskDevices.$inferSelect;
 export type InsertKioskDevice = typeof kioskDevices.$inferInsert;
+
+/**
+ * One shared upload credential for the LIM X18 fleet. Hardware remains
+ * individually registered/activatable in kioskDevices; the shared plaintext
+ * key is never stored, only its SHA-256 hash.
+ */
+export const kioskIntegrationSettings = mysqlTable("kiosk_integration_settings", {
+  id: int("id").primaryKey(),
+  apiKeyHash: varchar("apiKeyHash", { length: 64 }).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type KioskIntegrationSettings = typeof kioskIntegrationSettings.$inferSelect;
 
 /**
  * Kiosk sessions table.

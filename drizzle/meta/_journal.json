@@ -36,6 +36,13 @@
       "when": 1790280491473,
       "tag": "0004_secure_readings_access",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1790282931337,
+      "tag": "0005_shared_living_upload_key",
+      "breakpoints": true
     }
   ]
 }

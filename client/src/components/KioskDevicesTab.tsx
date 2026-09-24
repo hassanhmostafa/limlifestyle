@@ -42,13 +42,12 @@ export function KioskDevicesTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<DeviceForm>(emptyForm);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [issuedCredential, setIssuedCredential] = useState<{ deviceId: string; apiKey: string } | null>(null);
+  const [issuedCredential, setIssuedCredential] = useState<{ apiKey: string } | null>(null);
 
   const registerMutation = trpc.kioskIntegration.registerDevice.useMutation({
     onSuccess: (data) => {
       utils.kioskIntegration.listDevices.invalidate();
-      setIssuedCredential({ deviceId: form.deviceId, apiKey: data.apiKey });
-      toast.success("Device registered. Copy the upload key now.");
+      toast.success("Device registered. It uses the shared LIM upload key.");
       setShowForm(false);
       setForm(emptyForm);
     },
@@ -66,10 +65,10 @@ export function KioskDevicesTab() {
     onError: (e) => toast.error(e.message),
   });
 
-  const rotateKeyMutation = trpc.kioskIntegration.rotateDeviceApiKey.useMutation({
+  const rotateKeyMutation = trpc.kioskIntegration.rotateSharedUploadKey.useMutation({
     onSuccess: (data) => {
-      setIssuedCredential({ deviceId: data.deviceId, apiKey: data.apiKey });
-      toast.success("A new upload key was issued. Copy it now.");
+      setIssuedCredential({ apiKey: data.apiKey });
+      toast.success("A new shared upload key was issued. Copy it now.");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -143,13 +142,24 @@ export function KioskDevicesTab() {
             <Cpu className="w-5 h-5 text-cyan-600" />
             Kiosk Devices
           </h2>
-          <Button
-            className="bg-cyan-500 hover:bg-cyan-600 text-white"
-            onClick={openAdd}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Register Device
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              className="bg-cyan-500 hover:bg-cyan-600 text-white"
+              onClick={openAdd}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Register Device
+            </Button>
+            <Button
+              variant="outline"
+              className="border-amber-300 text-amber-700 hover:bg-amber-50"
+              onClick={() => rotateKeyMutation.mutate({})}
+              disabled={rotateKeyMutation.isPending}
+            >
+              {rotateKeyMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <KeyRound className="w-4 h-4 mr-2" />}
+              Create / Rotate Shared Key
+            </Button>
+          </div>
         </div>
 
         {/* Info card */}
@@ -164,6 +174,9 @@ export function KioskDevicesTab() {
             </p>
             <p className="mt-2">
               <span className="font-medium">Kiosk ID</span> (optional): link this device to an existing station in the system so readings are tagged with the correct location.
+            </p>
+            <p className="mt-2">
+              <span className="font-medium">One shared upload key:</span> all registered active devices use the same LIM key. Rotating it updates the key for the entire fleet.
             </p>
           </CardContent>
         </Card>
@@ -218,16 +231,6 @@ export function KioskDevicesTab() {
                       {device.isActive === "true"
                         ? <ToggleRight className="w-5 h-5 text-green-500" />
                         : <ToggleLeft className="w-5 h-5 text-gray-400" />}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-gray-500 hover:text-amber-600"
-                      onClick={() => rotateKeyMutation.mutate({ id: device.id })}
-                      disabled={rotateKeyMutation.isPending}
-                      title="Rotate upload key"
-                    >
-                      <KeyRound className="w-4 h-4" />
                     </Button>
                     <Button
                       size="sm"
@@ -311,21 +314,21 @@ export function KioskDevicesTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Credential shown exactly once after registration or rotation. */}
+      {/* Shared credential shown exactly once after creation or rotation. */}
       <Dialog open={!!issuedCredential} onOpenChange={(open) => !open && setIssuedCredential(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Device Upload Key — Copy Now</DialogTitle>
+            <DialogTitle>Shared LIM Upload Key — Copy Now</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-gray-600">
-              Use this key only for <span className="font-mono">{issuedCredential?.deviceId}</span>. LIM stores it only as a hash and cannot show it again.
+              Use this one key for every registered active LIM device. LIM stores it only as a hash and cannot show it again.
             </p>
             <code className="block w-full break-all rounded-lg bg-slate-950 p-3 text-xs text-cyan-300 font-mono">
               {issuedCredential?.apiKey}
             </code>
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
-              Configure the machine as <span className="font-mono">https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_KEY</span>. Rotating the key disables the previous one immediately.
+              Configure every machine as <span className="font-mono">https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_KEY</span>. Rotating the key disables the previous key for every device immediately.
             </p>
           </div>
           <DialogFooter>

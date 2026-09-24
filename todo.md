@@ -7,7 +7,7 @@
 - [x] Link a QR-scanned LIM session or a manual Saudi mobile number to a participant account.
 - [x] Create a pending LIM account automatically when a valid Saudi mobile number has no account; activating that number later exposes the saved readings.
 - [x] Remove the phone-scans-machine-results workflow. X18 uploads results directly and the participant opens **My Health**.
-- [x] Require an active registered device and dedicated per-device upload key, stored only as a hash.
+- [x] Require an active registered device and one shared LIM fleet upload key, stored only as a hash.
 - [x] Add event-app Bearer-token endpoints for a participant to view only their own readings and complete `machineMetrics`.
 - [x] Add consent-gated clinician endpoints; an expert only sees participants who have explicitly authorized them.
 - [x] Mark and hide historical demo/simulator readings from participant and event health histories without deleting them; stop runtime demo seeding.

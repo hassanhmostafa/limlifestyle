@@ -9,18 +9,18 @@
 الجهاز يجب أن يرسل طلب **HTTPS POST** إلى:
 
 ```text
-https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_DEVICE_KEY
+https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_LIM_UPLOAD_KEY
 ```
 
-استبدل `YOUR_DEVICE_KEY` بمفتاح الجهاز الذي تم إنشاؤه له فقط. المفتاح مختلف لكل جهاز ولا يُحفظ في قاعدة البيانات كنص صريح؛ LIM يحفظ بصمته المشفّرة فقط.
+استبدل `YOUR_LIM_UPLOAD_KEY` بمفتاح رفع LIM المشترك. يستخدم **كل جهاز LIM مسجّل ومفعّل المفتاح نفسه**؛ يستمر LIM في التحقق من `deviceNo` لكل جهاز على حدة، ولا يُحفظ المفتاح كنص صريح بل بصمته المشفّرة فقط.
 
 | الإعداد | القيمة |
 |---|---|
 | الطريقة | `POST` |
 | نوع المحتوى | `application/json` |
 | تعريف الجهاز | `deviceNo` في جسم JSON |
-| مصادقة الجهاز المفضلة | رأس `X-LIM-Device-Key: YOUR_DEVICE_KEY` |
-| بديل لأجهزة X18 التي لا تدعم الرؤوس | `?apiKey=YOUR_DEVICE_KEY` في عنوان الرفع |
+| مصادقة الجهاز المفضلة | رأس `X-LIM-Device-Key: YOUR_LIM_UPLOAD_KEY` |
+| بديل لأجهزة X18 التي لا تدعم الرؤوس | `?apiKey=YOUR_LIM_UPLOAD_KEY` في عنوان الرفع |
 | الجهاز المسجّل حاليًا | `G260820131014906` |
 
 لا تفتح هذا الرابط في المتصفح لاختبار الإرسال؛ فتحه ينفّذ طلب `GET` فقط ولا يرسل قياسًا. الاختبار الصحيح هو `POST` من الجهاز بعد انتهاء القياس.
@@ -77,7 +77,7 @@ https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_DEVICE_KEY
 مثال `curl` للتشخيص فقط:
 
 ```bash
-curl -X POST 'https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_DEVICE_KEY' \
+curl -X POST 'https://limlifestyle.com/api/kiosk/data?apiKey=YOUR_LIM_UPLOAD_KEY' \
   -H 'Content-Type: application/json' \
   --data @x18-sample.json
 ```
@@ -180,8 +180,8 @@ Authorization: Bearer <accessToken>
 - رابط النتائج لا يقبل `phone` أو `userId` كوسيط؛ لا يمكن تبديل هوية المشارك في الطلب.
 - يتم التحقق من JWT وتحديد مستخدم LIM من `openId` داخله، ثم تستعلم قاعدة البيانات بـ `userId` الداخلي لهذا الشخص فقط.
 - رقم الهاتف موحّد بصيغة سعودية، ولا يُعاد في الرد إلا بصيغته المحلية المقنّعة وظيفيًا (`05XXXXXXXX`).
-- نقطة الرفع تتحقق من `deviceNo` المسجّل والمفعّل **ومن مفتاح الجهاز المنفصل**.
-- لا يُحفظ مفتاح الجهاز كنص صريح؛ عند التسجيل أو تدوير المفتاح لا يُعرض النص إلا مرة واحدة.
+- نقطة الرفع تتحقق من `deviceNo` المسجّل والمفعّل **ومن مفتاح رفع LIM المشترك**.
+- لا يُحفظ مفتاح الرفع المشترك كنص صريح؛ عند إنشائه أو تدويره لا يُعرض النص إلا مرة واحدة.
 
 ## 4. وصول الطبيب المصرّح له فقط
 

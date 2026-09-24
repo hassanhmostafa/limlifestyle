@@ -33,7 +33,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { createMachinePhoneUser, getDb } from "../db";
-import { kioskDevices, kioskSessions, healthReadings, users } from "../../drizzle/schema";
+import { kioskDevices, kioskIntegrationSettings, kioskSessions, healthReadings, users } from "../../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import crypto from "crypto";
 import { isLIMPhoneQrToken, normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
@@ -290,10 +290,11 @@ async function saveX18MachinePayload(
     return { success: false, message: "Device not registered or inactive." };
   }
 
-  if (!device.apiKeyHash) {
-    return { success: false, message: "Device upload credential is not configured." };
+  const [settings] = await db.select().from(kioskIntegrationSettings).where(eq(kioskIntegrationSettings.id, 1));
+  if (!settings?.apiKeyHash) {
+    return { success: false, message: "Shared LIM upload credential is not configured." };
   }
-  if (!apiKeysMatch(providedApiKey, device.apiKeyHash)) {
+  if (!apiKeysMatch(providedApiKey, settings.apiKeyHash)) {
     return { success: false, message: "Invalid device upload credential." };
   }
 
@@ -838,34 +839,29 @@ export const kioskIntegrationRouter = router({
         });
       }
 
-      const apiKey = createDeviceApiKey();
       await db.insert(kioskDevices).values({
         deviceId: input.deviceId,
-        apiKeyHash: hashApiKey(apiKey),
         label: input.label ?? null,
         kioskId: input.kioskId ?? null,
         isActive: "true",
       });
 
-      return { success: true, apiKey };
+      return { success: true };
     }),
 
-  /** Replaces a device credential. The plaintext key is returned only now and
-   * stored solely as a SHA-256 hash. */
-  rotateDeviceApiKey: protectedProcedure
-    .input(z.object({ id: z.number() }))
+  /** Replaces the one shared credential used by all registered, active X18
+   * devices. The plaintext key is returned only here and stored as a hash. */
+  rotateSharedUploadKey: protectedProcedure
+    .input(z.object({}))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      const [device] = await db.select({ id: kioskDevices.id, deviceId: kioskDevices.deviceId })
-        .from(kioskDevices).where(eq(kioskDevices.id, input.id));
-      if (!device) throw new TRPCError({ code: "NOT_FOUND", message: "Device not found." });
-
       const apiKey = createDeviceApiKey();
-      await db.update(kioskDevices).set({ apiKeyHash: hashApiKey(apiKey) }).where(eq(kioskDevices.id, input.id));
-      return { success: true, deviceId: device.deviceId, apiKey };
+      await db.insert(kioskIntegrationSettings).values({ id: 1, apiKeyHash: hashApiKey(apiKey) })
+        .onDuplicateKeyUpdate({ set: { apiKeyHash: hashApiKey(apiKey), updatedAt: new Date() } });
+      return { success: true, apiKey };
     }),
 
   /**
