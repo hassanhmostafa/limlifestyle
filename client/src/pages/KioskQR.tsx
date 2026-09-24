@@ -99,7 +99,7 @@ export default function KioskQR() {
             <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5 text-white" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+            <span className="text-2xl font-bold text-gray-900">LIM</span>
           </div>
           <p className="text-gray-500 text-sm mt-1">
             {isAr ? "رمز تسجيل الدخول للجهاز" : "Machine Login QR Code"}
@@ -171,8 +171,8 @@ export default function KioskQR() {
                     <CheckCircle2 className="w-4 h-4 text-white" />
                   </div>
                   <div className="text-left min-w-0">
-                    <p className="text-xs font-medium text-gray-800 truncate">{user.name ?? "Tech Care User"}</p>
-                    <p className="text-xs text-gray-400 truncate">{user.email ?? user.openId}</p>
+                    <p className="text-xs font-medium text-gray-800 truncate">{user.name ?? "LIM User"}</p>
+                    <p className="text-xs text-gray-400 truncate">{user.phone ?? user.openId}</p>
                   </div>
                 </div>
 
@@ -196,8 +196,8 @@ export default function KioskQR() {
               </p>
               <p className="text-xs text-gray-500 leading-relaxed">
                 {isAr
-                  ? "عند انتهاء الجهاز من القياسات، سيعرض رمز QR. افتح تطبيق Tech Care وامسح الرمز لاستلام نتائجك."
-                  : "When the machine finishes measuring, it will display a QR code. Open Tech Care and scan it to receive your results."}
+                  ? "عند انتهاء الجهاز من القياسات، سيعرض رمز QR. افتح تطبيق LIM وامسح الرمز لاستلام نتائجك."
+                  : "When the machine finishes measuring, it will display a QR code. Open LIM and scan it to receive your results."}
               </p>
               <Button
                 variant="outline"

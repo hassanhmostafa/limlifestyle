@@ -132,9 +132,9 @@ describe("health.logReading", () => {
     const caller = appRouter.createCaller(makeCtx("user"));
     const result = await caller.health.logReading({
       kioskId: "kiosk-1",
-      bloodPressureSystolic: 120,
-      bloodPressureDiastolic: 80,
-      heartRate: 72,
+      sbp: 120,
+      dbp: 80,
+      hr: 72,
     });
     expect(result).toBeDefined();
   });
@@ -144,7 +144,7 @@ describe("health.logReading", () => {
     await expect(
       caller.health.logReading({
         kioskId: "kiosk-1",
-        bloodPressureSystolic: 999, // out of range
+        sbp: 999, // out of range
       })
     ).rejects.toThrow();
   });

@@ -60,9 +60,9 @@ export const aiPlansRouter = router({
       let healthScoreValue: number | null = null;
       if (latest) {
         const scoreResult = calculateHealthScore({
-          bloodPressureSystolic: latest.bloodPressureSystolic,
-          bloodPressureDiastolic: latest.bloodPressureDiastolic,
-          heartRate: latest.heartRate,
+          sbp: latest.sbp,
+          dbp: latest.dbp,
+          hr: latest.hr,
           bmi: latest.bmi ? parseFloat(latest.bmi) : null,
           temperature: latest.temperature ? parseFloat(latest.temperature) : null,
         });
@@ -77,9 +77,9 @@ export const aiPlansRouter = router({
         weight: latest?.weight ?? null,
         height: latest?.height ?? null,
         bmi: bmiValue,
-        bloodPressureSystolic: latest?.bloodPressureSystolic ?? null,
-        bloodPressureDiastolic: latest?.bloodPressureDiastolic ?? null,
-        heartRate: latest?.heartRate ?? null,
+        sbp: latest?.sbp ?? null,
+        dbp: latest?.dbp ?? null,
+        hr: latest?.hr ?? null,
         temperature: latest?.temperature ?? null,
         healthScore: healthScoreValue,
       };
@@ -114,8 +114,8 @@ Formatting rules (MUST follow):
 - Gender: ${user.gender ?? "Not provided"}
 
 **Latest Health Metrics:**
-- Blood Pressure: ${latest?.bloodPressureSystolic && latest?.bloodPressureDiastolic ? `${latest.bloodPressureSystolic}/${latest.bloodPressureDiastolic} mmHg` : "Not available"}
-- Heart Rate: ${latest?.heartRate ? `${latest.heartRate} bpm` : "Not available"}
+ - Blood Pressure: ${latest?.sbp && latest?.dbp ? `${latest.sbp}/${latest.dbp} mmHg` : "Not available"}
+ - Heart Rate: ${latest?.hr ? `${latest.hr} bpm` : "Not available"}
 - Weight: ${latest?.weight ? `${latest.weight} kg` : "Not available"}
 - Height: ${latest?.height ? `${latest.height} cm` : "Not available"}
 - BMI: ${bmiInfo}

@@ -11,6 +11,7 @@ import { bookingsRouter } from "./routers/bookings";
 import { expertRequestsRouter } from "./routers/expertRequests";
 import { chatRouter } from "./routers/chat";
 import { emailAuthRouter } from "./routers/emailAuth";
+import { phoneAuthRouter } from "./routers/phoneAuth";
 import { kioskIntegrationRouter } from "./routers/kioskIntegration";
 
 export const appRouter = router({
@@ -24,6 +25,7 @@ export const appRouter = router({
   expertRequests: expertRequestsRouter,
   chat: chatRouter,
   emailAuth: emailAuthRouter,
+  phoneAuth: phoneAuthRouter,
   kioskIntegration: kioskIntegrationRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

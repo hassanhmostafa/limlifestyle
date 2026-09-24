@@ -144,11 +144,11 @@ export default function PWAInstallPrompt() {
           <div className="bg-white border border-cyan-200 rounded-2xl shadow-xl p-4 flex items-start gap-3">
             <img
               src="https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/pwa-icon-512-Njw5mfjYVQrS2JHikUmEfa.png"
-              alt="Tech Care"
+              alt="LIM"
               className="w-12 h-12 rounded-xl flex-shrink-0"
             />
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 text-sm">Install Tech Care</p>
+              <p className="font-semibold text-gray-900 text-sm">Install LIM</p>
               <p className="text-xs text-gray-500 mt-0.5">
                 Add to your home screen for quick access to your health data
               </p>

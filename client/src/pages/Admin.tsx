@@ -378,7 +378,7 @@ export default function Admin() {
           <div className="container flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-1">Admin Panel</h1>
-              <p className="text-slate-300">Manage Tech Care kiosk locations and users</p>
+              <p className="text-slate-300">Manage LIM kiosk locations and users</p>
             </div>
 
           </div>
@@ -743,7 +743,7 @@ export default function Admin() {
                   { key: "latitude", label: "Latitude *", placeholder: "21.5433", full: false },
                   { key: "longitude", label: "Longitude *", placeholder: "39.1726", full: false },
                   { key: "phone", label: "Phone", placeholder: "+966 12 645 8888", full: false },
-                  { key: "email", label: "Email", placeholder: "station@techcare.com", full: false },
+                  { key: "email", label: "Email", placeholder: "station@limlifestyle.com", full: false },
                   { key: "image", label: "Image URL", placeholder: "https://...", full: true },
                   { key: "rating", label: "Rating (0–5)", placeholder: "4.8", full: false },
                 ] as { key: keyof KioskFormData; label: string; placeholder: string; full: boolean }[]

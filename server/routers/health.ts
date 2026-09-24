@@ -48,9 +48,9 @@ export const healthRouter = router({
     .input(
       z.object({
         kioskId: z.string(),
-        bloodPressureSystolic: z.number().int().min(50).max(300).optional(),
-        bloodPressureDiastolic: z.number().int().min(30).max(200).optional(),
-        heartRate: z.number().int().min(30).max(250).optional(),
+        sbp: z.number().int().min(50).max(300).optional(),
+        dbp: z.number().int().min(30).max(200).optional(),
+        hr: z.number().int().min(30).max(250).optional(),
         weight: z.string().optional(),
         height: z.string().optional(),
         bmi: z.string().optional(),
@@ -63,9 +63,9 @@ export const healthRouter = router({
       return createHealthReading({
         userId: ctx.user.id,
         kioskId: input.kioskId,
-        bloodPressureSystolic: input.bloodPressureSystolic ?? null,
-        bloodPressureDiastolic: input.bloodPressureDiastolic ?? null,
-        heartRate: input.heartRate ?? null,
+        sbp: input.sbp ?? null,
+        dbp: input.dbp ?? null,
+        hr: input.hr ?? null,
         weight: input.weight ?? null,
         height: input.height ?? null,
         bmi: input.bmi ?? null,
@@ -132,9 +132,9 @@ export const healthRouter = router({
     // Use most recent reading
     const latest = readings[0];
     const result = calculateHealthScore({
-      bloodPressureSystolic: latest.bloodPressureSystolic,
-      bloodPressureDiastolic: latest.bloodPressureDiastolic,
-      heartRate: latest.heartRate,
+      sbp: latest.sbp,
+      dbp: latest.dbp,
+      hr: latest.hr,
       bmi: latest.bmi ? parseFloat(latest.bmi) : null,
       temperature: latest.temperature ? parseFloat(latest.temperature) : null,
     });

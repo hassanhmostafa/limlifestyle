@@ -112,7 +112,7 @@ const en: Translations = {
   hero_title1: "Your Health,",
   hero_title2: "Our Priority",
   hero_subtitle:
-    "Access advanced health screenings at convenient kiosk locations across Jeddah. Measure your vital signs, track your wellness journey, and get personalized health insights with Tech Care.",
+    "Access advanced health screenings at convenient kiosk locations across Jeddah. Measure your vital signs, track your wellness journey, and get personalized health insights with LIM.",
   hero_findStation: "Find a Station",
   hero_learnMore: "Learn More",
   hero_activeStations: "Active Stations",
@@ -122,13 +122,13 @@ const en: Translations = {
   home_searchSubtitle: "Search by location or browse all available kiosks",
   home_searchPlaceholder: "Enter your location or station name...",
   home_searchBtn: "Search",
-  home_whyTitle: "Why Choose Tech Care?",
+  home_whyTitle: "Why Choose LIM?",
   home_whySubtitle:
     "Experience modern healthcare accessibility with our comprehensive health screening platform",
   home_servicesTitle: "Health Screening Services",
   home_servicesSubtitle: "Our kiosks provide comprehensive health measurements and assessments",
   home_ctaTitle: "Ready to Start Your Wellness Journey?",
-  home_ctaSubtitle: "Find your nearest Tech Care station today and take control of your health",
+  home_ctaSubtitle: "Find your nearest LIM station today and take control of your health",
   home_ctaBtn: "Find a Station Near You",
 
   feat_locations: "Convenient Locations",
@@ -162,7 +162,7 @@ const en: Translations = {
   svc_riskDesc: "Identify potential health risks",
 
   findStation_title: "Find a Health Station",
-  findStation_subtitle: "Locate the nearest Tech Care kiosk in Jeddah",
+  findStation_subtitle: "Locate the nearest LIM kiosk in Jeddah",
   findStation_searchPlaceholder: "Search by name or area...",
   findStation_results: "stations found",
   findStation_noResults: "No stations match your search.",

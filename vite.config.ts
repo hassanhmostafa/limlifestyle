@@ -161,9 +161,9 @@ const plugins = [
     registerType: "autoUpdate",
     includeAssets: ["favicon.ico"],
     manifest: {
-      name: "Tech Care",
-      short_name: "Tech Care",
-      description: "Find health kiosks near you, track your health metrics, and connect with medical experts.",
+      name: "LIM",
+      short_name: "LIM",
+      description: "LIM health kiosk platform for tracking health measurements and wellness insights.",
       theme_color: "#06b6d4",
       background_color: "#ffffff",
       display: "standalone",

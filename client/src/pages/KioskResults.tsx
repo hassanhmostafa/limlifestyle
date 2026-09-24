@@ -19,10 +19,19 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRef } from "react";
-import { getLoginUrl } from "@/const";
 
 type PageState = "loading" | "scan" | "claiming" | "success" | "error";
 type ScanTab = "qr" | "manual";
+
+function readResultsToken(raw: string): string | null {
+  try {
+    const url = new URL(raw);
+    return url.searchParams.get("token") || url.searchParams.get("resultsToken");
+  } catch {
+    // The simulator may encode only the opaque LIM results token.
+    return /^[a-f0-9]{16,}$/i.test(raw) ? raw : null;
+  }
+}
 
 export default function KioskResults() {
   const search = useSearch();
@@ -87,9 +96,15 @@ export default function KioskResults() {
       const controls = await reader.decodeFromVideoDevice(undefined, videoEl, (result, err) => {
         if (!result) return;
         const raw = result.getText().trim();
-        let token = raw;
-        try { const url = new URL(raw); token = url.searchParams.get("token") || url.searchParams.get("resultsToken") || raw; } catch { /* not a URL */ }
+        const token = readResultsToken(raw);
         stopScanner();
+        if (!token) {
+          setErrorMessage(isAr
+            ? "رمز QR هذا هو رابط تقرير الشركة المصنّعة، وليس رمز نقل نتائج LIM. اضبط رابط رفع البيانات في الجهاز أو استخدم رمز LIM الذي يظهر في المحاكي."
+            : "This QR code is a manufacturer report link, not a LIM results-transfer QR. Configure the machine data-upload URL, or use the LIM QR shown by the simulator.");
+          setPageState("error");
+          return;
+        }
         claimMutation.mutate({ resultsToken: token });
         setPageState("claiming");
       });
@@ -133,8 +148,8 @@ export default function KioskResults() {
   if (pageState === "success" && claimedReading) {
     const r = claimedReading;
     const metrics = [
-      { label: isAr ? "ضغط الدم" : "Blood Pressure", value: r.bloodPressureSystolic && r.bloodPressureDiastolic ? `${r.bloodPressureSystolic}/${r.bloodPressureDiastolic} mmHg` : "—" },
-      { label: isAr ? "معدل ضربات القلب" : "Heart Rate", value: r.heartRate ? `${r.heartRate} bpm` : "—" },
+      { label: isAr ? "ضغط الدم" : "Blood Pressure", value: r.sbp && r.dbp ? `${r.sbp}/${r.dbp} mmHg` : "—" },
+      { label: isAr ? "معدل ضربات القلب" : "Heart Rate", value: r.hr ? `${r.hr} bpm` : "—" },
       { label: isAr ? "الوزن" : "Weight", value: r.weight ? `${r.weight} kg` : "—" },
       { label: isAr ? "الطول" : "Height", value: r.height ? `${r.height} cm` : "—" },
       { label: isAr ? "مؤشر كتلة الجسم" : "BMI", value: r.bmi ?? "—" },
@@ -149,7 +164,7 @@ export default function KioskResults() {
               <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
                 <Heart className="w-5 h-5 text-white" />
               </div>
-              <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+              <span className="text-2xl font-bold text-gray-900">LIM</span>
             </div>
           </div>
           <Card className="shadow-lg border-0">
@@ -224,7 +239,7 @@ export default function KioskResults() {
             <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5 text-white" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+            <span className="text-2xl font-bold text-gray-900">LIM</span>
           </div>
         </div>
 

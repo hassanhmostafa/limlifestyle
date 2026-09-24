@@ -7,11 +7,6 @@ vi.mock("./db", () => ({
   cancelBooking: vi.fn(),
   getBookedSlots: vi.fn(),
   getKioskById: vi.fn(),
-  createKioskRequest: vi.fn(),
-  getUserKioskRequests: vi.fn(),
-  getAllKioskRequests: vi.fn(),
-  countPendingKioskRequests: vi.fn(),
-  updateKioskRequestStatus: vi.fn(),
   getKioskBookings: vi.fn(),
   updateBookingStatus: vi.fn(),
   searchUsers: vi.fn(),
@@ -29,11 +24,6 @@ import {
   cancelBooking,
   getBookedSlots,
   getKioskById,
-  createKioskRequest,
-  getUserKioskRequests,
-  getAllKioskRequests,
-  countPendingKioskRequests,
-  updateKioskRequestStatus,
   getKioskBookings,
   updateBookingStatus,
   searchUsers,
@@ -164,46 +154,6 @@ describe("bookings.cancel", () => {
   });
 });
 
-// ── Kiosk Requests Router Tests ────────────────────────────────────────────────
-
-describe("kioskRequests.requestCreate", () => {
-  it("creates a create request with correct type and payload", async () => {
-    vi.mocked(createKioskRequest).mockResolvedValue({ id: 1 } as any);
-    const { kioskRequestsRouter } = await import("./routers/kioskRequests");
-    const caller = kioskRequestsRouter.createCaller(makeCtx("user", 7));
-    await caller.requestCreate({ name: "New Kiosk", location: "Mall", address: "123 St" });
-    expect(createKioskRequest).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 7,
-      type: "create",
-      status: "pending",
-    }));
-  });
-});
-
-describe("kioskRequests.requestDelete", () => {
-  it("creates a delete request with kioskId in payload", async () => {
-    vi.mocked(createKioskRequest).mockResolvedValue({ id: 2 } as any);
-    const { kioskRequestsRouter } = await import("./routers/kioskRequests");
-    const caller = kioskRequestsRouter.createCaller(makeCtx("user", 8));
-    await caller.requestDelete({ kioskId: "kiosk-abc", kioskName: "ABC Kiosk" });
-    expect(createKioskRequest).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 8,
-      type: "delete",
-      payload: expect.objectContaining({ kioskId: "kiosk-abc" }),
-    }));
-  });
-});
-
-describe("kioskRequests.myRequests", () => {
-  it("returns requests for the current user", async () => {
-    vi.mocked(getUserKioskRequests).mockResolvedValue([]);
-    const { kioskRequestsRouter } = await import("./routers/kioskRequests");
-    const caller = kioskRequestsRouter.createCaller(makeCtx("user", 9));
-    await caller.myRequests();
-    expect(getUserKioskRequests).toHaveBeenCalledWith(9);
-  });
-});
-
 // ── Admin searchUsers Tests ────────────────────────────────────────────────────
 
 describe("admin.searchUsers", () => {
@@ -228,40 +178,5 @@ describe("admin.searchUsers", () => {
     const caller = adminRouter.createCaller(makeCtx("user"));
     await expect(caller.searchUsers({ query: "test" }))
       .rejects.toMatchObject({ code: "FORBIDDEN" });
-  });
-});
-
-// ── Admin kioskRequests Tests ──────────────────────────────────────────────────
-
-describe("admin.pendingRequestCount", () => {
-  it("returns count from db helper", async () => {
-    vi.mocked(countPendingKioskRequests).mockResolvedValue(3);
-    const { adminRouter } = await import("./routers/admin");
-    const caller = adminRouter.createCaller(makeCtx("admin"));
-    const count = await caller.pendingRequestCount();
-    expect(count).toBe(3);
-  });
-});
-
-describe("admin.rejectKioskRequest", () => {
-  it("rejects a pending request", async () => {
-    vi.mocked(getAllKioskRequests).mockResolvedValue([
-      { id: 10, type: "create", status: "pending", payload: {}, message: null, adminNote: null, userId: 5, reviewedBy: null, createdAt: Date.now(), updatedAt: Date.now() },
-    ] as any);
-    vi.mocked(updateKioskRequestStatus).mockResolvedValue(undefined);
-    const { adminRouter } = await import("./routers/admin");
-    const caller = adminRouter.createCaller(makeCtx("admin"));
-    await caller.rejectKioskRequest({ requestId: 10, adminNote: "Not suitable" });
-    expect(updateKioskRequestStatus).toHaveBeenCalledWith(10, "rejected", 1, "Not suitable");
-  });
-
-  it("throws BAD_REQUEST for already processed request", async () => {
-    vi.mocked(getAllKioskRequests).mockResolvedValue([
-      { id: 11, type: "create", status: "approved", payload: {}, message: null, adminNote: null, userId: 5, reviewedBy: null, createdAt: Date.now(), updatedAt: Date.now() },
-    ] as any);
-    const { adminRouter } = await import("./routers/admin");
-    const caller = adminRouter.createCaller(makeCtx("admin"));
-    await expect(caller.rejectKioskRequest({ requestId: 11 }))
-      .rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

@@ -213,7 +213,7 @@ export default function KioskLogin() {
               <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
                 <Heart className="w-5 h-5 text-white" />
               </div>
-              <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+              <span className="text-2xl font-bold text-gray-900">LIM</span>
             </div>
           </div>
 
@@ -468,7 +468,7 @@ export default function KioskLogin() {
             <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5 text-white" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">Tech Care</span>
+            <span className="text-2xl font-bold text-gray-900">LIM</span>
           </div>
         </div>
 
@@ -496,10 +496,10 @@ export default function KioskLogin() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 text-sm truncate">
-                    {user.name ?? (isAr ? "مستخدم Tech Care" : "Tech Care User")}
+                    {user.name ?? (isAr ? "مستخدم LIM" : "LIM User")}
                   </p>
                   <p className="text-xs text-gray-400 truncate">
-                    {user.email ?? user.openId}
+                    {user.phone ?? user.openId}
                   </p>
                 </div>
               </div>

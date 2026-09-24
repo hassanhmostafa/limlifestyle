@@ -38,7 +38,7 @@ export default function Navigation() {
             <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
               <Heart className="w-6 h-6 text-white" />
             </div>
-            <span className="font-bold text-xl text-gray-900">Tech Care</span>
+            <span className="font-bold text-xl text-gray-900">LIM</span>
           </div>
         </Link>
 

@@ -94,9 +94,9 @@ function gradeFromScore(score: number): { grade: HealthScoreGrade; gradeColor: s
 }
 
 export interface HealthScoreInput {
-  bloodPressureSystolic?: number | null;
-  bloodPressureDiastolic?: number | null;
-  heartRate?: number | null;
+  sbp?: number | null;
+  dbp?: number | null;
+  hr?: number | null;
   bmi?: number | null;
   temperature?: number | null;
 }
@@ -106,8 +106,8 @@ export interface HealthScoreInput {
  * Any missing metric is excluded from the weighted average.
  */
 export function calculateHealthScore(input: HealthScoreInput): HealthScoreResult {
-  const bpScore = scoreBP(input.bloodPressureSystolic ?? null, input.bloodPressureDiastolic ?? null);
-  const hrScore = scoreHR(input.heartRate ?? null);
+  const bpScore = scoreBP(input.sbp ?? null, input.dbp ?? null);
+  const hrScore = scoreHR(input.hr ?? null);
   const bmiScore = scoreBMI(input.bmi ?? null);
   const tempScore = scoreTemp(input.temperature ?? null);
 

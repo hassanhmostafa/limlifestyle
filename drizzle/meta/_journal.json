@@ -15,6 +15,13 @@
       "when": 1782038996067,
       "tag": "0001_mighty_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1790274781536,
+      "tag": "0002_lim_phone_x18",
+      "breakpoints": true
     }
   ]
 }

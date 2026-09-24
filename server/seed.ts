@@ -22,7 +22,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.5433000",
     longitude: "39.1726000",
     phone: "+966 12 645 8888",
-    email: "redsea@techcare.com",
+    email: "redsea@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/hero-health-kiosk-5mwyXD2eAKfFKPmEnVJdix.webp",
     rating: "4.8",
@@ -46,7 +46,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.5239000",
     longitude: "39.1714000",
     phone: "+966 12 652 3333",
-    email: "corniche@techcare.com",
+    email: "corniche@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/health-metrics-visual-M3LugxJgaMsdLyecxjVXzc.webp",
     rating: "4.9",
@@ -70,7 +70,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.5436000",
     longitude: "39.1572000",
     phone: "+966 12 667 5555",
-    email: "tahlia@techcare.com",
+    email: "tahlia@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/hero-health-kiosk-5mwyXD2eAKfFKPmEnVJdix.webp",
     rating: "4.7",
@@ -94,7 +94,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.4834000",
     longitude: "39.1859000",
     phone: "+966 12 642 1111",
-    email: "balad@techcare.com",
+    email: "balad@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/health-metrics-visual-M3LugxJgaMsdLyecxjVXzc.webp",
     rating: "4.6",
@@ -118,7 +118,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.6289000",
     longitude: "39.1234000",
     phone: "+966 12 698 7777",
-    email: "north@techcare.com",
+    email: "north@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/hero-health-kiosk-5mwyXD2eAKfFKPmEnVJdix.webp",
     rating: "4.8",
@@ -142,7 +142,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.4234000",
     longitude: "39.1456000",
     phone: "+966 12 634 2222",
-    email: "south@techcare.com",
+    email: "south@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/health-metrics-visual-M3LugxJgaMsdLyecxjVXzc.webp",
     rating: "4.5",
@@ -166,7 +166,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.7234000",
     longitude: "39.0856000",
     phone: "+966 12 689 4444",
-    email: "obhur@techcare.com",
+    email: "obhur@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/hero-health-kiosk-5mwyXD2eAKfFKPmEnVJdix.webp",
     rating: "4.7",
@@ -190,7 +190,7 @@ export const SEED_KIOSKS: InsertKiosk[] = [
     latitude: "21.5834000",
     longitude: "39.2156000",
     phone: "+966 12 671 6666",
-    email: "nuzha@techcare.com",
+    email: "nuzha@limlifestyle.com",
     image:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/health-metrics-visual-M3LugxJgaMsdLyecxjVXzc.webp",
     rating: "4.8",

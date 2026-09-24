@@ -68,7 +68,7 @@ async function startServer() {
   // Version/health check endpoint
   app.get("/api/version", (_req, res) => {
     res.json({
-      project: "Tech Care",
+      project: "LIM",
       version: "2.0.0",
       features: ["kiosk-integration", "expert-chat", "ai-plan", "bookings", "health-readings"],
       kioskDataEndpoint: "/api/kiosk/data",
@@ -80,7 +80,7 @@ async function startServer() {
   /**
    * Kiosk QR login polling endpoint.
    * The machine generates a random token, shows it as a QR code, then polls this URL
-   * every second to check if the user has scanned and confirmed via the Tech Care app.
+   * every second to check if the user has scanned and confirmed via the LIM app.
    * URL format is fixed by the machine firmware (matches Henan Lejia WeChat login protocol).
    */
   app.get("/weixin/login/xcx", handleKioskLoginPoll);

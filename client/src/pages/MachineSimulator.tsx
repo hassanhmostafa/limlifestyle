@@ -22,7 +22,7 @@ type ReceiptMetrics = {
 
 function printHealthReceipt(
   metrics: ReceiptMetrics,
-  patient: { name: string | null; email: string | null } | null
+  patient: { name: string | null; phone: string | null } | null
 ) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-SA", { year: "numeric", month: "long", day: "numeric" });
@@ -86,7 +86,7 @@ function printHealthReceipt(
 </head>
 <body>
   <div class="header">
-    <div class="station-name">Tech Care Health Station</div>
+    <div class="station-name">LIM Health Station</div>
     <div class="title">Health Check Receipt</div>
     <div class="subtitle">Automated Screening Results</div>
   </div>
@@ -94,7 +94,7 @@ function printHealthReceipt(
     <span>Date: ${dateStr}</span>
     <span>Time: ${timeStr}</span>
   </div>
-  ${patient?.name ? `<div class="patient"><strong>${patient.name}</strong>${patient.email ? `<span style="color:#64748b;font-size:11px">${patient.email}</span>` : ""}</div>` : ""}
+  ${patient?.name ? `<div class="patient"><strong>${patient.name}</strong>${patient.phone ? `<span style="color:#64748b;font-size:11px">${patient.phone}</span>` : ""}</div>` : ""}
   <table>
     <thead><tr><th>Measurement</th><th>Result</th><th>Status</th></tr></thead>
     <tbody>
@@ -108,7 +108,7 @@ function printHealthReceipt(
   <div class="footer">
     This receipt is for informational purposes only.<br/>
     Please consult a healthcare professional for medical advice.<br/>
-    <strong style="color:#0ea5e9">Tech Care · techcarev2-zgcnaa4a.manus.space</strong>
+    <strong style="color:#0ea5e9">LIM · limlifestyle.com</strong>
   </div>
   <script>window.onload = () => { window.print(); }<\/script>
 </body>
@@ -140,7 +140,7 @@ export default function MachineSimulator() {
 
   const [state, setState] = useState<SimulatorState>("idle");
   const [token, setToken] = useState<string | null>(null);
-  const [confirmedUser, setConfirmedUser] = useState<{ name: string | null; email: string | null } | null>(null);
+  const [confirmedUser, setConfirmedUser] = useState<{ name: string | null; phone: string | null } | null>(null);
   const [resultsToken, setResultsToken] = useState<string | null>(null);
   const [scannerActive, setScannerActive] = useState(false);
   const [scannerError, setScannerError] = useState("");
@@ -159,10 +159,10 @@ export default function MachineSimulator() {
     onSuccess: (data) => {
       stopScanner();
       if (data.user) {
-        setConfirmedUser(data.user as { name: string | null; email: string | null });
+        setConfirmedUser(data.user as { name: string | null; phone: string | null });
         setToken(data.sessionToken);
         setState("confirmed");
-        toast.success(`User identified: ${data.user.name ?? data.user.email}`);
+        toast.success(`User identified: ${data.user.name ?? data.user.phone}`);
       } else {
         toast.error("User not found for this token.");
         setState("scanning");
@@ -193,7 +193,7 @@ export default function MachineSimulator() {
   const guestMeasurementMutation = trpc.kioskIntegration.guestMeasurement.useMutation({
     onSuccess: (data) => {
       setTestMetrics(data.metrics);
-      setState("results");
+      setState("guest");
     },
     onError: (err) => {
       toast.error(err.message);
@@ -280,7 +280,7 @@ export default function MachineSimulator() {
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-6">
       {/* Header — mimics a kiosk machine UI */}
       <div className="mb-8 text-center">
-        <div className="text-cyan-400 text-sm font-mono uppercase tracking-widest mb-1">Tech Care Health Station</div>
+        <div className="text-cyan-400 text-sm font-mono uppercase tracking-widest mb-1">LIM Health Station</div>
         <div className="text-gray-400 text-xs font-mono">SIMULATOR MODE · Device: SIMULATOR</div>
       </div>
 
@@ -331,7 +331,7 @@ export default function MachineSimulator() {
               <div>
                 <h2 className="text-white text-xl font-bold mb-1">Scan User's Phone QR</h2>
                 <p className="text-gray-400 text-sm">
-                  Ask the user to open the Tech Care app → "My QR Code" and hold their phone up to this camera.
+                  Ask the user to open the LIM app → "My QR Code" and hold their phone up to this camera.
                 </p>
               </div>
 
@@ -360,7 +360,7 @@ export default function MachineSimulator() {
 
               <div className="bg-gray-900 rounded-xl p-3 text-xs text-gray-500 text-left space-y-1">
                 <p className="font-medium text-gray-400">How it works:</p>
-                <p>1. User opens Tech Care app on their phone</p>
+                <p>1. User opens the LIM app on their phone</p>
                 <p>2. User goes to "My QR Code" page</p>
                 <p>3. User holds phone up to this machine camera</p>
                 <p>4. Machine identifies the user automatically</p>
@@ -390,8 +390,8 @@ export default function MachineSimulator() {
                   <span className="text-white font-medium">{confirmedUser.name ?? "—"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500 text-sm">Email</span>
-                  <span className="text-cyan-400 text-sm">{confirmedUser.email ?? "—"}</span>
+                  <span className="text-gray-500 text-sm">Mobile</span>
+                  <span className="text-cyan-400 text-sm">{confirmedUser.phone ?? "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500 text-sm">Token</span>
@@ -432,37 +432,12 @@ export default function MachineSimulator() {
                        </div>
                      ))}
                    </div>
-                    {/* Results QR — phone scans this to receive results */}
-                    <div className="border-t border-gray-700 pt-3 space-y-3">
-                      <p className="text-white text-sm font-semibold text-center">
-                        امسح رمز الاستجابة السريعة لإرساله إلى هاتفك المحمول
-                      </p>
-                      <p className="text-gray-400 text-xs text-center">
-                        Scan this QR with the Tech Care app to receive your results
-                      </p>
-                      {storeResultsMutation.isPending ? (
-                        <div className="flex items-center justify-center gap-2 text-cyan-400 py-4">
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span className="text-sm">Generating results QR…</span>
-                        </div>
-                      ) : resultsToken ? (
-                        <div className="space-y-2">
-                          <div className="flex justify-center">
-                            <div className="bg-white p-3 rounded-xl inline-block shadow-lg">
-                              <QRCodeSVG value={resultsQrUrl} size={200} level="M" includeMargin={false} />
-                            </div>
-                          </div>
-                          <p className="text-gray-600 text-xs break-all text-center">{resultsQrUrl}</p>
-                        </div>
-                      ) : null}
-                      <Button
-                        className="w-full bg-gray-700 hover:bg-gray-600 text-white h-9 text-sm"
-                        onClick={() => printHealthReceipt(testMetrics!, confirmedUser)}
-                      >
-                        <Printer className="w-4 h-4 mr-2" />
-                        Print Health Receipt
-                      </Button>
-                    </div>
+                    {storeResultsMutation.isPending && (
+                      <div className="flex items-center justify-center gap-2 border-t border-gray-700 pt-4 text-cyan-400">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-sm">Preparing the results QR…</span>
+                      </div>
+                    )}
                  </div>
                ) : (
                   <Button
@@ -568,7 +543,7 @@ export default function MachineSimulator() {
               <div>
                 <h2 className="text-white text-xl font-bold mb-1">Scan to Get Your Results</h2>
                 <p className="text-gray-400 text-sm">
-                  Open the Tech Care app on your phone and scan this QR code to receive your results.
+                  Open the LIM app on your phone and scan this QR code to receive your results.
                 </p>
               </div>
 

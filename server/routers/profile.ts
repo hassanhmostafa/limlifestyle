@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getUserById, updateUserProfile } from "../db";
+import { getUserById, getUserByPhone, updateUserProfile } from "../db";
+import { normalizeSaudiMobilePhone } from "../lib/phone";
 
 export const profileRouter = router({
   /**
@@ -12,6 +14,7 @@ export const profileRouter = router({
     return {
       id: user.id,
       name: user.name,
+      phone: user.phone,
       email: user.email,
       gender: user.gender ?? null,
       birthDate: user.birthDate ?? null,
@@ -25,6 +28,7 @@ export const profileRouter = router({
     .input(
       z.object({
         name: z.string().min(1).max(255).optional(),
+        phone: z.string().min(1).optional(),
         gender: z.enum(["male", "female"]).nullable().optional(),
         birthDate: z
           .string()
@@ -34,11 +38,25 @@ export const profileRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const updated = await updateUserProfile(ctx.user.id, input);
+      let phone = input.phone;
+      if (phone !== undefined) {
+        const normalized = normalizeSaudiMobilePhone(phone);
+        if (!normalized.ok) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid Saudi mobile number, for example 05XXXXXXXX." });
+        }
+        phone = normalized.e164;
+        const existing = await getUserByPhone(phone);
+        if (existing && existing.id !== ctx.user.id) {
+          throw new TRPCError({ code: "CONFLICT", message: "This phone number is already linked to another account." });
+        }
+      }
+
+      const updated = await updateUserProfile(ctx.user.id, { ...input, phone });
       if (!updated) throw new Error("Failed to update profile");
       return {
         id: updated.id,
         name: updated.name,
+        phone: updated.phone,
         email: updated.email,
         gender: updated.gender ?? null,
         birthDate: updated.birthDate ?? null,

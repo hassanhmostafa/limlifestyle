@@ -15,7 +15,7 @@ export default function Footer() {
               <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <Heart className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bold text-xl text-white">Tech Care</span>
+              <span className="font-bold text-xl text-white">LIM</span>
             </div>
             <p className="text-sm text-gray-400">
               {t.footer_tagline}
@@ -67,7 +67,7 @@ export default function Footer() {
               </li>
               <li className="flex items-start gap-2">
                 <Mail className="w-4 h-4 mt-0.5 text-cyan-400 flex-shrink-0" />
-                <span className="text-gray-400">info@techcare.sa</span>
+                <span className="text-gray-400">info@limlifestyle.com</span>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 text-cyan-400 flex-shrink-0" />
@@ -105,7 +105,7 @@ export default function Footer() {
         {/* Divider */}
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-400">
-            <p>&copy; 2026 Tech Care. {t.footer_rights}</p>
+            <p>&copy; 2026 LIM. {t.footer_rights}</p>
             <div className="flex gap-6">
               <a href="#" className="hover:text-cyan-400 transition-colors">
                 {isAr ? "سياسة الخصوصية" : "Privacy Policy"}

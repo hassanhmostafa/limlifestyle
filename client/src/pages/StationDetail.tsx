@@ -329,8 +329,8 @@ export default function StationDetail() {
             <h2 className="text-3xl font-bold mb-4">{isAr ? "هل أنت مستعد لفحصك الصحي؟" : "Ready for Your Health Screening?"}</h2>
             <p className="text-cyan-50 mb-6 max-w-2xl mx-auto">
               {isAr
-                ? `زُر ${kiosk.name} اليوم مع Tech Care وابدأ خطوتك الأولى نحو صحة أفضل`
-                : `Visit ${kiosk.name} today with Tech Care and take the first step towards better health`}
+                ? `زُر ${kiosk.name} اليوم مع LIM وابدأ خطوتك الأولى نحو صحة أفضل`
+                : `Visit ${kiosk.name} today with LIM and take the first step towards better health`}
             </p>
             <div className="flex gap-4 justify-center">
               <Button

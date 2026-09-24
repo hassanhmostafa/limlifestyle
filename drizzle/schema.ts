@@ -14,6 +14,8 @@ export const users = mysqlTable("users", {
   /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
+  /** Verified account phone in E.164 format, e.g. +966563817217. */
+  phone: varchar("phone", { length: 20 }).unique(),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   /**
@@ -88,13 +90,19 @@ export const healthReadings = mysqlTable("health_readings", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   kioskId: varchar("kioskId", { length: 64 }).notNull(),
-  bloodPressureSystolic: int("bloodPressureSystolic"),
-  bloodPressureDiastolic: int("bloodPressureDiastolic"),
-  heartRate: int("heartRate"),
+  /** Vendor-native X18 field names, retained for protocol clarity. */
+  sbp: int("sbp"),
+  dbp: int("dbp"),
+  hr: int("hr"),
   weight: decimal("weight", { precision: 5, scale: 1 }),
   height: decimal("height", { precision: 5, scale: 1 }),
   bmi: decimal("bmi", { precision: 4, scale: 1 }),
   temperature: decimal("temperature", { precision: 4, scale: 1 }),
+  /** Full X18 body-composition payload, stored using the vendor's variable names. */
+  machineMetrics: json("machineMetrics").$type<Record<string, string>>(),
+  /** X18 report identifier shared by the device's multiple upload posts. */
+  recordNo: varchar("recordNo", { length: 64 }),
+  deviceNo: varchar("deviceNo", { length: 64 }),
   notes: text("notes"),
   recordedAt: timestamp("recordedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

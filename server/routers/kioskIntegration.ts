@@ -15,7 +15,7 @@
  * 2. Machine generates a random token and shows a QR code pointing to:
  *      GET /weixin/login/xcx?token=<random_token>
  *    (This URL format is fixed by the machine firmware — we must match it exactly.)
- * 3. User scans the QR code with the Tech Care app on their phone.
+ * 3. User scans the QR code with the LIM app on their phone.
  * 4. The app opens /kiosk-login?token=<random_token>, the user confirms their identity.
  * 5. The app calls POST /api/kiosk/confirm-login with { token, userId }.
  * 6. Meanwhile, the machine polls GET /weixin/login/xcx?token=<random_token> every second.
@@ -33,9 +33,17 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { kioskDevices, kioskSessions, healthReadings } from "../../drizzle/schema";
+import { kioskDevices, kioskSessions, healthReadings, users } from "../../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import crypto from "crypto";
+import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
+import {
+  extractX18Metrics,
+  mergeX18Metrics,
+  parseX18MeasurementTime,
+  X18MachinePayloadSchema,
+  type X18MachinePayload,
+} from "../lib/x18Payload";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -146,9 +154,9 @@ async function saveKioskMeasurement(
   await db.insert(healthReadings).values({
     userId,
     kioskId: resolvedKioskId ?? (deviceId ?? "unknown"),
-    bloodPressureSystolic:  systolic    ?? undefined,
-    bloodPressureDiastolic: diastolic   ?? undefined,
-    heartRate:              heartRate   ?? undefined,
+    sbp: systolic ?? undefined,
+    dbp: diastolic ?? undefined,
+    hr: heartRate ?? undefined,
     weight:      weight      !== null ? String(weight)      : undefined,
     height:      height      !== null ? String(height)      : undefined,
     bmi:         bmi         !== null ? String(bmi)         : undefined,
@@ -261,6 +269,86 @@ const KioskDataSchema = z.object({
   }).optional(),
 }).passthrough();
 
+/**
+ * Saves one of the X18_5's three payloads. The device uploads height/weight,
+ * body composition, and blood pressure separately; `recordNo` joins them into
+ * one LIM health reading.
+ */
+async function saveX18MachinePayload(
+  payload: X18MachinePayload,
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
+): Promise<{ success: boolean; userId?: number; message?: string }> {
+  const [device] = await db
+    .select()
+    .from(kioskDevices)
+    .where(and(eq(kioskDevices.deviceId, payload.deviceNo), eq(kioskDevices.isActive, "true")));
+
+  if (!device) {
+    return { success: false, message: "Device not registered or inactive." };
+  }
+
+  let savedUserId: number | undefined;
+  for (const item of payload.datas) {
+    const normalizedPhone = normalizeSaudiMobilePhone(item.userID ?? "");
+    if (!normalizedPhone.ok) {
+      return { success: false, message: "A valid Saudi mobile userID is required." };
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.phone, normalizedPhone.e164));
+    if (!user) {
+      return { success: false, message: "No LIM account matches the uploaded userID." };
+    }
+
+    const incoming = extractX18Metrics(item);
+    const recordNo = item.recordNo ?? `${payload.deviceNo}:${item.measureTime ?? Date.now()}`;
+    const [existing] = await db
+      .select()
+      .from(healthReadings)
+      .where(and(
+        eq(healthReadings.userId, user.id),
+        eq(healthReadings.deviceNo, payload.deviceNo),
+        eq(healthReadings.recordNo, recordNo)
+      ));
+
+    const current = {
+      height: existing?.height ?? undefined,
+      weight: existing?.weight ?? undefined,
+      bmi: existing?.bmi ?? undefined,
+      sbp: existing?.sbp !== null && existing?.sbp !== undefined ? String(existing.sbp) : undefined,
+      dbp: existing?.dbp !== null && existing?.dbp !== undefined ? String(existing.dbp) : undefined,
+      hr: existing?.hr !== null && existing?.hr !== undefined ? String(existing.hr) : undefined,
+      raw: existing?.machineMetrics ?? {},
+    };
+    const metrics = mergeX18Metrics(current, incoming);
+    const values = {
+      kioskId: device.kioskId ?? payload.deviceNo,
+      sbp: parseIntOrNull(metrics.sbp) ?? null,
+      dbp: parseIntOrNull(metrics.dbp) ?? null,
+      hr: parseIntOrNull(metrics.hr) ?? null,
+      weight: metrics.weight ?? null,
+      height: metrics.height ?? null,
+      bmi: metrics.bmi ?? null,
+      machineMetrics: metrics.raw,
+      recordNo,
+      deviceNo: payload.deviceNo,
+      notes: `X18_5 measurement${payload.deviceModel ? ` (${payload.deviceModel})` : ""}`,
+      recordedAt: parseX18MeasurementTime(item.measureTime),
+    };
+
+    if (existing) {
+      await db.update(healthReadings).set(values).where(eq(healthReadings.id, existing.id));
+    } else {
+      await db.insert(healthReadings).values({ userId: user.id, ...values });
+    }
+
+    savedUserId = user.id;
+  }
+
+  return savedUserId
+    ? { success: true, userId: savedUserId }
+    : { success: false, message: "No measurement data supplied." };
+}
+
 // ─── tRPC Router ─────────────────────────────────────────────────────────────
 
 export const kioskIntegrationRouter = router({
@@ -292,8 +380,7 @@ export const kioskIntegrationRouter = router({
       const [session] = await db.select().from(kioskSessions).where(and(eq(kioskSessions.token, input.token), eq(kioskSessions.status, "active"), gt(kioskSessions.expiresAt, new Date())));
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Token not found or expired." });
       if (input.deviceId) await db.update(kioskSessions).set({ deviceId: input.deviceId }).where(eq(kioskSessions.id, session.id));
-      const { users } = await import("../../drizzle/schema");
-      const [user] = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, session.userId));
+      const [user] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.id, session.userId));
       return { success: true, user: user ?? null, sessionToken: session.token };
     }),
 
@@ -325,9 +412,9 @@ export const kioskIntegrationRouter = router({
       await db.insert(healthReadings).values({
         userId: session.userId,
         kioskId: `RESULTS_PENDING:${resultsToken}`,
-        bloodPressureSystolic: m.systolic ?? undefined,
-        bloodPressureDiastolic: m.diastolic ?? undefined,
-        heartRate: m.heartRate ?? undefined,
+        sbp: m.systolic ?? undefined,
+        dbp: m.diastolic ?? undefined,
+        hr: m.heartRate ?? undefined,
         weight: m.weight !== undefined ? String(m.weight) : undefined,
         height: m.height !== undefined ? String(m.height) : undefined,
         bmi: m.bmi !== undefined ? String(m.bmi) : undefined,
@@ -353,11 +440,11 @@ export const kioskIntegrationRouter = router({
       if (reading.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "These results belong to a different account." });
       await db.update(hr).set({ kioskId: "KIOSK_DEVICE" }).where(eq(hr.id, reading.id));
       await db.update(kioskSessions).set({ status: "used" }).where(eq(kioskSessions.token, `results:${input.resultsToken}`));
-      return { success: true, reading: { id: reading.id, bloodPressureSystolic: reading.bloodPressureSystolic, bloodPressureDiastolic: reading.bloodPressureDiastolic, heartRate: reading.heartRate, weight: reading.weight, height: reading.height, bmi: reading.bmi, temperature: reading.temperature, notes: reading.notes, recordedAt: reading.recordedAt } };
+      return { success: true, reading: { id: reading.id, sbp: reading.sbp, dbp: reading.dbp, hr: reading.hr, weight: reading.weight, height: reading.height, bmi: reading.bmi, temperature: reading.temperature, notes: reading.notes, recordedAt: reading.recordedAt } };
     }),
 
   /**
-   * LEGACY — Called by the Tech Care app after the user scans the machine's QR code.
+   * LEGACY — Called by the LIM app after the user scans the machine's QR code.
    * Links the machine's random token to the logged-in user's account.
    * After this, the machine's polling endpoint (/weixin/login/xcx) will return success.
    */
@@ -510,17 +597,16 @@ export const kioskIntegrationRouter = router({
         },
       };
 
-      // Parse and save via the shared core logic (same path as the real machine)
-      const parsed = KioskDataSchema.safeParse(machinePayload);
-      if (!parsed.success) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to build test payload" });
-      }
-
-      const result = await saveKioskMeasurement(parsed.data, db);
-      if (!result.success) {
+      // Ensure the QR-login session is still valid. The reading itself is persisted
+      // only by storeResults, then finalized by claimResults, so no duplicate row is created.
+      const [session] = await db.select().from(kioskSessions).where(and(
+        eq(kioskSessions.token, token),
+        gt(kioskSessions.expiresAt, new Date())
+      ));
+      if (!session || session.userId !== ctx.user.id) {
         throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to save test measurement — session may have expired",
+          code: "NOT_FOUND",
+          message: "Session not found or expired.",
         });
       }
 
@@ -631,9 +717,8 @@ export const kioskIntegrationRouter = router({
         return { confirmed: false, user: null, expired: false };
       }
 
-      const { users } = await import("../../drizzle/schema");
       const [user] = await db
-        .select({ id: users.id, name: users.name, email: users.email })
+        .select({ id: users.id, name: users.name, phone: users.phone })
         .from(users)
         .where(eq(users.id, session.userId));
 
@@ -842,16 +927,16 @@ export async function handleKioskLoginPoll(req: any, res: any) {
       return res.json({ code: 0, msg: "数据不存在", data: null });
     }
 
-    // Return user data in the format the machine expects
-    // The machine uses this to display the user's name on screen
+    // Return user data in the fixed firmware format. `mobile` and `idnumber`
+    // use the phone-based account identifier rather than an email or database ID.
     return res.json({
       code: 1,
       msg: "操作成功",
       data: {
-        name: user.name ?? "Tech Care User",
+        name: user.name ?? "LIM User",
         sex: user.gender === "female" ? "女" : user.gender === "male" ? "男" : "",
-        mobile: user.email ?? "",
-        idnumber: String(user.id),
+        mobile: toMachineUserId(user.phone),
+        idnumber: toMachineUserId(user.phone),
         unionid: user.openId,
       },
     });
@@ -865,8 +950,8 @@ export async function handleKioskLoginPoll(req: any, res: any) {
  * POST /api/kiosk/data
  *
  * Receives health measurement data from the machine after a session completes.
- * The machine POSTs JSON containing the session token and all measured metrics.
- * This handler maps the machine's field names to our health_readings schema and saves them.
+ * It accepts both the documented legacy nested protocol and the real X18_5 flat
+ * payloads (`deviceNo`, `datas`, `sbp`, `fatRate`, etc.).
  *
  * Response format matches the Henan Lejia API Protocol:
  *   { code: "1", msg: "successful" }
@@ -877,6 +962,23 @@ export async function handleKioskData(req: any, res: any) {
 
     if (!body || typeof body !== "object") {
       return res.status(400).json({ code: "0", msg: "Invalid request body" });
+    }
+
+    // The physical X18_5 uploads three native JSON payloads for one recordNo:
+    // height/weight, body composition, and blood pressure. Merge them server-side.
+    const x18Payload = X18MachinePayloadSchema.safeParse(body);
+    if (x18Payload.success) {
+      const db = await getDb();
+      if (!db) return res.status(500).json({ code: "0", msg: "Database unavailable" });
+
+      const result = await saveX18MachinePayload(x18Payload.data, db);
+      if (!result.success) {
+        console.warn(`[KioskData] X18 upload rejected: ${result.message}`);
+        return res.status(401).json({ code: "0", msg: result.message ?? "X18 upload rejected" });
+      }
+
+      console.log(`[KioskData] Saved X18 record for userId=${result.userId}, device=${x18Payload.data.deviceNo}`);
+      return res.json({ code: "1", msg: "successful" });
     }
 
     const parsed = KioskDataSchema.safeParse(body);

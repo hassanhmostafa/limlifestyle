@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { User, Calendar, Save, UserCircle2, UserCircle } from "lucide-react";
+import { User, Calendar, Save, UserCircle2, UserCircle, Phone, Lock } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -27,15 +27,25 @@ export default function Profile() {
     },
     onError: (err) => toast.error(err.message),
   });
+  const setPhoneCredentials = trpc.phoneAuth.setCredentials.useMutation({
+    onSuccess: () => {
+      toast.success(isAr ? "تم تفعيل تسجيل الدخول برقم الجوال" : "Mobile-number sign-in is enabled");
+      utils.profile.get.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
   const utils = trpc.useUtils();
 
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phonePassword, setPhonePassword] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [birthDate, setBirthDate] = useState("");
 
   useEffect(() => {
     if (profile) {
       setName(profile.name ?? "");
+      setPhone(profile.phone ?? "");
       setGender((profile.gender as "male" | "female") ?? "");
       setBirthDate(profile.birthDate ?? "");
     }
@@ -75,11 +85,22 @@ export default function Profile() {
   }
 
   const handleSave = () => {
-    updateProfile.mutate({
+    const profileInput = {
       name: name || undefined,
+      phone: phone || undefined,
       gender: gender || null,
       birthDate: birthDate || null,
-    });
+    };
+    if (phonePassword) {
+      setPhoneCredentials.mutate({ phone, password: phonePassword }, {
+        onSuccess: () => {
+          setPhonePassword("");
+          updateProfile.mutate(profileInput);
+        },
+      });
+      return;
+    }
+    updateProfile.mutate(profileInput);
   };
 
   return (
@@ -93,8 +114,8 @@ export default function Profile() {
           </h1>
           <p className="text-gray-500 mt-2">
             {isAr
-              ? "حافظ على تحديث ملفك الشخصي حتى تتمكن Tech Care من حساب مؤشرات صحية دقيقة مثل مؤشر كتلة الجسم."
-              : "Keep your profile up to date so Tech Care can calculate accurate health metrics like BMI."}
+              ? "حافظ على تحديث ملفك الشخصي حتى يتمكن LIM من حساب مؤشرات صحية دقيقة مثل مؤشر كتلة الجسم."
+              : "Keep your profile up to date so LIM can calculate accurate health metrics like BMI."}
           </p>
         </div>
 
@@ -109,6 +130,53 @@ export default function Profile() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={isAr ? "اسمك الكامل" : "Your full name"}
+              className="max-w-sm"
+            />
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-2">
+            <Label htmlFor="phone" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              {isAr ? "رقم الجوال" : "Mobile Number"}
+            </Label>
+            <p className="text-xs text-gray-400">
+              {isAr
+                ? "يُستخدم رقم الجوال للتعرّف عليك في جهاز LIM."
+                : "Your mobile number is used to identify you on the LIM kiosk."}
+            </p>
+            <Input
+              id="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              dir="ltr"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="05XXXXXXXX"
+              className="max-w-sm"
+            />
+          </div>
+
+          {/* Phone sign-in password */}
+          <div className="space-y-2">
+            <Label htmlFor="phone-password" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Lock className="w-4 h-4" />
+              {isAr ? "كلمة مرور تسجيل الدخول بالجوال" : "Mobile Sign-in Password"}
+            </Label>
+            <p className="text-xs text-gray-400">
+              {isAr
+                ? "أدخل كلمة مرور من 6 أحرف أو أكثر لتفعيل تسجيل الدخول برقم جوالك. اتركها فارغة إذا لم ترغب في تغييرها."
+                : "Enter a password of at least 6 characters to enable mobile-number sign-in. Leave this empty to keep your current password."}
+            </p>
+            <Input
+              id="phone-password"
+              type="password"
+              autoComplete="new-password"
+              value={phonePassword}
+              onChange={(e) => setPhonePassword(e.target.value)}
+              placeholder="••••••••"
+              minLength={6}
               className="max-w-sm"
             />
           </div>
@@ -201,7 +269,7 @@ export default function Profile() {
               </>
             ) : (
               <>
-                Your <strong>gender</strong> and <strong>date of birth</strong> allow Tech Care to calculate your{" "}
+                Your <strong>gender</strong> and <strong>date of birth</strong> allow LIM to calculate your{" "}
                 <strong>ideal BMI</strong> using the Devine formula, and to apply age-appropriate healthy BMI ranges
                 (e.g., seniors aged 65+ have a slightly higher healthy range of 22–27). Your weight and height are
                 measured directly from the physical kiosk device.

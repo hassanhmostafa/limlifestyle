@@ -38,7 +38,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "phone", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -105,6 +105,13 @@ export async function getUserByEmail(email: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getUserByPhone(phone: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
 export async function createEmailUser(data: {
   openId: string;
   name: string;
@@ -125,10 +132,45 @@ export async function createEmailUser(data: {
   return getUserByEmail(data.email);
 }
 
+export async function createPhoneUser(data: {
+  openId: string;
+  name: string;
+  phone: string;
+  passwordHash: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(users).values({
+    openId: data.openId,
+    name: data.name,
+    phone: data.phone,
+    passwordHash: data.passwordHash,
+    loginMethod: "phone_password",
+    role: "user",
+    lastSignedIn: new Date(),
+  });
+  return getUserByPhone(data.phone);
+}
+
 export async function updatePasswordHash(userId: number, passwordHash: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+export async function updateUserPhoneCredentials(
+  userId: number,
+  data: { phone: string; passwordHash: string }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({
+    phone: data.phone,
+    passwordHash: data.passwordHash,
+    loginMethod: "phone_password",
+    updatedAt: new Date(),
+  }).where(eq(users.id, userId));
+  return getUserById(userId);
 }
 
 /**
@@ -136,7 +178,7 @@ export async function updatePasswordHash(userId: number, passwordHash: string) {
  */
 export async function updateUserProfile(
   userId: number,
-  data: { gender?: "male" | "female" | null; birthDate?: string | null; name?: string | null }
+  data: { gender?: "male" | "female" | null; birthDate?: string | null; name?: string | null; phone?: string | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -269,6 +311,7 @@ export async function getAllUsers() {
   return db.select({
     id: users.id,
     name: users.name,
+    phone: users.phone,
     email: users.email,
     role: users.role,
     adminType: users.adminType,
@@ -286,12 +329,14 @@ export async function searchUsers(query: string) {
   return db.select({
     id: users.id,
     name: users.name,
+    phone: users.phone,
     email: users.email,
     role: users.role,
     adminType: users.adminType,
   }).from(users).where(
     or(
       like(users.name, pattern),
+      like(users.phone, pattern),
       like(users.email, pattern)
     )
   ).limit(20);
