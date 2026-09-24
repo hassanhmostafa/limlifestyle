@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Bone, Droplets, Dumbbell, Flame, Gauge, Percent, Scale, Sparkles } from "lucide-react";
+import { Bone, CalendarDays, Droplets, Dumbbell, Flame, Gauge, Percent, Scale, Sparkles, UserRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 export type DashboardReading = {
@@ -13,6 +13,12 @@ export type DashboardReading = {
   recordNo?: string | null;
   deviceNo?: string | null;
   source?: string;
+};
+
+export type PatientIdentity = {
+  name?: string | null;
+  age?: number | null;
+  gender?: "male" | "female" | null;
 };
 
 type Language = "en" | "ar";
@@ -191,7 +197,7 @@ function BodySilhouette({ mode }: { mode: "muscle" | "fat" }) {
   );
 }
 
-export function BodyCompositionReport({ readings, language }: { readings: DashboardReading[]; language: Language }) {
+export function BodyCompositionReport({ readings, language, patient }: { readings: DashboardReading[]; language: Language; patient?: PatientIdentity }) {
   const reports = readings.filter((reading) => Object.keys(recordMetrics(reading)).length > 0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mode, setMode] = useState<"muscle" | "fat">("muscle");
@@ -205,6 +211,11 @@ export function BodyCompositionReport({ readings, language }: { readings: Dashbo
   const compositionKeys = ["fat", "waterRate", "skeletalMuscle", "muscle"];
   const additionKeys = ["bmr", "vfal", "fatFree", "bone", "protein", "waterICW", "waterECW", "mineral", "whr", "fatSubCutRate", "idealWeight", "dci", "bodyAge", "obesity"];
   const segments = segmentDefinitions[mode];
+  const genderLabel = patient?.gender === "male"
+    ? (language === "ar" ? "ذكر" : "Male")
+    : patient?.gender === "female"
+      ? (language === "ar" ? "أنثى" : "Female")
+      : "—";
   const segmentColor = mode === "muscle" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950";
   const allSegments = [...segmentDefinitions.muscle, ...segmentDefinitions.fat];
   const trendMetrics = [...metrics, ...allSegments.map((segment) => ({ key: segment.key, en: segment.en, ar: segment.ar, unit: "kg", color: segment.key.startsWith("muscle") ? "#25855e" : "#ef836f" }))]
@@ -220,6 +231,11 @@ export function BodyCompositionReport({ readings, language }: { readings: Dashbo
               <div className="mb-2 flex items-center gap-2 text-emerald-100"><Sparkles className="h-4 w-4"/><span className="text-xs font-semibold uppercase tracking-[0.16em]">{language === "ar" ? "بيانات توضيحية من جهاز X18" : "X18 measurement report"}</span></div>
               <h2 className="text-2xl font-extrabold">{language === "ar" ? "نتائج تحليل الجسم" : "Body Analysis Results"}</h2>
               <p className="mt-1 text-sm text-emerald-100">{new Date(report.recordedAt).toLocaleDateString(language === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "الاسم" : "Name"}:</span><span className="font-bold">{patient?.name || "—"}</span></div>
+                <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><CalendarDays className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "العمر" : "Age"}:</span><span className="font-bold">{patient?.age ?? "—"}{patient?.age !== null && patient?.age !== undefined ? (language === "ar" ? " سنة" : " yrs") : ""}</span></div>
+                <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5 text-emerald-100"/><span className="text-emerald-100">{language === "ar" ? "الجنس" : "Gender"}:</span><span className="font-bold">{genderLabel}</span></div>
+              </div>
             </div>
             {reports.length > 1 && <select aria-label="Select body composition report" value={report.id} onChange={(event) => setSelectedId(Number(event.target.value))} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none backdrop-blur [&_option]:text-slate-900">
               {reports.map((item) => <option key={item.id} value={item.id}>{new Date(item.recordedAt).toLocaleDateString(language === "ar" ? "ar-SA" : "en-US")}</option>)}

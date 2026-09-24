@@ -46,6 +46,8 @@ import {
   LogIn,
   Target,
   Download,
+  UserRound,
+  CalendarDays,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -62,6 +64,7 @@ import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { downloadHealthScoresPDF } from "@/lib/pdfExport";
 import { BodyCompositionReport } from "@/components/BodyCompositionReport";
+import { computeAge } from "@shared/bmi";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -496,6 +499,10 @@ export default function HealthDashboard() {
     { enabled: isAuthenticated }
   );
 
+  const { data: profile } = trpc.profile.get.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+
   const { data: bmiData, isLoading: bmiLoading } = trpc.health.bmiComparison.useQuery(
     undefined,
     { enabled: isAuthenticated }
@@ -550,6 +557,13 @@ export default function HealthDashboard() {
 
   // Latest values for summary cards
   const latest = readings?.[0];
+  const participantAge = profile?.birthDate ? computeAge(profile.birthDate) : null;
+  const participantIdentity = {
+    name: profile?.name ?? user?.name ?? null,
+    age: participantAge,
+    gender: profile?.gender ?? null,
+  };
+  const profileNeedsDetails = !participantIdentity.name || participantIdentity.age === null || !participantIdentity.gender;
   const bpSystolicValues = (readings ?? []).map((r) => r.sbp ?? null);
   const hrValues = (readings ?? []).map((r) => r.hr ?? null);
   const weightValues = (readings ?? []).map((r) => (r.weight ? parseFloat(r.weight) : null));
@@ -815,6 +829,23 @@ export default function HealthDashboard() {
         </section>
 
         <div className="container py-8 space-y-8">
+          {/* Participant identity is sourced from the LIM profile, not from a
+              transient machine scan, so it stays consistent across reports. */}
+          <Card className="border-0 bg-gradient-to-r from-emerald-50 to-cyan-50 p-5 shadow-sm" dir={language === "ar" ? "rtl" : "ltr"}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{language === "ar" ? "بيانات المشارك" : "Participant details"}</p>
+                <h2 className="mt-1 text-xl font-extrabold text-slate-900">{participantIdentity.name || (language === "ar" ? "أكمل بياناتك الشخصية" : "Complete your personal details")}</h2>
+              </div>
+              <Link href="/profile"><Button variant="outline" size="sm" className="border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50">{profileNeedsDetails ? (language === "ar" ? "إكمال الملف الشخصي" : "Complete Profile") : (language === "ar" ? "تعديل الملف الشخصي" : "Edit Profile")}</Button></Link>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الاسم" : "Name"}</p><p className="font-bold text-slate-800">{participantIdentity.name || "—"}</p></div></div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700"><CalendarDays className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "العمر" : "Age"}</p><p className="font-bold text-slate-800">{participantIdentity.age ?? "—"}{participantIdentity.age !== null ? (language === "ar" ? " سنة" : " years") : ""}</p></div></div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الجنس" : "Gender"}</p><p className="font-bold text-slate-800">{participantIdentity.gender === "male" ? (language === "ar" ? "ذكر" : "Male") : participantIdentity.gender === "female" ? (language === "ar" ? "أنثى" : "Female") : "—"}</p></div></div>
+            </div>
+          </Card>
+
           {/* Health Score Banner */}
           <HealthScoreBanner scoreData={healthScore} scoreLoading={scoreLoading} />
 
@@ -845,7 +876,7 @@ export default function HealthDashboard() {
 
           {/* Full X18_5 body-composition report. Rendered only when the machine
               supplied native machineMetrics; manual readings remain unchanged. */}
-          <BodyCompositionReport readings={readings ?? []} language={language} />
+          <BodyCompositionReport readings={readings ?? []} language={language} patient={participantIdentity} />
 
           {/* Chart toggle pills */}
           <div className="flex flex-wrap items-center gap-2">
