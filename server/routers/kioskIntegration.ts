@@ -36,7 +36,7 @@ import { createMachinePhoneUser, getDb } from "../db";
 import { kioskDevices, kioskIntegrationSettings, kioskSessions, healthReadings, users } from "../../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import crypto from "crypto";
-import { isLIMPhoneQrToken, normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
+import { findX18ScannedIdentity, isLIMPhoneQrToken, normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
 import {
   extractX18Metrics,
   mergeX18Metrics,
@@ -300,22 +300,22 @@ async function saveX18MachinePayload(
 
   let savedUserId: number | undefined;
   for (const item of payload.datas) {
-    // Firmware variants place the scanned QR either in `userID` or in `name`.
-    // The photographed X18 screen visibly renders the raw scanned token as its name.
-    const scannedQrToken = [item.userID, item.name].find(isLIMPhoneQrToken);
-    const rawUserId = scannedQrToken ?? item.userID?.trim() ?? "";
+    // Firmware variants place the raw scanner value in either `userID` or
+    // `name`. Prefer a recognizable LIM legacy token or Saudi mobile from
+    // either location, so the current phone-number QR works on both variants.
+    const rawUserId = findX18ScannedIdentity([item.userID, item.name]) ?? item.userID?.trim() ?? "";
     let user: typeof users.$inferSelect | undefined;
     let sessionId: number | undefined;
 
-    // When the X18 scans the LIM phone QR, it writes the opaque QR value to
-    // its `userID` field. Resolve that short-lived LIM session directly.
+    // Backwards compatibility: older LIM QR codes contained an opaque token.
+    // Resolve such an already-scanned legacy session directly.
     if (isLIMPhoneQrToken(rawUserId)) {
       const [session] = await db.select().from(kioskSessions).where(and(
         eq(kioskSessions.token, rawUserId),
         gt(kioskSessions.expiresAt, new Date())
       ));
       // The X18 sends height/weight, composition, and BP separately, so allow
-      // the same short-lived QR session to be used across all three posts.
+      // the same legacy session to be used across all three posts.
       if (session && (session.status === "active" || session.status === "used")) {
         const [matchedUser] = await db.select().from(users).where(eq(users.id, session.userId));
         user = matchedUser;
@@ -406,34 +406,57 @@ async function saveX18MachinePayload(
 export const kioskIntegrationRouter = router({
 
   /**
-   * TWO-SCAN FLOW — Step 1a (Phone → App):
-   * Generates a short-lived login token for the user to display as a QR on their phone.
-   * The machine scans this QR and calls claimUserQR to get the user identity.
+   * Phone → X18: return the national mobile number for the QR value.
+   * X18 displays the raw scanner value in its ID field, so encoding the
+   * participant's phone produces the same display and upload identity as
+   * entering that phone manually on the machine.
    */
   generateUserQR: protectedProcedure
     .mutation(async ({ ctx }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const token = crypto.randomBytes(8).toString("hex");
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-      await db.insert(kioskSessions).values({ token, deviceId: "PHONE_QR", userId: ctx.user.id, status: "active", expiresAt });
-      return { token, expiresAt };
+      const machineUserId = toMachineUserId(ctx.user.phone);
+      if (!machineUserId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Add a valid Saudi mobile number to your LIM profile before using the machine QR.",
+        });
+      }
+      return { machineUserId };
     }),
 
   /**
-   * TWO-SCAN FLOW — Step 1b (Machine → Server):
-   * Machine calls this after scanning the phone QR. Returns user identity.
+   * Simulator compatibility: accepts either the retired opaque QR token or the
+   * current mobile-number QR and creates a short simulator session.
+   * The physical X18 does not call this procedure; it uploads the scanned phone
+   * in userID directly to /api/kiosk/data.
    */
   claimUserQR: publicProcedure
     .input(z.object({ token: z.string().min(1), deviceId: z.string().optional() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const [session] = await db.select().from(kioskSessions).where(and(eq(kioskSessions.token, input.token), eq(kioskSessions.status, "active"), gt(kioskSessions.expiresAt, new Date())));
-      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Token not found or expired." });
-      if (input.deviceId) await db.update(kioskSessions).set({ deviceId: input.deviceId }).where(eq(kioskSessions.id, session.id));
-      const [user] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.id, session.userId));
-      return { success: true, user: user ?? null, sessionToken: session.token };
+      const qrValue = input.token.trim();
+      if (isLIMPhoneQrToken(qrValue)) {
+        const [session] = await db.select().from(kioskSessions).where(and(eq(kioskSessions.token, qrValue), eq(kioskSessions.status, "active"), gt(kioskSessions.expiresAt, new Date())));
+        if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Token not found or expired." });
+        if (input.deviceId) await db.update(kioskSessions).set({ deviceId: input.deviceId }).where(eq(kioskSessions.id, session.id));
+        const [user] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.id, session.userId));
+        return { success: true, user: user ?? null, sessionToken: session.token };
+      }
+
+      const phone = normalizeSaudiMobilePhone(qrValue);
+      if (!phone.ok) throw new TRPCError({ code: "BAD_REQUEST", message: "QR must contain a valid Saudi mobile number." });
+      const [user] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.phone, phone.e164));
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "No LIM account matches this mobile number." });
+
+      const sessionToken = crypto.randomBytes(16).toString("hex");
+      await db.insert(kioskSessions).values({
+        token: sessionToken,
+        deviceId: input.deviceId ?? "SIMULATOR",
+        userId: user.id,
+        status: "active",
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
+      return { success: true, user, sessionToken };
     }),
 
   /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLIMPhoneQrToken, normalizeSaudiMobilePhone, toMachineUserId } from "./lib/phone";
+import { findX18ScannedIdentity, isLIMPhoneQrToken, normalizeSaudiMobilePhone, toMachineUserId } from "./lib/phone";
 
 describe("Saudi mobile normalization", () => {
   it("accepts national and international forms", () => {
@@ -21,5 +21,11 @@ describe("Saudi mobile normalization", () => {
     expect(isLIMPhoneQrToken("723e6f7b05512fe8")).toBe(true);
     expect(isLIMPhoneQrToken("0563817217")).toBe(false);
     expect(isLIMPhoneQrToken("https://manufacturer.example/report")).toBe(false);
+  });
+
+  it("uses the phone QR regardless of whether X18 stores it in userID or name", () => {
+    expect(findX18ScannedIdentity(["0563817217", "Hassan"])).toBe("0563817217");
+    expect(findX18ScannedIdentity(["generated-value", "+966563817217"])).toBe("+966563817217");
+    expect(findX18ScannedIdentity(["ff05254ea4b73eb6", "Hassan"])).toBe("ff05254ea4b73eb6");
   });
 });

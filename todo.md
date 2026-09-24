@@ -5,6 +5,7 @@
 - [x] Accept native X18_5 `datas` uploads and merge all posts with the same `deviceNo` and `recordNo` into one measurement.
 - [x] Persist native core values (`sbp`, `dbp`, `hr`, `height`, `weight`, `bmi`) and preserve all X18 body-composition values in `machineMetrics`.
 - [x] Link a QR-scanned LIM session or a manual Saudi mobile number to a participant account.
+- [x] Encode the participant's Saudi mobile number in **My QR Code**, so X18 displays that number in its ID field exactly like manual phone entry.
 - [x] Create a pending LIM account automatically when a valid Saudi mobile number has no account; activating that number later exposes the saved readings.
 - [x] Remove the phone-scans-machine-results workflow. X18 uploads results directly and the participant opens **My Health**.
 - [x] Require an active registered device and one shared LIM fleet upload key, stored only as a hash.

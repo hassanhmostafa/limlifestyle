@@ -35,9 +35,19 @@ export function toMachineUserId(phone: string | null | undefined): string {
 }
 
 /**
- * The LIM mobile QR intentionally contains a short opaque identifier, not a
- * phone number. The X18 firmware stores this raw scanner value in `userID`.
+ * Recognizes legacy opaque LIM QR identifiers. Current My QR Code displays
+ * the national mobile number so that the X18 visibly shows that number in ID.
  */
 export function isLIMPhoneQrToken(value: string | null | undefined): boolean {
   return /^[a-f0-9]{16}$/i.test(value?.trim() ?? "");
+}
+
+/**
+ * Different X18 firmware screens put the raw scanner value in userID or name.
+ * Select a recognized LIM legacy token or Saudi phone from either field.
+ */
+export function findX18ScannedIdentity(values: Array<string | null | undefined>): string | undefined {
+  return values.find((value) =>
+    isLIMPhoneQrToken(value) || normalizeSaudiMobilePhone(value ?? "").ok
+  )?.trim();
 }
