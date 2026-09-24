@@ -15,6 +15,7 @@
 - [x] Mark and hide historical demo/simulator readings from participant and event health histories without deleting them; stop runtime demo seeding.
 - [x] Add non-secret integration documentation and unit/API validation.
 - [x] Render full X18 body-composition reports in **My Health**, including muscle/fat switching, segmental measurements, metabolism indicators, and a separate trend graph for every available X18 metric.
+- [x] Add the consent-gated `/events` journey in LIM: one authenticated account, event-form storage, a phone-number QR for X18, and the same privacy-scoped physical results displayed in `/events` and **My Health**.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.
