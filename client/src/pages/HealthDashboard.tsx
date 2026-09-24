@@ -61,6 +61,7 @@ import {
 import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { downloadHealthScoresPDF } from "@/lib/pdfExport";
+import { BodyCompositionReport } from "@/components/BodyCompositionReport";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -472,7 +473,7 @@ function buildChartData(readings: RawReading[], range: ChartRange) {
 export default function HealthDashboard() {
   const { user, isAuthenticated, loading } = useAuth();
   const utils = trpc.useUtils();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const [showLog, setShowLog] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -841,6 +842,10 @@ export default function HealthDashboard() {
 
           {/* BMI Comparison Section */}
           <BmiComparisonCard bmiData={bmiData} bmiLoading={bmiLoading} />
+
+          {/* Full X18_5 body-composition report. Rendered only when the machine
+              supplied native machineMetrics; manual readings remain unchanged. */}
+          <BodyCompositionReport readings={readings ?? []} language={language} />
 
           {/* Chart toggle pills */}
           <div className="flex flex-wrap items-center gap-2">
