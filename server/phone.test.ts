@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSaudiMobilePhone, toMachineUserId } from "./lib/phone";
+import { isLIMPhoneQrToken, normalizeSaudiMobilePhone, toMachineUserId } from "./lib/phone";
 
 describe("Saudi mobile normalization", () => {
   it("accepts national and international forms", () => {
@@ -15,5 +15,11 @@ describe("Saudi mobile normalization", () => {
 
   it("returns the local format required by the X18 userID field", () => {
     expect(toMachineUserId("+966563817217")).toBe("0563817217");
+  });
+
+  it("recognizes the short-lived LIM QR token captured by X18 firmware", () => {
+    expect(isLIMPhoneQrToken("723e6f7b05512fe8")).toBe(true);
+    expect(isLIMPhoneQrToken("0563817217")).toBe(false);
+    expect(isLIMPhoneQrToken("https://manufacturer.example/report")).toBe(false);
   });
 });

@@ -85,6 +85,18 @@ async function startServer() {
    */
   app.get("/weixin/login/xcx", handleKioskLoginPoll);
 
+  // Human-readable status when the URL is opened in a phone/browser. The X18 itself
+  // must use POST; this GET response makes configuration testing unambiguous.
+  app.get("/api/kiosk/data", (_req, res) => {
+    res.json({
+      status: "online",
+      service: "LIM X18_5 data upload",
+      method: "POST",
+      contentType: "application/json",
+      message: "This endpoint is ready for the machine. Opening it in a browser does not submit a measurement.",
+    });
+  });
+
   // Kiosk data ingestion endpoint (plain HTTP POST from TRIPLEBIGHT kiosk machines)
   app.post("/api/kiosk/data", handleKioskData);
 

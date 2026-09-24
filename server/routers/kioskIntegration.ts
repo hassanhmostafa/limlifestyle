@@ -36,7 +36,7 @@ import { getDb } from "../db";
 import { kioskDevices, kioskSessions, healthReadings, users } from "../../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import crypto from "crypto";
-import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
+import { isLIMPhoneQrToken, normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
 import {
   extractX18Metrics,
   mergeX18Metrics,
@@ -289,14 +289,39 @@ async function saveX18MachinePayload(
 
   let savedUserId: number | undefined;
   for (const item of payload.datas) {
-    const normalizedPhone = normalizeSaudiMobilePhone(item.userID ?? "");
-    if (!normalizedPhone.ok) {
-      return { success: false, message: "A valid Saudi mobile userID is required." };
+    // Firmware variants place the scanned QR either in `userID` or in `name`.
+    // The photographed X18 screen visibly renders the raw scanned token as its name.
+    const scannedQrToken = [item.userID, item.name].find(isLIMPhoneQrToken);
+    const rawUserId = scannedQrToken ?? item.userID?.trim() ?? "";
+    let user: typeof users.$inferSelect | undefined;
+    let sessionId: number | undefined;
+
+    // When the X18 scans the LIM phone QR, it writes the opaque QR value to
+    // its `userID` field. Resolve that short-lived LIM session directly.
+    if (isLIMPhoneQrToken(rawUserId)) {
+      const [session] = await db.select().from(kioskSessions).where(and(
+        eq(kioskSessions.token, rawUserId),
+        gt(kioskSessions.expiresAt, new Date())
+      ));
+      // The X18 sends height/weight, composition, and BP separately, so allow
+      // the same short-lived QR session to be used across all three posts.
+      if (session && (session.status === "active" || session.status === "used")) {
+        const [matchedUser] = await db.select().from(users).where(eq(users.id, session.userId));
+        user = matchedUser;
+        sessionId = session.id;
+      }
+    } else {
+      // Manual machine login sends the Saudi mobile number as the X18 `userID`.
+      const normalizedPhone = normalizeSaudiMobilePhone(rawUserId);
+      if (!normalizedPhone.ok) {
+        return { success: false, message: "The X18 userID must be a LIM QR token or a valid Saudi mobile number." };
+      }
+      const [matchedUser] = await db.select().from(users).where(eq(users.phone, normalizedPhone.e164));
+      user = matchedUser;
     }
 
-    const [user] = await db.select().from(users).where(eq(users.phone, normalizedPhone.e164));
     if (!user) {
-      return { success: false, message: "No LIM account matches the uploaded userID." };
+      return { success: false, message: "No active LIM account matches the uploaded userID." };
     }
 
     const incoming = extractX18Metrics(item);
@@ -339,6 +364,10 @@ async function saveX18MachinePayload(
       await db.update(healthReadings).set(values).where(eq(healthReadings.id, existing.id));
     } else {
       await db.insert(healthReadings).values({ userId: user.id, ...values });
+    }
+
+    if (sessionId) {
+      await db.update(kioskSessions).set({ status: "used" }).where(eq(kioskSessions.id, sessionId));
     }
 
     savedUserId = user.id;

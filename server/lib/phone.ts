@@ -33,3 +33,11 @@ export function toMachineUserId(phone: string | null | undefined): string {
   const normalized = normalizeSaudiMobilePhone(phone);
   return normalized.ok ? normalized.national : "";
 }
+
+/**
+ * The LIM mobile QR intentionally contains a short opaque identifier, not a
+ * phone number. The X18 firmware stores this raw scanner value in `userID`.
+ */
+export function isLIMPhoneQrToken(value: string | null | undefined): boolean {
+  return /^[a-f0-9]{16}$/i.test(value?.trim() ?? "");
+}

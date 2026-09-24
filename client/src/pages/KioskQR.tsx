@@ -189,23 +189,23 @@ export default function KioskQR() {
               </div>
             ) : null}
 
-            {/* Step 2 hint */}
+            {/* Physical X18 result-delivery note */}
             <div className="bg-gray-50 rounded-xl p-3 text-left space-y-2">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                 {isAr ? "بعد القياسات" : "After measurements"}
               </p>
               <p className="text-xs text-gray-500 leading-relaxed">
                 {isAr
-                  ? "عند انتهاء الجهاز من القياسات، سيعرض رمز QR. افتح تطبيق LIM وامسح الرمز لاستلام نتائجك."
-                  : "When the machine finishes measuring, it will display a QR code. Open LIM and scan it to receive your results."}
+                  ? "سيُرسل جهاز X18 النتائج تلقائياً إلى حسابك في LIM عبر رابط رفع البيانات. رمز QR الأخير على الجهاز هو تقرير الشركة المصنّعة فقط؛ افتح «صحتي» لعرض نتائج LIM."
+                  : "The X18 sends results to your LIM account automatically through its data-upload URL. The final QR on the machine is a manufacturer report only; open My Health to view LIM results."}
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full text-xs h-8 border-cyan-200 text-cyan-600 hover:bg-cyan-50"
-                onClick={() => navigate("/kiosk-results")}
+                onClick={() => navigate("/health")}
               >
-                {isAr ? "مسح رمز النتائج" : "Scan Results QR"}
+                {isAr ? "فتح صحتي" : "Open My Health"}
               </Button>
             </div>
 
