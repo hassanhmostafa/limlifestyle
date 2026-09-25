@@ -27,6 +27,7 @@ import {
   type EventAnswers,
   scoreEventLifestyle,
 } from "@/lib/eventLifestyle";
+import { completedEventJourneySteps } from "@/lib/eventJourney";
 
 type Registration = {
   firstName: string;
@@ -89,7 +90,9 @@ export default function Events() {
   const saveLifestyle = trpc.events.saveLifestyle.useMutation({
     onSuccess: () => {
       sessionQuery.refetch();
-      setScreen("journey");
+      // The next actionable step is scanning the participant QR at X18.
+      // Take the participant directly there instead of making them reopen it.
+      setScreen("device");
       toast.success("تم حفظ تقييم نمط الحياة");
     },
     onError: (eventError) => setError(eventError.message),
@@ -124,7 +127,7 @@ export default function Events() {
     if (session.status === "measured") setScreen((current) => current === "register" ? "report" : current);
   }, [session?.code]);
 
-  const completedSteps = hasResult ? 5 : Object.keys(session?.answers ?? {}).length > 2 ? 3 : session ? 1 : 0;
+  const completedSteps = completedEventJourneySteps(Boolean(session), session?.answers, hasResult);
   const journeySteps: { id: string; label: string; hint: string; icon: typeof UserRound; target: Screen }[] = [
     { id: "registration", label: "البيانات الشخصية", hint: "تم حفظ بياناتك", icon: UserRound, target: "journey" },
     { id: "lifestyle", label: "تقييم نمط الحياة", hint: "نحو 10 دقائق", icon: HeartPulse, target: "lifestyle" },
