@@ -1,4 +1,4 @@
-import { eq, like, or, desc, and, gte, ilike, notInArray } from "drizzle-orm";
+import { eq, like, or, desc, and, gte, ilike, inArray, notInArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, kiosks, InsertKiosk, healthReadings, InsertHealthReading,
@@ -398,6 +398,25 @@ export async function getUserReadings(userId: number) {
 }
 
 /**
+ * Returns the specific record associated with an opaque Events session. The
+ * normal participant history hides simulator rows; this intentional exception
+ * lets an Events-only test record render inside its own browser session.
+ */
+export async function getEventReadingByRecordNo(userId: number, recordNo: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(healthReadings)
+    .where(and(
+      eq(healthReadings.userId, userId),
+      eq(healthReadings.recordNo, recordNo),
+      inArray(healthReadings.source, ["x18", "simulator"]),
+    ))
+    .orderBy(desc(healthReadings.recordedAt));
+}
+
+/**
  * Get health readings for a user since a given date (for chart range filtering).
  * Pass null for `since` to get all readings (Max range).
  */
@@ -490,7 +509,7 @@ export async function createEventParticipantSession(data: InsertEventParticipant
 
 export async function updateEventParticipantSession(
   accessTokenHash: string,
-  data: Partial<Pick<InsertEventParticipantSession, "answers" | "status">>,
+  data: Partial<Pick<InsertEventParticipantSession, "answers" | "status" | "latestRecordNo">>,
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -132,7 +132,7 @@ export function EventBodyResults({ readings }: { readings: DashboardReading[] })
           <b>ليم <em>LIM</em></b>
         </div>
         <div className="lim-results-title">
-          <span>نتائج جهاز القياس</span>
+          <span>{reading.source === "simulator" ? "بيانات اختبار" : "نتائج جهاز القياس"}</span>
           <h2>نتائج تحليل الجسم</h2>
           <p><CalendarDays size={16} />{eventReadingDate(reading.recordedAt)}</p>
         </div>
@@ -194,7 +194,7 @@ export function EventBodyResults({ readings }: { readings: DashboardReading[] })
 
       <footer className="lim-results-footer">
         <Sparkles size={17} />
-        <p>التصنيفات حسب مرجع الجهاز. القياسات تقديرية وتُراجع مع المختص.</p>
+        <p>{reading.source === "simulator" ? "قيم اختبار مولّدة عشوائيًا، وليست نتيجة من جهاز X18." : "التصنيفات حسب مرجع الجهاز. القياسات تقديرية وتُراجع مع المختص."}</p>
         <span>رقم التحليل: <bdi>{reading.recordNo ?? "—"}</bdi></span>
       </footer>
     </section>

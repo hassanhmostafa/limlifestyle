@@ -41,4 +41,23 @@ describe("EventBodyResults", () => {
     expect(markup).toContain("body-muscle_66410d1d.png");
     expect(markup).toContain("الدهون");
   });
+
+  it("visibly labels generated QR-step reports as test data", () => {
+    const markup = renderToStaticMarkup(
+      createElement(EventBodyResults, { readings: [{
+        id: 72,
+        source: "simulator",
+        recordedAt: new Date("2026-09-25T10:00:00Z"),
+        recordNo: "EVENT-TEST-20260925-001",
+        deviceNo: "EVENTS_TEST",
+        height: "174.5",
+        weight: "76.6",
+        bmi: "25.2",
+        machineMetrics: { fatRate: "25.3", muscle: "42.8", bmr: "1426" },
+      }] }),
+    );
+
+    expect(markup).toContain("بيانات اختبار");
+    expect(markup).toContain("قيم اختبار مولّدة عشوائيًا");
+  });
 });

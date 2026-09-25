@@ -3,15 +3,17 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import {
+  createHealthReading,
   createEventParticipantSession,
   createMachinePhoneUser,
+  getEventReadingByRecordNo,
   getEventParticipantSessionByTokenHash,
   getUserById,
   getUserByPhone,
-  getUserReadings,
   updateEventParticipantSession,
 } from "../db";
 import { hashApiKey } from "../lib/apiSecurity";
+import { createEventTestMeasurement } from "../lib/eventTestMeasurement";
 import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
 
 const EVENT_CODE = "lim-events";
@@ -139,6 +141,46 @@ export const eventsRouter = router({
     }),
 
   /**
+   * Creates a complete, clearly labelled X18-like result so the event journey
+   * can be tested when a physical machine is unavailable. It bypasses neither
+   * the real `/api/kiosk/data?apiKey=…` endpoint nor its authentication; it is
+   * an Events-only simulator record and remains hidden from My Health.
+   */
+  generateTestMeasurement: publicProcedure
+    .input(eventTokenInput)
+    .mutation(async ({ input }) => {
+      const session = await requireEventSession(input.accessToken);
+      const generated = createEventTestMeasurement();
+      await createHealthReading({
+        userId: session.userId,
+        kioskId: "EVENTS_TEST",
+        source: "simulator",
+        sbp: generated.sbp,
+        dbp: generated.dbp,
+        hr: generated.hr,
+        weight: generated.weight,
+        height: generated.height,
+        bmi: generated.bmi,
+        machineMetrics: generated.machineMetrics,
+        patientName: session.displayName ?? null,
+        patientAge: session.age ?? null,
+        patientSex: session.sex ?? null,
+        recordNo: generated.recordNo,
+        deviceNo: "EVENTS_TEST",
+        notes: "LIM Events generated test measurement — not a physical X18 upload.",
+        recordedAt: new Date(),
+      });
+      const updated = await updateEventParticipantSession(tokenHash(input.accessToken), {
+        status: "measured",
+        latestRecordNo: generated.recordNo,
+      });
+      if (!updated || updated.id !== session.id) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to link the generated test result." });
+      }
+      return { success: true, recordNo: generated.recordNo, source: "simulator" as const };
+    }),
+
+  /**
    * Result retrieval is scoped to the opaque event token and the measurement
    * that arrived for this particular event session. Older LIM measurements
    * must never make a freshly started event journey look complete.
@@ -155,16 +197,14 @@ export const eventsRouter = router({
         readings: [],
       };
     }
-    const readings = await getUserReadings(session.userId);
+    const readings = await getEventReadingByRecordNo(session.userId, session.latestRecordNo);
     return {
       session: {
         code: session.code,
         status: session.status,
         latestRecordNo: session.latestRecordNo,
       },
-      readings: readings.filter((reading) => (
-        reading.source === "x18" && reading.recordNo === session.latestRecordNo
-      )),
+      readings,
     };
   }),
 });

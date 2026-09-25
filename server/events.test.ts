@@ -7,12 +7,13 @@ vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
+    createHealthReading: vi.fn(),
     createEventParticipantSession: vi.fn(),
     createMachinePhoneUser: vi.fn(),
+    getEventReadingByRecordNo: vi.fn(),
     getEventParticipantSessionByTokenHash: vi.fn(),
     getUserById: vi.fn(),
     getUserByPhone: vi.fn(),
-    getUserReadings: vi.fn(),
     updateEventParticipantSession: vi.fn(),
   };
 });
@@ -87,20 +88,17 @@ describe("standalone events results", () => {
     const caller = appRouter.createCaller(anonymousContext);
     const result = await caller.events.results({ accessToken: "z".repeat(43) });
     expect(result.readings).toEqual([]);
-    expect(mockedDb.getUserReadings).not.toHaveBeenCalled();
+    expect(mockedDb.getEventReadingByRecordNo).not.toHaveBeenCalled();
   });
 
-  it("requires the opaque event token and returns only the X18 reading marked for this event session", async () => {
+  it("requires the opaque event token and returns only the result marked for this event session", async () => {
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
       ...eventSession,
       status: "measured",
       latestRecordNo: "EVENT-RECORD-1",
     });
-    mockedDb.getUserReadings.mockResolvedValue([
+    mockedDb.getEventReadingByRecordNo.mockResolvedValue([
       { id: 1, userId: 42, source: "x18", recordNo: "EVENT-RECORD-1", machineMetrics: { fatRate: "22.1" } },
-      { id: 4, userId: 42, source: "x18", recordNo: "OLD-RECORD", machineMetrics: { fatRate: "19.4" } },
-      { id: 2, userId: 42, source: "manual", machineMetrics: null },
-      { id: 3, userId: 42, source: "simulator", machineMetrics: {} },
     ] as never);
 
     const caller = appRouter.createCaller(anonymousContext);
@@ -108,7 +106,39 @@ describe("standalone events results", () => {
 
     expect(result.readings).toHaveLength(1);
     expect(result.readings[0].id).toBe(1);
-    expect(mockedDb.getUserReadings).toHaveBeenCalledWith(42);
+    expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(42, "EVENT-RECORD-1");
+  });
+
+  it("creates a complete simulator-only test report for the active event session", async () => {
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
+    mockedDb.createHealthReading.mockResolvedValue({ id: 17 } as never);
+    mockedDb.updateEventParticipantSession.mockResolvedValue({
+      ...eventSession,
+      status: "measured",
+      latestRecordNo: "EVENT-TEST-123",
+    });
+
+    const caller = appRouter.createCaller(anonymousContext);
+    const result = await caller.events.generateTestMeasurement({ accessToken: "z".repeat(43) });
+
+    expect(result.success).toBe(true);
+    expect(result.source).toBe("simulator");
+    expect(result.recordNo).toMatch(/^EVENT-TEST-/);
+    expect(mockedDb.createHealthReading).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 42,
+      source: "simulator",
+      deviceNo: "EVENTS_TEST",
+      machineMetrics: expect.objectContaining({
+        fatRate: expect.any(String),
+        muscleRightArm: expect.any(String),
+        waterICW: expect.any(String),
+        sbp: expect.any(String),
+      }),
+    }));
+    expect(mockedDb.updateEventParticipantSession).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ status: "measured", latestRecordNo: result.recordNo }),
+    );
   });
 
   it("rejects a missing or unknown event token", async () => {
