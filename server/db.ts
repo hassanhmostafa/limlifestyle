@@ -394,7 +394,9 @@ export async function getUserReadings(userId: number) {
     .select()
     .from(healthReadings)
     .where(and(eq(healthReadings.userId, userId), notInArray(healthReadings.source, ["demo", "simulator"])))
-    .orderBy(desc(healthReadings.recordedAt));
+    // Device clocks are not authoritative; show the report LIM received most
+    // recently so a just-arrived linked X18 result appears immediately.
+    .orderBy(desc(healthReadings.createdAt));
 }
 
 /**
@@ -413,7 +415,7 @@ export async function getEventReadingByRecordNo(userId: number, recordNo: string
       eq(healthReadings.recordNo, recordNo),
       inArray(healthReadings.source, ["x18", "x18_test", "simulator"]),
     ))
-    .orderBy(desc(healthReadings.recordedAt));
+    .orderBy(desc(healthReadings.createdAt));
 }
 
 /**
@@ -428,7 +430,7 @@ export async function getUserReadingsSince(userId: number, since: Date | null) {
       .select()
       .from(healthReadings)
       .where(and(eq(healthReadings.userId, userId), notInArray(healthReadings.source, ["demo", "simulator"])))
-      .orderBy(desc(healthReadings.recordedAt));
+      .orderBy(desc(healthReadings.createdAt));
   }
   return db
     .select()
@@ -438,7 +440,7 @@ export async function getUserReadingsSince(userId: number, since: Date | null) {
       notInArray(healthReadings.source, ["demo", "simulator"]),
       gte(healthReadings.recordedAt, since),
     ))
-    .orderBy(desc(healthReadings.recordedAt));
+    .orderBy(desc(healthReadings.createdAt));
 }
 
 /**

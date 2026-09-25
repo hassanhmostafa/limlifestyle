@@ -38,7 +38,7 @@ describe("EventBodyResults", () => {
     expect(markup).toContain("نتائج تحليل الجسم");
     expect(markup).toContain("توزيع الدهون والعضلات");
     expect(markup).toContain("الحرق ومؤشرات إضافية");
-    expect(markup).toContain("body-muscle_d437e41d.png");
+    expect(markup).toContain("body-muscle-v2_e7ba4c5c.png");
     expect(markup).toContain("الدهون");
   });
 

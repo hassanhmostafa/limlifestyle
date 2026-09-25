@@ -19,6 +19,8 @@
 - [x] Port the supplied standalone Events result-page structure, Arabic labels, muscle/fat anatomy controls, cards, and anatomical assets without restoring its broken separate account/password result gateway. `/events` remains absent from the main LIM navigation.
 - [x] Add **إنشاء نتيجة اختبار** at the Events QR step. It generates a session-scoped complete X18-like `datas` payload and posts it through the exact `/api/kiosk/data?apiKey=…` HTTP upload handler with a five-minute, record-bound temporary test credential. The record is marked `x18_test`, shown in Events and the linked My Health account, and never uses the physical fleet key.
 - [x] Re-upload the Events muscle/fat images to stable published storage paths and enlarge/re-align the anatomy figure, cards, and connector lines for the mobile result layout.
+- [x] Route a completed body analysis to **الاستشارة الطبية** (step 4) rather than marking steps 4 and 5 finished; the final report remains an explicit next action.
+- [x] Ensure newly received phone-linked X18 and Events records are ordered by LIM receipt time in **My Health**, refresh while that page is open, and normalize future X18 Saudi-local timestamps to UTC for new uploads.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.

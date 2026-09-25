@@ -28,7 +28,7 @@ import {
   type EventAnswers,
   scoreEventLifestyle,
 } from "@/lib/eventLifestyle";
-import { completedEventJourneySteps } from "@/lib/eventJourney";
+import { completedEventJourneySteps, nextEventScreenAfterMeasurement } from "@/lib/eventJourney";
 
 type Registration = {
   firstName: string;
@@ -126,8 +126,12 @@ export default function Events() {
   useEffect(() => {
     if (!session) return;
     setAnswers({ importance: 5, confidence: 5, ...session.answers });
-    if (session.status === "measured") setScreen((current) => current === "register" ? "report" : current);
+    if (session.status === "measured") setScreen((current) => current === "register" ? "queue" : current);
   }, [session?.code]);
+
+  useEffect(() => {
+    setScreen((current) => nextEventScreenAfterMeasurement(current, hasResult));
+  }, [hasResult]);
 
   const completedSteps = completedEventJourneySteps(Boolean(session), session?.answers, hasResult);
   const journeySteps: { id: string; label: string; hint: string; icon: typeof UserRound; target: Screen }[] = [

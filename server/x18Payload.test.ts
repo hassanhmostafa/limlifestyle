@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractX18Metrics, mergeX18Metrics, X18MachinePayloadSchema } from "./lib/x18Payload";
+import { extractX18Metrics, mergeX18Metrics, parseX18MeasurementTime, X18MachinePayloadSchema } from "./lib/x18Payload";
 import { extractX18ReportedIdentity, formatX18Sex } from "./lib/x18Identity";
 
 const heightWeightPayload = {
@@ -98,5 +98,10 @@ describe("X18_5 payload mapping", () => {
     }).datas[0];
 
     expect(extractX18ReportedIdentity(item)).toEqual({ patientName: null, patientAge: null, patientSex: null });
+  });
+
+  it("stores a zone-less X18 Saudi time in UTC rather than three hours in the future", () => {
+    expect(parseX18MeasurementTime("2026-09-25 16:11:16").toISOString())
+      .toBe("2026-09-25T13:11:16.000Z");
   });
 });

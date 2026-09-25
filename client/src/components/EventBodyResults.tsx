@@ -87,7 +87,7 @@ function Distribution({ mode, values }: { mode: Mode; values: Record<string, str
       <SegmentCard area="right-leg" mode={mode} label="الساق اليسرى" value={values[`${mode}LeftLeg`]} />
       <div className="lim-anatomy-figure">
         <img
-          src={mode === "muscle" ? "/manus-storage/body-muscle_d437e41d.png" : "/manus-storage/body-fat_3bb14e6b.png"}
+          src={mode === "muscle" ? "/manus-storage/body-muscle-v2_e7ba4c5c.png" : "/manus-storage/body-fat-v2_1aa1b2ff.png"}
           alt={mode === "muscle" ? "رسم توضيحي محايد لتوزيع العضلات" : "رسم توضيحي محايد لتوزيع الدهون"}
         />
       </div>

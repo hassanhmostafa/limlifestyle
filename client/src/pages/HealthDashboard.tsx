@@ -504,7 +504,14 @@ export default function HealthDashboard() {
 
   const { data: readings, isLoading: readingsLoading } = trpc.health.myReadings.useQuery(
     undefined,
-    { enabled: isAuthenticated }
+    {
+      enabled: isAuthenticated,
+      // Physical uploads arrive independently of this browser session. Polling
+      // while My Health is open avoids requiring a manual reload after X18 or
+      // Events receives a report for the same phone-linked account.
+      refetchInterval: 15_000,
+      refetchOnMount: "always",
+    }
   );
 
   const { data: bmiData, isLoading: bmiLoading } = trpc.health.bmiComparison.useQuery(

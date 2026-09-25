@@ -182,6 +182,22 @@ export function mergeX18Metrics(existing: X18MetricBundle, incoming: X18MetricBu
 
 export function parseX18MeasurementTime(value: string | undefined): Date {
   if (!value) return new Date();
+  // X18 sends `YYYY-MM-DD HH:mm:ss` without a zone. The physical fleet runs
+  // in Saudi Arabia (UTC+03:00), while our database timestamps are UTC.
+  // Parsing it as server-local UTC would make reports appear three hours in
+  // the future and can hide a newly arrived Events result behind an old row.
+  const saudiaLocal = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (saudiaLocal) {
+    const [, year, month, day, hour, minute, second = "0"] = saudiaLocal;
+    return new Date(Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour) - 3,
+      Number(minute),
+      Number(second),
+    ));
+  }
   const parsed = new Date(value.replace(" ", "T"));
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
