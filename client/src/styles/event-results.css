@@ -64,7 +64,7 @@
   --leader-diagonal: 12cqw;
   --arm-leader-short: 8cqw;
   --arm-leader-diagonal: 7cqw;
-  --leg-leader: 9cqw;
+  --leg-leader: 15cqw;
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1.4;

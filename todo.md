@@ -28,6 +28,7 @@
 - [x] Render the Events body chart at one fixed mobile geometry in both the immediate measurement view and final report: smaller figure and labels, wider horizontal connector space, and no nested report-card width reduction.
 - [x] Make the Events anatomy chart a single fixed-ratio board: artwork, labels, leader lines, target dots, and label text all use container-relative dimensions and resize together without screen-specific positioning.
 - [x] Refine the shared Events connector targets: shorter arm leaders land on the arms, the trunk leader reaches the stomach center, and raised leg leaders end horizontally at mid-leg in both the immediate result and final report.
+- [x] Extend the shared horizontal leg leaders so their target dots reach the legs rather than stopping in open space.
 - [x] Add persisted, explicit Events milestones: **التقرير النهائي** completes the consultation and opens the report; **إنهاء الرحلة** completes the report and marks all five journey steps finished.
 
 ## Required field verification after deployment
