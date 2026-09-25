@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleKioskData, handleKioskLoginPoll } from "../routers/kioskIntegration";
 import { handleClinicianParticipantResults, handleClinicianParticipants, handleEventMyResults, handleEventPhoneLogin } from "../routers/eventApi";
+import { handleEventAnatomyAsset } from "../eventAssets";
 import { seedKiosks, updateUserProfile, getUserByOpenId } from "../db";
 import { SEED_KIOSKS } from "../seed";
 import { ENV } from "./env";
@@ -96,6 +97,10 @@ async function startServer() {
 
   // Kiosk data ingestion endpoint (plain HTTP POST from TRIPLEBIGHT kiosk machines)
   app.post("/api/kiosk/data", handleKioskData);
+
+  // Same-origin image endpoint for the standalone Events report. It avoids
+  // unreliable signed cross-origin image redirects in installed/mobile Safari.
+  app.get("/api/events/anatomy/:kind", handleEventAnatomyAsset);
 
   // Event applications authenticate a participant by their LIM phone account,
   // then fetch only that participant's readings with a short-lived Bearer token.

@@ -23,6 +23,11 @@ import {
 import "@/styles/event-results.css";
 
 type Mode = "muscle" | "fat";
+export type EventParticipantIdentity = {
+  firstName?: string | null;
+  age?: number | null;
+  sex?: "male" | "female" | string | null;
+};
 
 /** Formats timestamps using the same Riyadh/Gregorian presentation as the supplied Events project. */
 export function eventReadingDate(value: Date | string) {
@@ -87,8 +92,10 @@ function Distribution({ mode, values }: { mode: Mode; values: Record<string, str
       <SegmentCard area="right-leg" mode={mode} label="الساق اليسرى" value={values[`${mode}LeftLeg`]} />
       <div className="lim-anatomy-figure">
         <img
-          src={mode === "muscle" ? "/manus-storage/body-muscle-v2_e7ba4c5c.png" : "/manus-storage/body-fat-v2_1aa1b2ff.png"}
+          src={`/api/events/anatomy/${mode}`}
           alt={mode === "muscle" ? "رسم توضيحي محايد لتوزيع العضلات" : "رسم توضيحي محايد لتوزيع الدهون"}
+          decoding="async"
+          loading="eager"
         />
       </div>
     </div>
@@ -114,12 +121,19 @@ function QuickIndicator({ icon, label, value, unit }: { icon: React.ReactNode; l
  * reads come from the existing shared `health_readings` X18 data rather than the
  * original archive's separate password/login gateway.
  */
-export function EventBodyResults({ readings }: { readings: DashboardReading[] }) {
+export function EventBodyResults({ readings, participant }: { readings: DashboardReading[]; participant?: EventParticipantIdentity }) {
   const [mode, setMode] = useState<Mode>("muscle");
   const reading = readings[0];
   if (!reading) return null;
 
   const values = eventReadingValues(reading);
+  // A physical X18 report is authoritative whenever it supplies demographics.
+  // Events still shows the check-in form identity when the device intentionally
+  // leaves a field empty, so a participant never sees a blank report header.
+  const participantName = reading.patientName?.trim() || participant?.firstName?.trim() || null;
+  const participantAge = reading.patientAge ?? participant?.age ?? null;
+  const participantSex = reading.patientSex ?? participant?.sex ?? null;
+  const participantSexLabel = participantSex === "1" || participantSex === "male" ? "ذكر" : participantSex === "2" || participantSex === "female" ? "أنثى" : participantSex || null;
   const bmr = formatValue(values.bmr);
   const moreFields = eventResultCategories.additional.filter(([key]) => !["bmr", "vfal", "bone", "fatFree", "protein", "waterICW", "waterECW"].includes(key));
   const hasVitals = eventResultCategories.vitals.some(([key]) => eventNumeric(values[key]) !== null);
@@ -135,6 +149,11 @@ export function EventBodyResults({ readings }: { readings: DashboardReading[] })
           <span>{reading.source === "x18_test" ? "بيانات اختبار" : "نتائج جهاز القياس"}</span>
           <h2>نتائج تحليل الجسم</h2>
           <p><CalendarDays size={16} />{eventReadingDate(reading.recordedAt)}</p>
+          {(participantName || participantAge !== null || participantSexLabel) && <p className="lim-results-participant">
+            {participantName && <b>{participantName}</b>}
+            {participantAge !== null && <span>{participantAge} سنة</span>}
+            {participantSexLabel && <span>{participantSexLabel}</span>}
+          </p>}
         </div>
         <button type="button" className="lim-download-button lim-print-hide" onClick={() => window.print()}>
           <Download size={19} /> تحميل التقرير

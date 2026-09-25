@@ -27,6 +27,8 @@
 .lim-results-title > span { display: inline-flex; padding: 4px 12px; border-radius: 999px; color: #557069; background: #eff7dc; font-size: .8rem; }
 .lim-results-title h2 { margin: 5px 0 3px; color: var(--lim-forest); font-size: clamp(1.45rem, 4vw, 2rem); font-weight: 900; line-height: 1.2; }
 .lim-results-title p { display: flex; justify-content: center; align-items: center; gap: 6px; color: #536b65; font-size: .85rem; }
+.lim-results-title .lim-results-participant { gap: 0; margin-top: 4px; color: #315a50; font-size: .78rem; font-weight: 700; }
+.lim-results-participant > * + *::before { content: "•"; margin: 0 7px; color: #9bb5ae; }
 .lim-download-button { justify-self: end; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 8px 12px; border: 1.5px solid var(--lim-forest); border-radius: 13px; color: var(--lim-forest); background: #fff; font-weight: 800; cursor: pointer; }
 
 .lim-top-metrics,

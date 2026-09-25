@@ -28,7 +28,7 @@ import {
   type EventAnswers,
   scoreEventLifestyle,
 } from "@/lib/eventLifestyle";
-import { completedEventJourneySteps, nextEventScreenAfterMeasurement } from "@/lib/eventJourney";
+import { completedEventJourneySteps } from "@/lib/eventJourney";
 
 type Registration = {
   firstName: string;
@@ -126,12 +126,10 @@ export default function Events() {
   useEffect(() => {
     if (!session) return;
     setAnswers({ importance: 5, confidence: 5, ...session.answers });
-    if (session.status === "measured") setScreen((current) => current === "register" ? "queue" : current);
+    // A restored measured session opens its body report first. Consultation is
+    // a deliberate participant action through the yellow LIM button below it.
+    if (session.status === "measured") setScreen((current) => current === "register" ? "device" : current);
   }, [session?.code]);
-
-  useEffect(() => {
-    setScreen((current) => nextEventScreenAfterMeasurement(current, hasResult));
-  }, [hasResult]);
 
   const completedSteps = completedEventJourneySteps(Boolean(session), session?.answers, hasResult);
   const journeySteps: { id: string; label: string; hint: string; icon: typeof UserRound; target: Screen }[] = [
@@ -175,7 +173,7 @@ export default function Events() {
         if (index <= completedSteps || (target === "queue" && completedSteps >= 2)) go(target);
       }} onReset={reset} />}
       {screen === "lifestyle" && session && <LifestyleView answers={answers} sectionIndex={lifestyleIndex} setSectionIndex={setLifestyleIndex} onBack={() => go("journey")} onSave={() => saveLifestyle.mutate({ accessToken: session.token, answers })} saving={saveLifestyle.isPending} />}
-      {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} testing={generateTestMeasurement.isPending} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onGenerateTest={async () => {
+      {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} testing={generateTestMeasurement.isPending} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onViewConsultation={() => go("queue")} onGenerateTest={async () => {
         setError("");
         try {
           const testUpload = await generateTestMeasurement.mutateAsync({ accessToken: session.token });
@@ -248,9 +246,9 @@ function LifestyleView({ answers, sectionIndex, setSectionIndex, onBack, onSave,
   </section>;
 }
 
-function DeviceView({ session, readings, loading, testing, onBack, onRefresh, onGenerateTest }: { session: StoredSession; readings: DashboardReading[]; loading: boolean; testing: boolean; onBack: () => void; onRefresh: () => void; onGenerateTest: () => Promise<void> }) {
+function DeviceView({ session, readings, loading, testing, onBack, onRefresh, onViewConsultation, onGenerateTest }: { session: StoredSession; readings: DashboardReading[]; loading: boolean; testing: boolean; onBack: () => void; onRefresh: () => void; onViewConsultation: () => void; onGenerateTest: () => Promise<void> }) {
   const hasResult = readings.length > 0;
-  if (hasResult) return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><EventBodyResults readings={readings} /></section>;
+  if (hasResult) return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><EventBodyResults readings={readings} participant={session} /><PrimaryButton onClick={onViewConsultation} className="mt-6"><Stethoscope className="ml-2 h-5 w-5" />الانتقال إلى الاستشارة الطبية<ChevronLeft className="mr-2 h-5 w-5" /></PrimaryButton></section>;
   return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="mb-5 rounded-[28px] border border-[#dce9e5] bg-white p-5 shadow-[0_8px_25px_rgba(18,58,52,.05)]"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dff33d] text-[#123a34]"><QrCode className="h-6 w-6" /></span><div><h1 className="text-xl font-black">رمز جوالك للفحص</h1><p className="mt-1 text-sm leading-6 text-[#6c8882]">امسح الرمز بقارئ جهاز تحليل الجسم قبل بدء القياس.</p></div></div>
     {session.deviceUserId ? <><div className="my-5 rounded-2xl border border-[#dce9e5] bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={260} level="M" includeMargin className="mx-auto h-auto w-full max-w-[260px]" /></div><p className="rounded-xl bg-[#f3f8f6] p-3 text-center text-sm leading-6 text-[#45665f]">سيظهر الرقم نفسه في خانة <b dir="ltr">ID</b> على الجهاز: <b dir="ltr" className="text-[#123a34]">{session.deviceUserId}</b></p></> : <p role="alert" className="mt-4 rounded-xl bg-[#fff0ed] p-3 text-sm text-[#a43f30]">تعذر تجهيز رمز الجهاز لهذه الجلسة.</p>}
   </div>
@@ -260,7 +258,7 @@ function DeviceView({ session, readings, loading, testing, onBack, onRefresh, on
 
 function QueueView({ hasResults, onBack, code, onReport }: { hasResults: boolean; onBack: () => void; code: string; onReport: () => void }) { return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="rounded-[30px] bg-[#123f37] p-7 text-center text-white"><span className="mx-auto grid h-20 w-20 place-items-center rounded-[24px] bg-[#dff33d] text-[#123a34]"><Stethoscope className="h-10 w-10" /></span><h1 className="mt-6 text-2xl font-black">الاستشارة الطبية</h1><p className="mt-3 leading-7 text-[#d2e1dd]">{hasResults ? "نتائجك جاهزة للاستشارة. قدّم رمز الجلسة للفريق الصحي عند الحاجة." : "يمكنك متابعة تنظيم الاستشارة أثناء انتظار نتيجة القياس."}</p><div className="mx-auto mt-6 w-fit rounded-2xl bg-white/10 px-5 py-3"><span className="block text-xs text-[#bcd1cc]">رمز الجلسة</span><strong dir="ltr" className="mt-1 block font-mono text-lg text-[#dff33d]">{code}</strong></div></div><PrimaryButton onClick={onReport} className="mt-6">عرض التقرير</PrimaryButton></section>; }
 
-function ReportView({ session, readings, onBack }: { session: StoredSession; readings: DashboardReading[]; onBack: () => void }) { const lifestyle = scoreEventLifestyle(session.answers); return <section className="px-5 pb-14 pt-6 print:px-0"><div className="print:hidden"><BackButton onClick={onBack} /></div><div className="rounded-[28px] border border-[#dce9e5] bg-white p-5"><p className="text-sm font-bold text-[#197f6f]">التقرير الصحي</p><h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1><p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p><div className="mt-6"><div className="flex items-end justify-between"><h2 className="font-black">تقييم نمط الحياة</h2><strong className="text-2xl text-[#197f6f]">{lifestyle.overall}<span className="text-sm">/100</span></strong></div><div className="mt-4 space-y-3">{Object.entries(lifestyle.domains).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{({ nutrition: "التغذية", activity: "النشاط", sleep: "النوم", mood: "المزاج والضغوط", connection: "المعنى والترابط", substances: "تجنب المواد الضارة" } as Record<string, string>)[key]}</span><strong>{value}/10</strong></div><Progress value={value * 10} className="h-2" /></div>)}</div></div>{readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} /></div>}<p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p></div><Button type="button" onClick={() => window.print()} className="mt-5 h-13 w-full rounded-2xl bg-[#197f6f] font-bold print:hidden">طباعة التقرير</Button></section>; }
+function ReportView({ session, readings, onBack }: { session: StoredSession; readings: DashboardReading[]; onBack: () => void }) { const lifestyle = scoreEventLifestyle(session.answers); return <section className="px-5 pb-14 pt-6 print:px-0"><div className="print:hidden"><BackButton onClick={onBack} /></div><div className="rounded-[28px] border border-[#dce9e5] bg-white p-5"><p className="text-sm font-bold text-[#197f6f]">التقرير الصحي</p><h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1><p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p><div className="mt-6"><div className="flex items-end justify-between"><h2 className="font-black">تقييم نمط الحياة</h2><strong className="text-2xl text-[#197f6f]">{lifestyle.overall}<span className="text-sm">/100</span></strong></div><div className="mt-4 space-y-3">{Object.entries(lifestyle.domains).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{({ nutrition: "التغذية", activity: "النشاط", sleep: "النوم", mood: "المزاج والضغوط", connection: "المعنى والترابط", substances: "تجنب المواد الضارة" } as Record<string, string>)[key]}</span><strong>{value}/10</strong></div><Progress value={value * 10} className="h-2" /></div>)}</div></div>{readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}<p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p></div><Button type="button" onClick={() => window.print()} className="mt-5 h-13 w-full rounded-2xl bg-[#197f6f] font-bold print:hidden">طباعة التقرير</Button></section>; }
 
 function Hero({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <div className="mb-7 rounded-[28px] bg-[#123f37] p-6 text-white shadow-[0_18px_45px_rgba(11,55,47,.15)]"><div className="mb-7 flex items-center justify-between"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-[#dff33d]">{eyebrow}</span><Activity className="h-6 w-6 text-[#dff33d]" /></div><h1 className="text-[1.7rem] font-black leading-tight">{title}</h1><p className="mt-3 text-base leading-7 text-[#d4e3df]">{copy}</p><div className="mt-5 flex items-center gap-2 text-sm text-[#c6d9d4]"><ClipboardCheck className="h-5 w-5 text-[#dff33d]" /><span>تُحفظ كل خطوة تلقائيًا</span></div></div>; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }

@@ -30,7 +30,10 @@ async function buildDownloadUrl(
   apiKey: string
 ): Promise<string> {
   const downloadApiUrl = new URL(
-    "v1/storage/downloadUrl",
+    // Match the platform's built-in /manus-storage proxy. The prior
+    // `downloadUrl` route does not issue a usable URL in this deployment,
+    // causing same-origin Events image proxy requests to return 502.
+    "v1/storage/presign/get",
     ensureTrailingSlash(baseUrl)
   );
   downloadApiUrl.searchParams.set("path", normalizeKey(relKey));
@@ -38,7 +41,12 @@ async function buildDownloadUrl(
     method: "GET",
     headers: buildAuthHeaders(apiKey),
   });
-  return (await response.json()).url;
+  if (!response.ok) {
+    throw new Error(`Storage download URL failed (${response.status})`);
+  }
+  const { url } = await response.json() as { url?: string };
+  if (!url) throw new Error("Storage download URL response was empty");
+  return url;
 }
 
 function ensureTrailingSlash(value: string): string {

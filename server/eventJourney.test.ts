@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completedEventJourneySteps, nextEventScreenAfterMeasurement } from "../client/src/lib/eventJourney";
+import { completedEventJourneySteps } from "../client/src/lib/eventJourney";
 
 describe("completedEventJourneySteps", () => {
   it("keeps body analysis incomplete after lifestyle assessment", () => {
@@ -11,11 +11,8 @@ describe("completedEventJourneySteps", () => {
     }, false)).toBe(2);
   });
 
-  it("opens the medical consultation after the current X18 measurement arrives", () => {
+  it("keeps the consultation as the next step after the current X18 measurement arrives", () => {
     expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true)).toBe(3);
-    expect(nextEventScreenAfterMeasurement("device", true)).toBe("queue");
-    expect(nextEventScreenAfterMeasurement("queue", true)).toBe("queue");
-    expect(nextEventScreenAfterMeasurement("device", false)).toBe("device");
   });
 
   it("handles newly created and absent sessions", () => {

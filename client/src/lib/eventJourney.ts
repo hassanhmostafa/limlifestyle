@@ -17,12 +17,3 @@ export function completedEventJourneySteps(
   const hasLifestyle = Object.keys(answers ?? {}).length > 2;
   return hasLifestyle ? 2 : 1;
 }
-
-/**
- * A device upload completes body analysis, then advances the participant to
- * medical consultation. It must never silently mark consultation and the final
- * report as completed.
- */
-export function nextEventScreenAfterMeasurement<T extends string>(currentScreen: T, hasCurrentSessionMeasurement: boolean): T | "queue" {
-  return currentScreen === "device" && hasCurrentSessionMeasurement ? "queue" : currentScreen;
-}

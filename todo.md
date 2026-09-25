@@ -21,6 +21,8 @@
 - [x] Re-upload the Events muscle/fat images to stable published storage paths and enlarge/re-align the anatomy figure, cards, and connector lines for the mobile result layout.
 - [x] Route a completed body analysis to **الاستشارة الطبية** (step 4) rather than marking steps 4 and 5 finished; the final report remains an explicit next action.
 - [x] Ensure newly received phone-linked X18 and Events records are ordered by LIM receipt time in **My Health**, refresh while that page is open, and normalize future X18 Saudi-local timestamps to UTC for new uploads.
+- [x] Deliver Events muscle/fat art through a first-party `/api/events/anatomy/:kind` image proxy rather than a signed storage redirect, ensuring Safari can render the image after production publishing.
+- [x] On an Events result, use the device-reported name when present and the Events-form name when the device omitted it; keep the participant on their body report after a result arrives and show an explicit LIM-styled **الانتقال إلى الاستشارة الطبية** button.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.

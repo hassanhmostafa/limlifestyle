@@ -32,14 +32,16 @@ describe("EventBodyResults", () => {
           fatRightLeg: "4.1",
           fatLeftLeg: "4.1",
         },
-      }] }),
+      }], participant: { firstName: "عبداللطيف", age: 34, sex: "male" } }),
     );
 
     expect(markup).toContain("نتائج تحليل الجسم");
     expect(markup).toContain("توزيع الدهون والعضلات");
     expect(markup).toContain("الحرق ومؤشرات إضافية");
-    expect(markup).toContain("body-muscle-v2_e7ba4c5c.png");
+    expect(markup).toContain("/api/events/anatomy/muscle");
     expect(markup).toContain("الدهون");
+    expect(markup).toContain("عبداللطيف");
+    expect(markup).toContain("34 سنة");
   });
 
   it("visibly labels generated QR-step reports as test data", () => {
