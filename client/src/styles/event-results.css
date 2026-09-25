@@ -104,7 +104,7 @@
 .lim-segment-right-arm .lim-segment-target { left: calc(-1 * var(--arm-target)); top: calc(50% + 3.1cqw); }
 .lim-segment-left-leg .lim-segment-target { right: calc(-1 * var(--leg-target)); top: calc(50% - 1.7cqw); }
 .lim-segment-right-leg .lim-segment-target { left: calc(-1 * var(--leg-target)); top: calc(50% - 1.7cqw); }
-.lim-segment-trunk .lim-segment-target { left: -21.4cqw; top: calc(50% - 11cqw); }
+.lim-segment-trunk .lim-segment-target { left: -25.2cqw; top: calc(50% - 11cqw); }
 .lim-segment-fat { border-color: var(--lim-coral); }
 .lim-segment-fat::after, .lim-segment-fat::before, .lim-segment-fat .lim-segment-target { background: var(--lim-coral); }
 .lim-segment-card span { display: block; color: #2b5148; font-size: clamp(.65rem, 3.7cqw, 1rem); line-height: 1.2; }
