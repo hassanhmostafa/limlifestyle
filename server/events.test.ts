@@ -82,10 +82,23 @@ describe("standalone events.createSession", () => {
 });
 
 describe("standalone events results", () => {
-  it("requires the opaque event token and returns only physical X18 readings for its linked internal participant", async () => {
+  it("does not expose prior LIM measurements to a fresh event journey", async () => {
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
+    const caller = appRouter.createCaller(anonymousContext);
+    const result = await caller.events.results({ accessToken: "z".repeat(43) });
+    expect(result.readings).toEqual([]);
+    expect(mockedDb.getUserReadings).not.toHaveBeenCalled();
+  });
+
+  it("requires the opaque event token and returns only the X18 reading marked for this event session", async () => {
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
+      ...eventSession,
+      status: "measured",
+      latestRecordNo: "EVENT-RECORD-1",
+    });
     mockedDb.getUserReadings.mockResolvedValue([
-      { id: 1, userId: 42, source: "x18", machineMetrics: { fatRate: "22.1" } },
+      { id: 1, userId: 42, source: "x18", recordNo: "EVENT-RECORD-1", machineMetrics: { fatRate: "22.1" } },
+      { id: 4, userId: 42, source: "x18", recordNo: "OLD-RECORD", machineMetrics: { fatRate: "19.4" } },
       { id: 2, userId: 42, source: "manual", machineMetrics: null },
       { id: 3, userId: 42, source: "simulator", machineMetrics: {} },
     ] as never);

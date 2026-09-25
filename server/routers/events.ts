@@ -138,9 +138,23 @@ export const eventsRouter = router({
       return { success: true, answers: updated.answers ?? {} };
     }),
 
-  /** Result retrieval is scoped solely to the opaque event session token. */
+  /**
+   * Result retrieval is scoped to the opaque event token and the measurement
+   * that arrived for this particular event session. Older LIM measurements
+   * must never make a freshly started event journey look complete.
+   */
   results: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
+    if (!session.latestRecordNo) {
+      return {
+        session: {
+          code: session.code,
+          status: session.status,
+          latestRecordNo: null,
+        },
+        readings: [],
+      };
+    }
     const readings = await getUserReadings(session.userId);
     return {
       session: {
@@ -148,7 +162,9 @@ export const eventsRouter = router({
         status: session.status,
         latestRecordNo: session.latestRecordNo,
       },
-      readings: readings.filter((reading) => reading.source === "x18"),
+      readings: readings.filter((reading) => (
+        reading.source === "x18" && reading.recordNo === session.latestRecordNo
+      )),
     };
   }),
 });
