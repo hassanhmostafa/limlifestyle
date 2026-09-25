@@ -23,7 +23,6 @@ export default function Navigation() {
   const navLinks = [
     { href: "/find-station", label: t.nav_findStation },
     { href: "/health", label: t.nav_myHealth },
-    { href: "/events", label: language === "ar" ? "فعاليات LIM" : "LIM Events" },
     ...(isAuthenticated ? [{ href: "/ai-plan", label: language === "ar" ? "خطة الذكاء الاصطناعي" : "AI Plan" }] : []),
   ];
 

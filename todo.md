@@ -16,6 +16,7 @@
 - [x] Add non-secret integration documentation and unit/API validation.
 - [x] Render full X18 body-composition reports in **My Health**, including muscle/fat switching, segmental measurements, metabolism indicators, and a separate trend graph for every available X18 metric.
 - [x] Add the standalone `/events` journey from the event project: no LIM main-app sign-in in its frontend, its own event-form and opaque browser session, a phone-number QR for X18, and physical results drawn from the same shared LIM `health_readings` record that **My Health** uses.
+- [x] Port the supplied standalone Events result-page structure, Arabic labels, muscle/fat anatomy controls, cards, and anatomical assets without restoring its broken separate account/password result gateway. `/events` remains absent from the main LIM navigation.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   Activity,
   Bone,
@@ -12,174 +12,191 @@ import {
   Network,
   Sparkles,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardReading } from "@/components/BodyCompositionReport";
 import {
-  eventFormattedValue,
   eventNumeric,
   eventReadingValues,
-  eventReferenceRange,
   eventResultCategories,
   type EventResultField,
 } from "@/lib/eventResultsData";
 import "@/styles/event-results.css";
 
-type DistributionMode = "muscle" | "fat";
+type Mode = "muscle" | "fat";
 
-const segments = [
-  ["RightArm", "الذراع اليمنى"],
-  ["LeftArm", "الذراع اليسرى"],
-  ["Trunk", "الجذع"],
-  ["RightLeg", "الساق اليمنى"],
-  ["LeftLeg", "الساق اليسرى"],
-] as const;
-
-function reportDate(value: Date | string) {
+/** Formats timestamps using the same Riyadh/Gregorian presentation as the supplied Events project. */
+export function eventReadingDate(value: Date | string) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
+  return Number.isNaN(date.valueOf())
     ? "وقت القياس غير متوفر"
     : date.toLocaleString("ar-SA", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "Asia/Riyadh",
-        calendar: "gregory",
-      });
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Riyadh",
+      calendar: "gregory",
+    });
 }
 
-function statusLabel(value: string | undefined) {
-  if (value === "0") return "منخفض";
-  if (value === "1") return "ضمن مرجع الجهاز";
-  if (value === "2") return "مرتفع";
-  return null;
+function formatValue(value: string | undefined) {
+  const parsed = eventNumeric(value);
+  return parsed === null ? null : parsed.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
-function ResultMetric({ field, values, tone = "soft" }: { field: EventResultField; values: Record<string, string>; tone?: "soft" | "dark" }) {
+function statusLabel(status: string | undefined) {
+  return status === "0" ? "منخفض" : status === "1" ? "ضمن مرجع الجهاز" : status === "2" ? "مرتفع" : "";
+}
+
+function MetricCard({ field, values, tone = "soft" }: { field: EventResultField; values: Record<string, string>; tone?: "dark" | "soft" }) {
   const [key, label, unit] = field;
-  const value = eventFormattedValue(values[key], unit);
+  const value = formatValue(values[key]);
   const status = values[`${key}_s`];
   const badge = statusLabel(status);
-  const reference = eventReferenceRange(values, key);
-  const unavailable = eventNumeric(values[key]) === null;
-
   return (
-    <article className={`lim-event-metric lim-event-metric-${tone}`}>
+    <article className={`lim-result-metric lim-result-metric-${tone}`}>
       <p>{label}</p>
-      <div className="lim-event-value"><strong dir="ltr">{value}</strong></div>
-      {unavailable ? <span className="lim-event-unavailable">غير متوفر</span> : badge ? <span className={`lim-event-status lim-event-status-${status}`}>{badge}</span> : reference ? <small>مرجع الجهاز: {reference}</small> : null}
+      <div className="lim-result-value">
+        <strong dir="ltr">{value ?? "—"}</strong>
+        {value !== null && unit && <small>{unit}</small>}
+      </div>
+      {value === null ? (
+        <span className="lim-result-unavailable">غير متوفر</span>
+      ) : badge ? (
+        <span className={`lim-result-status lim-result-status-${status}`}>{badge}</span>
+      ) : null}
     </article>
   );
 }
 
-function SegmentCard({ label, value, position, mode }: { label: string; value?: string; position: string; mode: DistributionMode }) {
-  const numeric = eventNumeric(value);
+function SegmentCard({ label, value, area, mode }: { label: string; value?: string; area: string; mode: Mode }) {
+  const formatted = formatValue(value);
   return (
-    <div className={`lim-event-segment lim-event-segment-${position} lim-event-segment-${mode}`}>
+    <div className={`lim-segment-card lim-segment-${area} lim-segment-${mode}`}>
       <span>{label}</span>
-      <strong dir="ltr">{numeric === null ? "غير متوفر" : `${numeric.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg`}</strong>
+      <strong dir="ltr">{formatted === null ? "غير متوفر" : `${formatted} kg`}</strong>
     </div>
   );
 }
 
-function Distribution({ mode, values }: { mode: DistributionMode; values: Record<string, string> }) {
-  const prefix = mode === "muscle" ? "muscle" : "fat";
+function Distribution({ mode, values }: { mode: Mode; values: Record<string, string> }) {
   return (
-    <div className="lim-event-anatomy-stage">
-      <SegmentCard position="left-arm" mode={mode} label={segments[0][1]} value={values[`${prefix}${segments[0][0]}`]} />
-      <SegmentCard position="right-arm" mode={mode} label={segments[1][1]} value={values[`${prefix}${segments[1][0]}`]} />
-      <SegmentCard position="trunk" mode={mode} label={segments[2][1]} value={values[`${prefix}${segments[2][0]}`]} />
-      <SegmentCard position="left-leg" mode={mode} label={segments[3][1]} value={values[`${prefix}${segments[3][0]}`]} />
-      <SegmentCard position="right-leg" mode={mode} label={segments[4][1]} value={values[`${prefix}${segments[4][0]}`]} />
-      <div className="lim-event-anatomy-figure">
+    <div className="lim-anatomy-stage">
+      <SegmentCard area="left-arm" mode={mode} label="الذراع اليمنى" value={values[`${mode}RightArm`]} />
+      <SegmentCard area="right-arm" mode={mode} label="الذراع اليسرى" value={values[`${mode}LeftArm`]} />
+      <SegmentCard area="trunk" mode={mode} label="الجذع" value={values[`${mode}Trunk`]} />
+      <SegmentCard area="left-leg" mode={mode} label="الساق اليمنى" value={values[`${mode}RightLeg`]} />
+      <SegmentCard area="right-leg" mode={mode} label="الساق اليسرى" value={values[`${mode}LeftLeg`]} />
+      <div className="lim-anatomy-figure">
         <img
           src={mode === "muscle" ? "/manus-storage/body-muscle_66410d1d.png" : "/manus-storage/body-fat_bbcef35d.png"}
-          alt={mode === "muscle" ? "رسم توضيحي لتوزيع العضلات" : "رسم توضيحي لتوزيع الدهون"}
+          alt={mode === "muscle" ? "رسم توضيحي محايد لتوزيع العضلات" : "رسم توضيحي محايد لتوزيع الدهون"}
         />
       </div>
     </div>
   );
 }
 
-function QuickIndicator({ icon, field, values }: { icon: React.ReactNode; field: EventResultField; values: Record<string, string> }) {
-  const [key, label, unit] = field;
-  const numeric = eventNumeric(values[key]);
+function QuickIndicator({ icon, label, value, unit }: { icon: React.ReactNode; label: string; value?: string; unit?: string }) {
+  const formatted = formatValue(value);
   return (
-    <article className="lim-event-quick">
-      <span className="lim-event-quick-icon">{icon}</span>
+    <article className="lim-quick-indicator">
+      <span className="lim-quick-icon">{icon}</span>
       <div>
         <p>{label}</p>
-        <strong dir="ltr">{numeric === null ? "—" : `${numeric.toLocaleString("en-US", { maximumFractionDigits: 2 })}${unit ? ` ${unit}` : ""}`}</strong>
-        {numeric === null && <small>غير متوفر</small>}
+        <strong dir="ltr">{formatted ?? "—"} {formatted !== null ? unit : ""}</strong>
+        {formatted === null && <small>غير متوفر</small>}
       </div>
     </article>
   );
 }
 
 /**
- * Events-only X18 result presentation. It consumes the existing shared
- * `health_readings` payload; no machine route, upload key, or session behavior
- * is changed by this component.
+ * The supplied LIM Events body-result frontend, adapted solely at its data seam:
+ * reads come from the existing shared `health_readings` X18 data rather than the
+ * original archive's separate password/login gateway.
  */
 export function EventBodyResults({ readings }: { readings: DashboardReading[] }) {
-  const reports = readings.filter((reading) => Object.keys(eventReadingValues(reading)).length > 0);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [mode, setMode] = useState<DistributionMode>("muscle");
-  const report = reports.find((reading) => reading.id === selectedId) ?? reports[0];
-  const values = useMemo(() => report ? eventReadingValues(report) : {}, [report]);
+  const [mode, setMode] = useState<Mode>("muscle");
+  const reading = readings[0];
+  if (!reading) return null;
 
-  if (!report) return null;
-
-  const bmr = eventFormattedValue(values.bmr, "سعرة / يوم");
-  const details = eventResultCategories.details.filter(([key]) => eventNumeric(values[key]) !== null);
-  const vitals = eventResultCategories.vitals.filter(([key]) => eventNumeric(values[key]) !== null);
+  const values = eventReadingValues(reading);
+  const bmr = formatValue(values.bmr);
+  const moreFields = eventResultCategories.additional.filter(([key]) => !["bmr", "vfal", "bone", "fatFree", "protein", "waterICW", "waterECW"].includes(key));
+  const hasVitals = eventResultCategories.vitals.some(([key]) => eventNumeric(values[key]) !== null);
 
   return (
-    <section className="lim-event-results" dir="rtl">
-      <header className="lim-event-header">
-        <div className="lim-event-brand"><span><HeartPulse size={22} /></span><b>ليم <em>LIM</em></b></div>
-        <div className="lim-event-title"><span>بيانات توضيحية</span><h2>نتائج تحليل الجسم</h2><p><CalendarDays size={16} />{reportDate(report.recordedAt)}</p></div>
-        <button type="button" className="lim-event-download lim-print-hide" onClick={() => window.print()}><Download size={19} />تحميل التقرير</button>
+    <section className="lim-results-page" dir="rtl">
+      <header className="lim-results-header">
+        <div className="lim-results-brand" aria-label="ليم LIM">
+          <span><HeartPulse size={22} /></span>
+          <b>ليم <em>LIM</em></b>
+        </div>
+        <div className="lim-results-title">
+          <span>نتائج جهاز القياس</span>
+          <h2>نتائج تحليل الجسم</h2>
+          <p><CalendarDays size={16} />{eventReadingDate(reading.recordedAt)}</p>
+        </div>
+        <button type="button" className="lim-download-button lim-print-hide" onClick={() => window.print()}>
+          <Download size={19} /> تحميل التقرير
+        </button>
       </header>
 
-      {reports.length > 1 && <label className="lim-event-history">سجل التحاليل<select value={report.id} onChange={(event) => setSelectedId(Number(event.target.value))}>{reports.map((item) => <option key={item.id} value={item.id}>{reportDate(item.recordedAt)} · {item.recordNo ?? "—"}</option>)}</select></label>}
+      <div className="lim-top-metrics">
+        {eventResultCategories.primary.map((field) => <MetricCard key={field[0]} field={field} values={values} tone="dark" />)}
+      </div>
 
-      <div className="lim-event-top-metrics">{eventResultCategories.primary.map((field) => <ResultMetric key={field[0]} field={field} values={values} tone="dark" />)}</div>
-
-      <section className="lim-event-card">
+      <section className="lim-results-card">
         <h3>تكوين الجسم</h3>
-        <div className="lim-event-composition">{eventResultCategories.composition.map((field) => <ResultMetric key={field[0]} field={field} values={values} />)}</div>
-      </section>
-
-      <section className={`lim-event-card lim-event-distribution lim-event-distribution-${mode}`}>
-        <h3>توزيع الدهون والعضلات</h3>
-        <div className="lim-event-tabs" role="tablist" aria-label="توزيع القياسات">
-          <button type="button" role="tab" aria-selected={mode === "muscle"} onClick={() => setMode("muscle")}>العضلات</button>
-          <button type="button" role="tab" aria-selected={mode === "fat"} onClick={() => setMode("fat")}>الدهون</button>
+        <div className="lim-composition-grid">
+          {eventResultCategories.composition.map((field) => <MetricCard key={field[0]} field={field} values={values} />)}
         </div>
-        <Distribution mode={mode} values={values} />
-        <p className="lim-event-anatomy-note">رسم توضيحي لتوزيع القياسات؛ اليمين واليسار من منظور صاحب القياس.</p>
       </section>
 
-      <section className="lim-event-card lim-event-metabolism">
+      <section className={`lim-results-card lim-distribution-card lim-distribution-${mode}`}>
+        <h3>توزيع الدهون والعضلات</h3>
+        <Tabs value={mode} onValueChange={(value) => setMode(value as Mode)}>
+          <TabsList className="lim-distribution-tabs">
+            <TabsTrigger value="muscle">العضلات</TabsTrigger>
+            <TabsTrigger value="fat">الدهون</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Distribution mode={mode} values={values} />
+        <p className="lim-anatomy-note">رسم توضيحي لتوزيع القياسات؛ اليمين واليسار من منظور صاحب القياس.</p>
+      </section>
+
+      <section className="lim-results-card lim-metabolism-card">
         <h3>الحرق ومؤشرات إضافية</h3>
-        <div className="lim-event-bmr">
-          <span className="lim-event-bmr-icon"><Flame /></span>
-          <div><p>معدل الأيض الأساسي</p><strong dir="ltr">{bmr}</strong></div>
+        <div className="lim-bmr-banner">
+          <span className="lim-bmr-icon"><Flame /></span>
+          <div>
+            <p>معدل الأيض الأساسي</p>
+            <strong dir="ltr">{bmr ?? "—"}</strong>
+            <small>{bmr === null ? "غير متوفر" : "سعرة / يوم"}</small>
+          </div>
           <p>احتياج الجسم التقديري للطاقة في حالة الراحة</p>
         </div>
-        <div className="lim-event-quick-grid">
-          <QuickIndicator icon={<Activity />} field={eventResultCategories.quick[0]} values={values} />
-          <QuickIndicator icon={<Bone />} field={eventResultCategories.quick[1]} values={values} />
-          <QuickIndicator icon={<Network />} field={eventResultCategories.quick[2]} values={values} />
-          <QuickIndicator icon={<Dna />} field={eventResultCategories.quick[3]} values={values} />
-          <QuickIndicator icon={<Droplets />} field={eventResultCategories.quick[4]} values={values} />
-          <QuickIndicator icon={<Droplets />} field={eventResultCategories.quick[5]} values={values} />
+        <div className="lim-quick-grid">
+          <QuickIndicator icon={<Activity />} label="الدهون الحشوية" value={values.vfal} unit="مستوى" />
+          <QuickIndicator icon={<Bone />} label="كتلة العظام" value={values.bone} unit="kg" />
+          <QuickIndicator icon={<Network />} label="الكتلة الخالية من الدهون" value={values.fatFree} unit="kg" />
+          <QuickIndicator icon={<Dna />} label="كتلة البروتين" value={values.protein} unit="kg" />
+          <QuickIndicator icon={<Droplets />} label="الماء داخل الخلايا" value={values.waterICW} unit="kg" />
+          <QuickIndicator icon={<Droplets />} label="الماء خارج الخلايا" value={values.waterECW} unit="kg" />
         </div>
-        {(details.length > 0 || vitals.length > 0) && <details className="lim-event-details"><summary>عرض جميع التفاصيل <ChevronDown size={18} /></summary>
-          {details.length > 0 && <div className="lim-event-details-grid">{details.map((field) => <ResultMetric key={field[0]} field={field} values={values} />)}</div>}
-          {vitals.length > 0 && <><h4><HeartPulse size={19} />الضغط والنبض</h4><div className="lim-event-details-grid">{vitals.map((field) => <ResultMetric key={field[0]} field={field} values={values} />)}</div></>}
-        </details>}
+        {(moreFields.length > 0 || hasVitals) && (
+          <details className="lim-more-details">
+            <summary>عرض جميع التفاصيل <ChevronDown size={18} /></summary>
+            {moreFields.length > 0 && <div className="lim-details-grid">{moreFields.map((field) => <MetricCard key={field[0]} field={field} values={values} />)}</div>}
+            {hasVitals && <><h4><HeartPulse size={19} /> الضغط والنبض</h4><div className="lim-details-grid">{eventResultCategories.vitals.map((field) => <MetricCard key={field[0]} field={field} values={values} />)}</div></>}
+          </details>
+        )}
       </section>
 
-      <footer className="lim-event-footer"><Sparkles size={17} /><p>التصنيفات حسب مرجع الجهاز. القياسات تقديرية وتُراجع مع المختص.</p><span>رقم التحليل: <bdi>{report.recordNo ?? "—"}</bdi></span></footer>
+      <footer className="lim-results-footer">
+        <Sparkles size={17} />
+        <p>التصنيفات حسب مرجع الجهاز. القياسات تقديرية وتُراجع مع المختص.</p>
+        <span>رقم التحليل: <bdi>{reading.recordNo ?? "—"}</bdi></span>
+      </footer>
     </section>
   );
 }
