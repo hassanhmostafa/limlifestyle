@@ -7,7 +7,6 @@ vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
-    createHealthReading: vi.fn(),
     createEventParticipantSession: vi.fn(),
     createMachinePhoneUser: vi.fn(),
     getEventReadingByRecordNo: vi.fn(),
@@ -109,36 +108,27 @@ describe("standalone events results", () => {
     expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(42, "EVENT-RECORD-1");
   });
 
-  it("creates a complete simulator-only test report for the active event session", async () => {
+  it("builds a short-lived key and complete X18 payload for the real upload URL", async () => {
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
-    mockedDb.createHealthReading.mockResolvedValue({ id: 17 } as never);
-    mockedDb.updateEventParticipantSession.mockResolvedValue({
-      ...eventSession,
-      status: "measured",
-      latestRecordNo: "EVENT-TEST-123",
-    });
 
     const caller = appRouter.createCaller(anonymousContext);
     const result = await caller.events.generateTestMeasurement({ accessToken: "z".repeat(43) });
 
-    expect(result.success).toBe(true);
-    expect(result.source).toBe("simulator");
     expect(result.recordNo).toMatch(/^EVENT-TEST-/);
-    expect(mockedDb.createHealthReading).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 42,
-      source: "simulator",
+    expect(result.expiresInSeconds).toBe(300);
+    expect(result.apiKey).toMatch(/^lim_event_test\./);
+    expect(result.payload).toMatchObject({
       deviceNo: "EVENTS_TEST",
-      machineMetrics: expect.objectContaining({
+      deviceModel: "LIM-EVENTS-TEST",
+      datas: [expect.objectContaining({
+        userID: "0501234567",
+        recordNo: result.recordNo,
         fatRate: expect.any(String),
         muscleRightArm: expect.any(String),
         waterICW: expect.any(String),
         sbp: expect.any(String),
-      }),
-    }));
-    expect(mockedDb.updateEventParticipantSession).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ status: "measured", latestRecordNo: result.recordNo }),
-    );
+      })],
+    });
   });
 
   it("rejects a missing or unknown event token", async () => {

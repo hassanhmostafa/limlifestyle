@@ -561,7 +561,7 @@ export default function HealthDashboard() {
 
   // Latest values for summary cards
   const latest = readings?.[0];
-  const latestX18Report = readings?.find((reading) => reading.source === "x18");
+  const latestX18Report = readings?.find((reading) => reading.source === "x18" || reading.source === "x18_test");
   const deviceIdentity = {
     name: latestX18Report?.patientName ?? null,
     age: latestX18Report?.patientAge ?? null,

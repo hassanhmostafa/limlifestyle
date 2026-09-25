@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import {
-  createHealthReading,
   createEventParticipantSession,
   createMachinePhoneUser,
   getEventReadingByRecordNo,
@@ -14,6 +13,7 @@ import {
 } from "../db";
 import { hashApiKey } from "../lib/apiSecurity";
 import { createEventTestMeasurement } from "../lib/eventTestMeasurement";
+import { createEventTestUploadKey } from "../lib/eventTestUpload";
 import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
 
 const EVENT_CODE = "lim-events";
@@ -141,43 +141,43 @@ export const eventsRouter = router({
     }),
 
   /**
-   * Creates a complete, clearly labelled X18-like result so the event journey
-   * can be tested when a physical machine is unavailable. It bypasses neither
-   * the real `/api/kiosk/data?apiKey=…` endpoint nor its authentication; it is
-   * an Events-only simulator record and remains hidden from My Health.
+   * Builds a complete X18-like payload for the QR step. The browser posts this
+   * payload to the very same `/api/kiosk/data?apiKey=…` URL used by hardware,
+   * so test mode exercises the real HTTP parser, auth gate, identity resolution,
+   * merge/save logic, and event-result linkage.
    */
   generateTestMeasurement: publicProcedure
     .input(eventTokenInput)
     .mutation(async ({ input }) => {
       const session = await requireEventSession(input.accessToken);
-      const generated = createEventTestMeasurement();
-      await createHealthReading({
-        userId: session.userId,
-        kioskId: "EVENTS_TEST",
-        source: "simulator",
-        sbp: generated.sbp,
-        dbp: generated.dbp,
-        hr: generated.hr,
-        weight: generated.weight,
-        height: generated.height,
-        bmi: generated.bmi,
-        machineMetrics: generated.machineMetrics,
-        patientName: session.displayName ?? null,
-        patientAge: session.age ?? null,
-        patientSex: session.sex ?? null,
-        recordNo: generated.recordNo,
-        deviceNo: "EVENTS_TEST",
-        notes: "LIM Events generated test measurement — not a physical X18 upload.",
-        recordedAt: new Date(),
-      });
-      const updated = await updateEventParticipantSession(tokenHash(input.accessToken), {
-        status: "measured",
-        latestRecordNo: generated.recordNo,
-      });
-      if (!updated || updated.id !== session.id) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to link the generated test result." });
+      const user = await getUserById(session.userId);
+      if (!user?.phone) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A valid participant phone number is required for the test upload." });
       }
-      return { success: true, recordNo: generated.recordNo, source: "simulator" as const };
+      const generated = createEventTestMeasurement();
+      const deviceNo = "EVENTS_TEST";
+      const measureTime = new Date().toISOString();
+      const payload = {
+        deviceNo,
+        unitName: "LIM Events test sender",
+        deviceModel: "LIM-EVENTS-TEST",
+        datas: [{
+          userID: toMachineUserId(user.phone),
+          recordNo: generated.recordNo,
+          name: session.displayName ?? undefined,
+          age: session.age ? String(session.age) : undefined,
+          sex: session.sex === "male" ? "1" : session.sex === "female" ? "2" : undefined,
+          measureTime,
+          ...generated.machineMetrics,
+        }],
+      };
+      const apiKey = createEventTestUploadKey({
+        userId: user.id,
+        phone: user.phone,
+        recordNo: generated.recordNo,
+        deviceNo,
+      });
+      return { apiKey, payload, recordNo: generated.recordNo, expiresInSeconds: 300 };
     }),
 
   /**

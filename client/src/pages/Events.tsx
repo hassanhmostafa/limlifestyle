@@ -98,13 +98,7 @@ export default function Events() {
     },
     onError: (eventError) => setError(eventError.message),
   });
-  const generateTestMeasurement = trpc.events.generateTestMeasurement.useMutation({
-    onSuccess: async () => {
-      await Promise.all([sessionQuery.refetch(), resultQuery.refetch()]);
-      toast.success("تم إنشاء تقرير اختبار كامل لهذه الجلسة");
-    },
-    onError: (eventError) => setError(eventError.message),
-  });
+  const generateTestMeasurement = trpc.events.generateTestMeasurement.useMutation();
 
   const apiSession = sessionQuery.data;
   const session: StoredSession | null = apiSession && accessToken ? {
@@ -177,7 +171,25 @@ export default function Events() {
         if (index <= completedSteps || (target === "queue" && completedSteps >= 2)) go(target);
       }} onReset={reset} />}
       {screen === "lifestyle" && session && <LifestyleView answers={answers} sectionIndex={lifestyleIndex} setSectionIndex={setLifestyleIndex} onBack={() => go("journey")} onSave={() => saveLifestyle.mutate({ accessToken: session.token, answers })} saving={saveLifestyle.isPending} />}
-      {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} testing={generateTestMeasurement.isPending} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onGenerateTest={() => generateTestMeasurement.mutate({ accessToken: session.token })} />}
+      {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} testing={generateTestMeasurement.isPending} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onGenerateTest={async () => {
+        setError("");
+        try {
+          const testUpload = await generateTestMeasurement.mutateAsync({ accessToken: session.token });
+          const uploadResponse = await fetch(`/api/kiosk/data?apiKey=${encodeURIComponent(testUpload.apiKey)}`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(testUpload.payload),
+          });
+          const uploadBody = await uploadResponse.json() as { code?: string; msg?: string };
+          if (!uploadResponse.ok || uploadBody.code !== "1") {
+            throw new Error(uploadBody.msg || "تعذر رفع نتيجة الاختبار إلى رابط بيانات الجهاز.");
+          }
+          await Promise.all([sessionQuery.refetch(), resultQuery.refetch()]);
+          toast.success("تم إرسال التقرير التجريبي عبر رابط بيانات الجهاز");
+        } catch (eventError) {
+          setError(eventError instanceof Error ? eventError.message : "تعذر إنشاء نتيجة الاختبار.");
+        }
+      }} />}
       {screen === "queue" && session && <QueueView hasResults={hasResult} onBack={() => go("journey")} code={session.code} onReport={() => go("report")} />}
       {screen === "report" && session && <ReportView session={session} readings={physicalReadings} onBack={() => go("journey")} />}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
@@ -232,13 +244,13 @@ function LifestyleView({ answers, sectionIndex, setSectionIndex, onBack, onSave,
   </section>;
 }
 
-function DeviceView({ session, readings, loading, testing, onBack, onRefresh, onGenerateTest }: { session: StoredSession; readings: DashboardReading[]; loading: boolean; testing: boolean; onBack: () => void; onRefresh: () => void; onGenerateTest: () => void }) {
+function DeviceView({ session, readings, loading, testing, onBack, onRefresh, onGenerateTest }: { session: StoredSession; readings: DashboardReading[]; loading: boolean; testing: boolean; onBack: () => void; onRefresh: () => void; onGenerateTest: () => Promise<void> }) {
   const hasResult = readings.length > 0;
   if (hasResult) return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><EventBodyResults readings={readings} /></section>;
   return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="mb-5 rounded-[28px] border border-[#dce9e5] bg-white p-5 shadow-[0_8px_25px_rgba(18,58,52,.05)]"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dff33d] text-[#123a34]"><QrCode className="h-6 w-6" /></span><div><h1 className="text-xl font-black">رمز جوالك للفحص</h1><p className="mt-1 text-sm leading-6 text-[#6c8882]">امسح الرمز بقارئ جهاز تحليل الجسم قبل بدء القياس.</p></div></div>
     {session.deviceUserId ? <><div className="my-5 rounded-2xl border border-[#dce9e5] bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={260} level="M" includeMargin className="mx-auto h-auto w-full max-w-[260px]" /></div><p className="rounded-xl bg-[#f3f8f6] p-3 text-center text-sm leading-6 text-[#45665f]">سيظهر الرقم نفسه في خانة <b dir="ltr">ID</b> على الجهاز: <b dir="ltr" className="text-[#123a34]">{session.deviceUserId}</b></p></> : <p role="alert" className="mt-4 rounded-xl bg-[#fff0ed] p-3 text-sm text-[#a43f30]">تعذر تجهيز رمز الجهاز لهذه الجلسة.</p>}
   </div>
-  <div className="rounded-[28px] bg-[#123f37] p-6 text-white"><Activity className="h-8 w-8 text-[#dff33d]" /><h2 className="mt-4 text-xl font-black">بانتظار نتيجة الجهاز</h2><p className="mt-2 leading-7 text-[#d2e1dd]">بعد القياس يرسل X18 النتيجة مباشرة إلى نظام LIM. ستظهر هنا تلقائيًا، ويمكنك المتابعة إلى الاستشارة أثناء الانتظار.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><Button variant="outline" onClick={onRefresh} disabled={loading || testing} className="border-white/30 text-white hover:bg-white/10">{loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}تحديث النتائج</Button><Button type="button" onClick={onGenerateTest} disabled={testing || loading} className="bg-[#dff33d] text-[#123a34] hover:bg-[#d3ea2d]">{testing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}إنشاء نتيجة اختبار</Button></div><p className="mt-4 text-xs leading-5 text-[#c8dcd7]">للاختبار فقط: ينشئ هذا الزر كل قيم X18 عشوائيًا داخل جلسة الفعالية. لا يرسل أي بيانات إلى الجهاز ولا يظهر في سجل My Health.</p></div>
+  <div className="rounded-[28px] bg-[#123f37] p-6 text-white"><Activity className="h-8 w-8 text-[#dff33d]" /><h2 className="mt-4 text-xl font-black">بانتظار نتيجة الجهاز</h2><p className="mt-2 leading-7 text-[#d2e1dd]">بعد القياس يرسل X18 النتيجة مباشرة إلى نظام LIM. ستظهر هنا تلقائيًا، ويمكنك المتابعة إلى الاستشارة أثناء الانتظار.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><Button variant="outline" onClick={onRefresh} disabled={loading || testing} className="border-white/30 text-white hover:bg-white/10">{loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}تحديث النتائج</Button><Button type="button" onClick={() => void onGenerateTest()} disabled={testing || loading} className="bg-[#dff33d] text-[#123a34] hover:bg-[#d3ea2d]">{testing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}إنشاء نتيجة اختبار</Button></div><p className="mt-4 text-xs leading-5 text-[#c8dcd7]">للاختبار فقط: ينشئ هذا الزر كل قيم X18 عشوائيًا ثم يرفعها إلى نفس رابط بيانات الجهاز مع مفتاح مؤقت لهذه الجلسة. تظهر في Events وMy Health مع وسم «بيانات اختبار».</p></div>
   </section>;
 }
 

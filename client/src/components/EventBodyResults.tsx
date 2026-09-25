@@ -87,7 +87,7 @@ function Distribution({ mode, values }: { mode: Mode; values: Record<string, str
       <SegmentCard area="right-leg" mode={mode} label="الساق اليسرى" value={values[`${mode}LeftLeg`]} />
       <div className="lim-anatomy-figure">
         <img
-          src={mode === "muscle" ? "/manus-storage/body-muscle_66410d1d.png" : "/manus-storage/body-fat_bbcef35d.png"}
+          src={mode === "muscle" ? "/manus-storage/body-muscle_d437e41d.png" : "/manus-storage/body-fat_3bb14e6b.png"}
           alt={mode === "muscle" ? "رسم توضيحي محايد لتوزيع العضلات" : "رسم توضيحي محايد لتوزيع الدهون"}
         />
       </div>
@@ -132,7 +132,7 @@ export function EventBodyResults({ readings }: { readings: DashboardReading[] })
           <b>ليم <em>LIM</em></b>
         </div>
         <div className="lim-results-title">
-          <span>{reading.source === "simulator" ? "بيانات اختبار" : "نتائج جهاز القياس"}</span>
+          <span>{reading.source === "x18_test" ? "بيانات اختبار" : "نتائج جهاز القياس"}</span>
           <h2>نتائج تحليل الجسم</h2>
           <p><CalendarDays size={16} />{eventReadingDate(reading.recordedAt)}</p>
         </div>
@@ -194,7 +194,7 @@ export function EventBodyResults({ readings }: { readings: DashboardReading[] })
 
       <footer className="lim-results-footer">
         <Sparkles size={17} />
-        <p>{reading.source === "simulator" ? "قيم اختبار مولّدة عشوائيًا، وليست نتيجة من جهاز X18." : "التصنيفات حسب مرجع الجهاز. القياسات تقديرية وتُراجع مع المختص."}</p>
+        <p>{reading.source === "x18_test" ? "قيم اختبار مولّدة عشوائيًا ومرفوعة عبر رابط بيانات X18، وليست نتيجة من جهاز فعلي." : "التصنيفات حسب مرجع الجهاز. القياسات تقديرية وتُراجع مع المختص."}</p>
         <span>رقم التحليل: <bdi>{reading.recordNo ?? "—"}</bdi></span>
       </footer>
     </section>

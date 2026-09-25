@@ -38,7 +38,7 @@ describe("EventBodyResults", () => {
     expect(markup).toContain("نتائج تحليل الجسم");
     expect(markup).toContain("توزيع الدهون والعضلات");
     expect(markup).toContain("الحرق ومؤشرات إضافية");
-    expect(markup).toContain("body-muscle_66410d1d.png");
+    expect(markup).toContain("body-muscle_d437e41d.png");
     expect(markup).toContain("الدهون");
   });
 
@@ -46,7 +46,7 @@ describe("EventBodyResults", () => {
     const markup = renderToStaticMarkup(
       createElement(EventBodyResults, { readings: [{
         id: 72,
-        source: "simulator",
+        source: "x18_test",
         recordedAt: new Date("2026-09-25T10:00:00Z"),
         recordNo: "EVENT-TEST-20260925-001",
         deviceNo: "EVENTS_TEST",
@@ -58,6 +58,6 @@ describe("EventBodyResults", () => {
     );
 
     expect(markup).toContain("بيانات اختبار");
-    expect(markup).toContain("قيم اختبار مولّدة عشوائيًا");
+    expect(markup).toContain("قيم اختبار مولّدة عشوائيًا ومرفوعة عبر رابط بيانات X18");
   });
 });

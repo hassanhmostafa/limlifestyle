@@ -91,7 +91,7 @@ export const healthReadings = mysqlTable("health_readings", {
   userId: int("userId").notNull(),
   kioskId: varchar("kioskId", { length: 64 }).notNull(),
   /** Origin separates real X18 measurements from simulator, demo, and manual data. */
-  source: mysqlEnum("source", ["x18", "legacy", "simulator", "manual", "demo"]).default("manual").notNull(),
+  source: mysqlEnum("source", ["x18", "x18_test", "legacy", "simulator", "manual", "demo"]).default("manual").notNull(),
   /** Vendor-native X18 field names, retained for protocol clarity. */
   sbp: int("sbp"),
   dbp: int("dbp"),

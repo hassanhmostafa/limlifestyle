@@ -46,6 +46,7 @@ import {
 } from "../lib/x18Payload";
 import { extractX18ReportedIdentity } from "../lib/x18Identity";
 import { apiKeysMatch, createDeviceApiKey, hashApiKey, readDeviceApiKey } from "../lib/apiSecurity";
+import { verifyEventTestUploadKey } from "../lib/eventTestUpload";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -282,21 +283,14 @@ async function saveX18MachinePayload(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   providedApiKey: string | undefined
 ): Promise<{ success: boolean; userId?: number; message?: string }> {
+  const isEventsTestDevice = payload.deviceNo === "EVENTS_TEST";
   const [device] = await db
     .select()
     .from(kioskDevices)
     .where(and(eq(kioskDevices.deviceId, payload.deviceNo), eq(kioskDevices.isActive, "true")));
 
-  if (!device) {
+  if (!device && !isEventsTestDevice) {
     return { success: false, message: "Device not registered or inactive." };
-  }
-
-  const [settings] = await db.select().from(kioskIntegrationSettings).where(eq(kioskIntegrationSettings.id, 1));
-  if (!settings?.apiKeyHash) {
-    return { success: false, message: "Shared LIM upload credential is not configured." };
-  }
-  if (!apiKeysMatch(providedApiKey, settings.apiKeyHash)) {
-    return { success: false, message: "Invalid device upload credential." };
   }
 
   let savedUserId: number | undefined;
@@ -350,6 +344,24 @@ async function saveX18MachinePayload(
     const incoming = extractX18Metrics(item);
     const incomingIdentity = extractX18ReportedIdentity(item);
     const recordNo = item.recordNo ?? `${payload.deviceNo}:${item.measureTime ?? Date.now()}`;
+    if (isEventsTestDevice) {
+      if (!user.phone || !verifyEventTestUploadKey(providedApiKey, {
+        userId: user.id,
+        phone: user.phone,
+        recordNo,
+        deviceNo: payload.deviceNo,
+      })) {
+        return { success: false, message: "Invalid or expired LIM Events test upload credential." };
+      }
+    } else {
+      const [settings] = await db.select().from(kioskIntegrationSettings).where(eq(kioskIntegrationSettings.id, 1));
+      if (!settings?.apiKeyHash) {
+        return { success: false, message: "Shared LIM upload credential is not configured." };
+      }
+      if (!apiKeysMatch(providedApiKey, settings.apiKeyHash)) {
+        return { success: false, message: "Invalid device upload credential." };
+      }
+    }
     const [existing] = await db
       .select()
       .from(healthReadings)
@@ -369,9 +381,10 @@ async function saveX18MachinePayload(
       raw: existing?.machineMetrics ?? {},
     };
     const metrics = mergeX18Metrics(current, incoming);
+    const measurementSource: "x18" | "x18_test" = isEventsTestDevice ? "x18_test" : "x18";
     const values = {
-      kioskId: device.kioskId ?? payload.deviceNo,
-      source: "x18" as const,
+      kioskId: device?.kioskId ?? payload.deviceNo,
+      source: measurementSource,
       sbp: parseIntOrNull(metrics.sbp) ?? null,
       dbp: parseIntOrNull(metrics.dbp) ?? null,
       hr: parseIntOrNull(metrics.hr) ?? null,
@@ -386,7 +399,7 @@ async function saveX18MachinePayload(
       patientSex: incomingIdentity.patientSex ?? existing?.patientSex ?? null,
       recordNo,
       deviceNo: payload.deviceNo,
-      notes: `X18_5 measurement${payload.deviceModel ? ` (${payload.deviceModel})` : ""}`,
+      notes: `${isEventsTestDevice ? "LIM Events test upload via /api/kiosk/data" : "X18_5 measurement"}${payload.deviceModel ? ` (${payload.deviceModel})` : ""}`,
       recordedAt: parseX18MeasurementTime(item.measureTime),
     };
 

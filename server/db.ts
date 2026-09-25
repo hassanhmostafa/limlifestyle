@@ -411,7 +411,7 @@ export async function getEventReadingByRecordNo(userId: number, recordNo: string
     .where(and(
       eq(healthReadings.userId, userId),
       eq(healthReadings.recordNo, recordNo),
-      inArray(healthReadings.source, ["x18", "simulator"]),
+      inArray(healthReadings.source, ["x18", "x18_test", "simulator"]),
     ))
     .orderBy(desc(healthReadings.recordedAt));
 }

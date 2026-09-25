@@ -55,18 +55,18 @@
 .lim-distribution-tabs button { border-radius: 999px !important; font-weight: 800; }
 .lim-distribution-muscle .lim-distribution-tabs button[data-state="active"] { color: #fff !important; background: var(--lim-forest) !important; }
 .lim-distribution-fat .lim-distribution-tabs button[data-state="active"] { color: #fff !important; background: var(--lim-coral) !important; }
-.lim-anatomy-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 1fr); grid-template-areas: "left-arm figure right-arm" ". figure trunk" "left-leg figure right-leg"; align-items: center; gap: 10px; min-height: 520px; direction: ltr; }
-.lim-anatomy-figure { grid-area: figure; align-self: stretch; display: grid; place-items: center; min-width: 0; }
-.lim-anatomy-figure img { display: block; width: 100%; max-height: 510px; object-fit: contain; filter: drop-shadow(0 15px 14px rgba(27, 57, 48, .13)); }
+.lim-anatomy-stage { display: grid; grid-template-columns: minmax(82px, .82fr) minmax(170px, 1.55fr) minmax(82px, .82fr); grid-template-areas: "left-arm figure right-arm" ". figure trunk" "left-leg figure right-leg"; align-items: center; gap: 10px; min-height: 580px; direction: ltr; isolation: isolate; }
+.lim-anatomy-figure { grid-area: figure; align-self: stretch; display: grid; place-items: center; min-width: 0; overflow: visible; }
+.lim-anatomy-figure img { display: block; width: 165%; max-width: none; max-height: 570px; object-fit: contain; filter: drop-shadow(0 15px 14px rgba(27, 57, 48, .13)); }
 .lim-segment-card { position: relative; z-index: 2; padding: 11px 9px; border: 1.5px solid #8fcf38; border-radius: 13px; background: rgba(255, 255, 255, .93); text-align: center; direction: rtl; box-shadow: 0 8px 18px rgba(30, 74, 56, .06); }
-.lim-segment-card::after { content: ""; position: absolute; top: 50%; width: 28px; height: 1.5px; background: #8fcf38; }
+.lim-segment-card::after { content: ""; position: absolute; top: 50%; width: 42px; height: 1.5px; background: #8fcf38; }
 .lim-segment-left-arm { grid-area: left-arm; }
 .lim-segment-right-arm { grid-area: right-arm; }
 .lim-segment-trunk { grid-area: trunk; }
 .lim-segment-left-leg { grid-area: left-leg; }
 .lim-segment-right-leg { grid-area: right-leg; }
-.lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -28px; }
-.lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -28px; }
+.lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -42px; }
+.lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -42px; }
 .lim-segment-fat { border-color: var(--lim-coral); }
 .lim-segment-fat::after { background: var(--lim-coral); }
 .lim-segment-card span { display: block; color: #2b5148; font-size: .8rem; }
@@ -101,12 +101,12 @@
   .lim-results-brand { grid-column: 2; grid-row: 2; }
   .lim-download-button { grid-column: 1; grid-row: 2; justify-self: start; }
   .lim-top-metrics, .lim-composition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lim-anatomy-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr); min-height: 360px; gap: 5px; }
-  .lim-anatomy-figure img { max-height: 420px; }
+  .lim-anatomy-stage { grid-template-columns: minmax(74px, .8fr) minmax(150px, 1.45fr) minmax(74px, .8fr); min-height: 500px; gap: 5px; }
+  .lim-anatomy-figure img { width: 168%; max-height: 495px; }
   .lim-segment-card { padding: 9px 5px; }
-  .lim-segment-card::after { width: 13px; }
-  .lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -13px; }
-  .lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -13px; }
+  .lim-segment-card::after { width: 28px; }
+  .lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -28px; }
+  .lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -28px; }
   .lim-bmr-banner { grid-template-columns: auto 1fr; }
   .lim-bmr-banner > p { grid-column: 1 / -1; padding: 9px 0 0; border: 0; border-top: 1px solid #cfe4ab; text-align: center; }
   .lim-quick-grid, .lim-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -127,7 +127,7 @@
   .lim-results-brand { grid-column: 2; grid-row: 2; }
   .lim-download-button { grid-column: 1; grid-row: 2; justify-self: start; }
   .lim-top-metrics, .lim-composition-grid, .lim-quick-grid, .lim-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lim-anatomy-stage { min-height: 330px; gap: 4px; }
+  .lim-anatomy-stage { min-height: 460px; gap: 4px; }
   .lim-quick-indicator { flex-direction: column; align-items: flex-start; }
   .lim-bmr-banner { grid-template-columns: auto minmax(0, 1fr); padding: 12px; }
   .lim-bmr-banner > p { grid-column: 1 / -1; border: 0; padding: 0; }

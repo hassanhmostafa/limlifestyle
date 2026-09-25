@@ -5,7 +5,7 @@ export type EventHealthReading = {
   id: number;
   recordNo: string | null;
   deviceNo: string | null;
-  source: "x18" | "legacy" | "simulator" | "manual" | "demo";
+  source: "x18" | "x18_test" | "legacy" | "simulator" | "manual" | "demo";
   measuredAt: string;
   /** Identity reported by the device for this specific measurement. */
   deviceReportedIdentity: {
