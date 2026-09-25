@@ -57,36 +57,36 @@
 .lim-distribution-tabs button { border-radius: 999px !important; font-weight: 800; }
 .lim-distribution-muscle .lim-distribution-tabs button[data-state="active"] { color: #fff !important; background: var(--lim-forest) !important; }
 .lim-distribution-fat .lim-distribution-tabs button[data-state="active"] { color: #fff !important; background: var(--lim-coral) !important; }
-.lim-anatomy-stage { position: relative; height: 600px; min-height: 0; direction: ltr; isolation: isolate; }
+.lim-anatomy-stage { position: relative; height: 520px; min-height: 0; direction: ltr; isolation: isolate; }
 /* The supplied X18 artwork includes generous transparent margins. Give it a
    larger central canvas so the visible body lines up with the arm/trunk/leg callouts. */
-.lim-anatomy-figure { position: absolute; z-index: 1; top: 0; bottom: 0; left: 50%; display: grid; width: min(68%, 310px); min-width: 0; place-items: center; overflow: visible; transform: translateX(-50%); }
+.lim-anatomy-figure { position: absolute; z-index: 1; top: 0; bottom: 0; left: 50%; display: grid; width: min(56%, 260px); min-width: 0; place-items: center; overflow: visible; transform: translateX(-50%); }
 .lim-anatomy-figure img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 15px 14px rgba(27, 57, 48, .13)); }
-.lim-segment-card { position: absolute; z-index: 2; width: 26%; padding: 11px 9px; border: 1.5px solid #8fcf38; border-radius: 13px; background: rgba(255, 255, 255, .93); text-align: center; direction: rtl; box-shadow: 0 8px 18px rgba(30, 74, 56, .06); }
+.lim-segment-card { position: absolute; z-index: 2; width: 24%; padding: 8px 5px; border: 1.5px solid #8fcf38; border-radius: 13px; background: rgba(255, 255, 255, .93); text-align: center; direction: rtl; box-shadow: 0 8px 18px rgba(30, 74, 56, .06); }
 .lim-segment-card::after,
 .lim-segment-card::before { content: ""; position: absolute; height: 1.5px; background: #8fcf38; transform-origin: center; }
 /* Each callout has a short horizontal exit from its card followed by a diagonal
    segment that lands on the relevant body region, as in the supplied design. */
-.lim-segment-card::after { top: 50%; width: 34px; }
-.lim-segment-card::before { width: 46px; }
+.lim-segment-card::after { top: 50%; width: 38px; }
+.lim-segment-card::before { width: 38px; }
 .lim-segment-target { position: absolute; z-index: 3; display: block; width: 10px; height: 10px; border: 2px solid #fff; border-radius: 999px; background: #8fcf38; box-shadow: 0 1px 4px rgba(30, 74, 56, .22); }
-.lim-segment-left-arm { top: 29%; left: 0; }
-.lim-segment-right-arm { top: 29%; right: 0; }
-.lim-segment-trunk { top: 46%; right: 0; }
-.lim-segment-left-leg { top: 67%; left: 0; }
-.lim-segment-right-leg { top: 67%; right: 0; }
-.lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -34px; }
-.lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -34px; }
-.lim-segment-left-arm::before, .lim-segment-left-leg::before { right: -80px; top: 50%; transform: rotate(38deg); transform-origin: left center; }
-.lim-segment-right-arm::before, .lim-segment-right-leg::before { left: -80px; top: 50%; transform: rotate(-38deg); transform-origin: right center; }
-.lim-segment-trunk::before { left: -80px; top: 50%; transform: rotate(38deg); transform-origin: right center; }
-.lim-segment-left-arm .lim-segment-target, .lim-segment-left-leg .lim-segment-target { right: -85px; top: calc(50% + 23px); }
-.lim-segment-right-arm .lim-segment-target, .lim-segment-right-leg .lim-segment-target { left: -85px; top: calc(50% + 23px); }
-.lim-segment-trunk .lim-segment-target { left: -85px; top: calc(50% - 33px); }
+.lim-segment-left-arm { top: 27%; left: 0; }
+.lim-segment-right-arm { top: 27%; right: 0; }
+.lim-segment-trunk { top: 45%; right: 0; }
+.lim-segment-left-leg { top: 66%; left: 0; }
+.lim-segment-right-leg { top: 66%; right: 0; }
+.lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -38px; }
+.lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -38px; }
+.lim-segment-left-arm::before, .lim-segment-left-leg::before { right: -76px; top: 50%; transform: rotate(38deg); transform-origin: left center; }
+.lim-segment-right-arm::before, .lim-segment-right-leg::before { left: -76px; top: 50%; transform: rotate(-38deg); transform-origin: right center; }
+.lim-segment-trunk::before { left: -76px; top: 50%; transform: rotate(38deg); transform-origin: right center; }
+.lim-segment-left-arm .lim-segment-target, .lim-segment-left-leg .lim-segment-target { right: -81px; top: calc(50% + 20px); }
+.lim-segment-right-arm .lim-segment-target, .lim-segment-right-leg .lim-segment-target { left: -81px; top: calc(50% + 20px); }
+.lim-segment-trunk .lim-segment-target { left: -81px; top: calc(50% - 30px); }
 .lim-segment-fat { border-color: var(--lim-coral); }
 .lim-segment-fat::after, .lim-segment-fat::before, .lim-segment-fat .lim-segment-target { background: var(--lim-coral); }
-.lim-segment-card span { display: block; color: #2b5148; font-size: .8rem; }
-.lim-segment-card strong { display: block; margin-top: 2px; color: var(--lim-forest); font-size: 1rem; }
+.lim-segment-card span { display: block; color: #2b5148; font-size: .72rem; }
+.lim-segment-card strong { display: block; margin-top: 2px; color: var(--lim-forest); font-size: .94rem; }
 .lim-anatomy-note { margin: 3px 0 0; color: #667b74; font-size: .78rem; line-height: 1.7; text-align: center; }
 
 .lim-bmr-banner { display: grid; grid-template-columns: auto minmax(120px, 1fr) minmax(120px, 1fr); align-items: center; gap: 15px; padding: 15px 18px; border-radius: 17px; background: linear-gradient(100deg, #efffc5, #f8fff1); }
@@ -117,17 +117,17 @@
   .lim-results-brand { grid-column: 2; grid-row: 2; }
   .lim-download-button { grid-column: 1; grid-row: 2; justify-self: start; }
   .lim-top-metrics, .lim-composition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lim-anatomy-stage { height: 570px; }
-  .lim-anatomy-figure { top: 0; bottom: 0; width: min(70%, 300px); }
-  .lim-segment-card { width: 27%; padding: 9px 5px; }
-  .lim-segment-card::after { width: 24px; }
-  .lim-segment-card::before { width: 37px; }
-  .lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -24px; }
-  .lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -24px; }
-  .lim-segment-left-arm::before, .lim-segment-left-leg::before { right: -61px; }
-  .lim-segment-right-arm::before, .lim-segment-right-leg::before, .lim-segment-trunk::before { left: -61px; }
-  .lim-segment-left-arm .lim-segment-target, .lim-segment-left-leg .lim-segment-target { right: -66px; }
-  .lim-segment-right-arm .lim-segment-target, .lim-segment-right-leg .lim-segment-target, .lim-segment-trunk .lim-segment-target { left: -66px; }
+  .lim-anatomy-stage { height: 500px; }
+  .lim-anatomy-figure { top: 0; bottom: 0; width: min(56%, 250px); }
+  .lim-segment-card { width: 25%; padding: 8px 4px; }
+  .lim-segment-card::after { width: 32px; }
+  .lim-segment-card::before { width: 32px; }
+  .lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -32px; }
+  .lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -32px; }
+  .lim-segment-left-arm::before, .lim-segment-left-leg::before { right: -64px; }
+  .lim-segment-right-arm::before, .lim-segment-right-leg::before, .lim-segment-trunk::before { left: -64px; }
+  .lim-segment-left-arm .lim-segment-target, .lim-segment-left-leg .lim-segment-target { right: -69px; }
+  .lim-segment-right-arm .lim-segment-target, .lim-segment-right-leg .lim-segment-target, .lim-segment-trunk .lim-segment-target { left: -69px; }
   .lim-bmr-banner { grid-template-columns: auto 1fr; }
   .lim-bmr-banner > p { grid-column: 1 / -1; padding: 9px 0 0; border: 0; border-top: 1px solid #cfe4ab; text-align: center; }
   .lim-quick-grid, .lim-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -138,18 +138,19 @@
   .lim-segment-card { padding: 8px 3px; }
 }
 
-.lim-segment-card span, .lim-result-metric > p, .lim-quick-indicator p,
+.lim-result-metric > p, .lim-quick-indicator p,
 .lim-result-status, .lim-result-unavailable { font-size: .875rem; }
 .lim-segment-card { min-width: 0; overflow-wrap: anywhere; }
-.lim-segment-card strong { font-size: 1rem; }
+.lim-segment-card span { font-size: .72rem; }
+.lim-segment-card strong { font-size: .94rem; }
 @container (max-width: 480px) {
   .lim-results-header { grid-template-columns: 1fr auto; }
   .lim-results-title { grid-column: 1 / -1; grid-row: 1; }
   .lim-results-brand { grid-column: 2; grid-row: 2; }
   .lim-download-button { grid-column: 1; grid-row: 2; justify-self: start; }
   .lim-top-metrics, .lim-composition-grid, .lim-quick-grid, .lim-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lim-anatomy-stage { height: 545px; }
-  .lim-anatomy-figure { width: min(72%, 290px); }
+  .lim-anatomy-stage { height: 475px; }
+  .lim-anatomy-figure { width: min(58%, 240px); }
   .lim-quick-indicator { flex-direction: column; align-items: flex-start; }
   .lim-bmr-banner { grid-template-columns: auto minmax(0, 1fr); padding: 12px; }
   .lim-bmr-banner > p { grid-column: 1 / -1; border: 0; padding: 0; }
