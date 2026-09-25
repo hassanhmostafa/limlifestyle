@@ -1,289 +1,241 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Activity,
-  CheckCircle2,
-  ClipboardList,
+  ArrowRight,
+  Check,
+  ChevronLeft,
+  ClipboardCheck,
+  FileHeart,
   HeartPulse,
   Loader2,
-  LogIn,
-  MapPin,
   QrCode,
-  ShieldCheck,
-  Sparkles,
+  RotateCcw,
+  Stethoscope,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 import { BodyCompositionReport } from "@/components/BodyCompositionReport";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import {
+  eventLifestyleSections,
+  type EventAnswers,
+  scoreEventLifestyle,
+} from "@/lib/eventLifestyle";
 
-const goals = [
-  { value: "weight", ar: "إدارة الوزن", en: "Weight management" },
-  { value: "fitness", ar: "اللياقة والنشاط", en: "Fitness and activity" },
-  { value: "nutrition", ar: "التغذية", en: "Nutrition" },
-  { value: "general", ar: "الصحة العامة", en: "General health" },
-];
-
-type EventForm = {
-  displayName: string;
+type Registration = {
+  firstName: string;
   age: string;
   sex: "male" | "female" | "";
+  phone: string;
+  phoneConfirm: string;
   city: string;
-  activityDays: string;
-  sleepHours: string;
-  goals: string[];
   consent: boolean;
 };
-
-const initialForm: EventForm = {
-  displayName: "",
-  age: "",
-  sex: "",
-  city: "",
-  activityDays: "",
-  sleepHours: "",
-  goals: [],
-  consent: false,
+type Screen = "register" | "journey" | "lifestyle" | "device" | "queue" | "report";
+type StoredSession = {
+  token: string;
+  code: string;
+  firstName: string | null;
+  age: number | null;
+  sex: "male" | "female" | null;
+  phone: string;
+  city: string | null;
+  status: "checked_in" | "measured";
+  answers: EventAnswers;
+  deviceUserId: string | null;
 };
 
+const storageKey = "lim-events-session-token";
+const emptyRegistration: Registration = { firstName: "", age: "", sex: "", phone: "", phoneConfirm: "", city: "جدة", consent: false };
+const phonePattern = /^((\+966)|(00966)|(966)|(0))5\d{8}$/;
+
 /**
- * The event experience intentionally uses the authenticated LIM account and
- * the same health_readings records as My Health. It never accepts an X18 key
- * or stores a second copy of the physical measurement.
+ * The standalone Events web journey from the supplied project. It deliberately
+ * has no main-LIM navigation or sign-in dependency. Its opaque session token
+ * protects only this browser's event record while physical X18 results remain
+ * in the shared LIM health backend.
  */
 export default function Events() {
-  const { isAuthenticated, loading, user } = useAuth();
-  const { language } = useLanguage();
-  const isAr = language === "ar";
-  const [form, setForm] = useState<EventForm>(initialForm);
-  const [showQr, setShowQr] = useState(false);
-  const utils = trpc.useUtils();
+  const [screen, setScreen] = useState<Screen>("register");
+  const [registration, setRegistration] = useState<Registration>(emptyRegistration);
+  const [accessToken, setAccessToken] = useState<string | null>(() => localStorage.getItem(storageKey));
+  const [answers, setAnswers] = useState<EventAnswers>({ importance: 5, confidence: 5 });
+  const [error, setError] = useState("");
+  const [lifestyleIndex, setLifestyleIndex] = useState(0);
 
-  const sessionQuery = trpc.events.mySession.useQuery(undefined, {
-    enabled: isAuthenticated,
-    refetchOnWindowFocus: false,
-  });
-  const resultsQuery = trpc.events.myResults.useQuery(undefined, {
-    enabled: isAuthenticated && Boolean(sessionQuery.data?.session),
-    refetchInterval: showQr ? 10_000 : false,
-    refetchOnWindowFocus: true,
-  });
-
-  const checkInMutation = trpc.events.checkIn.useMutation({
-    onSuccess: async () => {
-      await Promise.all([utils.events.mySession.invalidate(), utils.events.myResults.invalidate()]);
-      setShowQr(true);
-      toast.success(isAr ? "تم حفظ تسجيل الفعالية" : "Event check-in saved");
+  const sessionQuery = trpc.events.getSession.useQuery(
+    { accessToken: accessToken ?? "" },
+    { enabled: Boolean(accessToken), retry: false, refetchOnWindowFocus: false },
+  );
+  const resultQuery = trpc.events.results.useQuery(
+    { accessToken: accessToken ?? "" },
+    { enabled: Boolean(accessToken), refetchInterval: screen === "device" || screen === "report" ? 10_000 : false, retry: false },
+  );
+  const createSession = trpc.events.createSession.useMutation({
+    onSuccess: (data) => {
+      localStorage.setItem(storageKey, data.accessToken);
+      setAccessToken(data.accessToken);
+      setScreen("journey");
+      toast.success("تم إنشاء جلستك الصحية");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (eventError) => setError(eventError.message),
+  });
+  const saveLifestyle = trpc.events.saveLifestyle.useMutation({
+    onSuccess: () => {
+      sessionQuery.refetch();
+      setScreen("journey");
+      toast.success("تم حفظ تقييم نمط الحياة");
+    },
+    onError: (eventError) => setError(eventError.message),
   });
 
-  const session = sessionQuery.data?.session;
-  const machineUserId = sessionQuery.data?.machineUserId;
-  const x18Readings = resultsQuery.data?.readings ?? [];
-  const hasResults = x18Readings.length > 0;
+  const apiSession = sessionQuery.data;
+  const session: StoredSession | null = apiSession && accessToken ? {
+    token: accessToken,
+    code: apiSession.code,
+    firstName: apiSession.firstName,
+    age: apiSession.age,
+    sex: apiSession.sex,
+    phone: "",
+    city: apiSession.city,
+    status: apiSession.status,
+    answers: apiSession.answers as EventAnswers,
+    deviceUserId: apiSession.deviceUserId,
+  } : null;
+  const physicalReadings = resultQuery.data?.readings ?? [];
+  const hasResult = physicalReadings.length > 0;
+
+  useEffect(() => {
+    if (!sessionQuery.isError) return;
+    localStorage.removeItem(storageKey);
+    setAccessToken(null);
+    setScreen("register");
+  }, [sessionQuery.isError]);
 
   useEffect(() => {
     if (!session) return;
-    const answers = session.answers ?? {};
-    const savedGoals = Array.isArray(answers.goals) ? answers.goals.filter((goal): goal is string => typeof goal === "string") : [];
-    setForm({
-      displayName: session.displayName ?? "",
-      age: session.age ? String(session.age) : "",
-      sex: session.sex ?? "",
-      city: session.city ?? "",
-      activityDays: typeof answers.activityDays === "number" || typeof answers.activityDays === "string" ? String(answers.activityDays) : "",
-      sleepHours: typeof answers.sleepHours === "number" || typeof answers.sleepHours === "string" ? String(answers.sleepHours) : "",
-      goals: savedGoals,
-      consent: session.consent === "true",
-    });
-  }, [session]);
+    setAnswers({ importance: 5, confidence: 5, ...session.answers });
+    if (session.status === "measured") setScreen((current) => current === "register" ? "report" : current);
+  }, [session?.code]);
 
-  const canSubmit = useMemo(() => (
-    form.displayName.trim().length > 0
-    && Number(form.age) >= 0
-    && Number(form.age) <= 130
-    && Boolean(form.sex)
-    && form.consent
-  ), [form]);
-
-  const update = <K extends keyof EventForm>(key: K, value: EventForm[K]) => setForm((current) => ({ ...current, [key]: value }));
-  const toggleGoal = (goal: string) => update("goals", form.goals.includes(goal)
-    ? form.goals.filter((item) => item !== goal)
-    : [...form.goals, goal]);
-
-  const submit = () => {
-    if (!canSubmit || !form.sex) return;
-    checkInMutation.mutate({
-      displayName: form.displayName.trim(),
-      age: Number(form.age),
-      sex: form.sex,
-      city: form.city.trim() || undefined,
-      consent: true,
-      answers: {
-        activityDays: form.activityDays ? Number(form.activityDays) : "",
-        sleepHours: form.sleepHours ? Number(form.sleepHours) : "",
-        goals: form.goals,
-      },
-    });
-  };
-
-  if (loading) {
-    return <div className="grid min-h-screen place-items-center bg-slate-50"><Loader2 className="h-8 w-8 animate-spin text-emerald-700" /></div>;
-  }
-
-  if (!isAuthenticated) {
-    return <EventSignInGate isAr={isAr} />;
-  }
-
-  return (
-    <div className="min-h-screen bg-[#f3f8f6] text-slate-900" dir={isAr ? "rtl" : "ltr"}>
-      <Navigation />
-      <main className="pt-16">
-        <section className="relative overflow-hidden bg-[#103d36] px-4 py-12 text-white sm:px-6 lg:py-16">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-lime-300/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 left-1/4 h-72 w-72 rounded-full bg-teal-300/10 blur-3xl" />
-          <div className="container relative max-w-5xl">
-            <div className="grid gap-8 lg:grid-cols-[1.4fr_0.6fr] lg:items-end">
-              <div>
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-lime-200/25 bg-white/10 px-3 py-1.5 text-sm font-bold text-lime-200">
-                  <Sparkles className="h-4 w-4" />
-                  {isAr ? "رحلة الفعالية الصحية" : "Event health journey"}
-                </div>
-                <h1 className="max-w-2xl text-3xl font-black leading-tight sm:text-5xl">
-                  {isAr ? "نموذجك وقياسك ونتيجتك في حساب LIM واحد" : "Your form, measurement, and result in one LIM account"}
-                </h1>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-emerald-100 sm:text-lg">
-                  {isAr
-                    ? "سجّل بيانات الفعالية، ثم اعرض رمز جوالك لجهاز X18. ستظهر نتائج القياس في هذه الصفحة وفي «صحتي» عند وصولها إلى LIM."
-                    : "Check in for the event, present your mobile QR to the X18, and view the same measurement here and in My Health once LIM receives it."}
-                </p>
-              </div>
-              <div className="rounded-[28px] border border-white/15 bg-white/10 p-5 backdrop-blur-sm">
-                <div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-lime-300 text-emerald-950"><ShieldCheck className="h-6 w-6" /></div><div><p className="font-bold">{isAr ? "خصوصية النتيجة" : "Private results"}</p><p className="text-sm text-emerald-100">{isAr ? "تُعرض لك فقط بعد تسجيل الدخول" : "Visible only after you sign in"}</p></div></div>
-                <p className="mt-4 text-sm leading-6 text-emerald-100">{isAr ? "الجهاز يرسل إلى LIM مرة واحدة؛ لا تُنسخ نتائجك إلى قاعدة بيانات فعالية منفصلة." : "The machine uploads to LIM once; results are not copied to a separate event database."}</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="container max-w-5xl py-8 sm:py-10">
-          <JourneySteps isAr={isAr} active={hasResults ? 3 : showQr || session ? 2 : 1} />
-
-          {!session && <EventCheckInForm
-            isAr={isAr}
-            form={form}
-            update={update}
-            toggleGoal={toggleGoal}
-            canSubmit={canSubmit}
-            pending={checkInMutation.isPending}
-            onSubmit={submit}
-          />}
-
-          {session && !showQr && !hasResults && <Card className="mx-auto max-w-2xl border-0 p-7 shadow-xl shadow-emerald-950/5">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div><p className="text-sm font-bold text-emerald-700">{isAr ? "تم تسجيلك في الفعالية" : "Event check-in complete"}</p><h2 className="mt-1 text-2xl font-black">{session.displayName || user?.name}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{isAr ? "اعرض رمز جوالك على قارئ X18 لربط القياس بحساب LIM نفسه." : "Show your mobile QR to the X18 scanner to link the measurement to this LIM account."}</p></div>
-              <Button onClick={() => setShowQr(true)} className="h-12 bg-emerald-700 px-5 font-bold hover:bg-emerald-800"><QrCode className="me-2 h-5 w-5" />{isAr ? "عرض رمز الجوال" : "Show mobile QR"}</Button>
-            </div>
-          </Card>}
-
-          {session && (showQr || hasResults) && <div className="grid gap-7 lg:grid-cols-[0.8fr_1.2fr]">
-            <QrMeasurementPanel isAr={isAr} machineUserId={machineUserId} name={session.displayName || user?.name || ""} />
-            <ResultsPanel isAr={isAr} loading={resultsQuery.isLoading} hasResults={hasResults} readings={x18Readings} onRefresh={() => resultsQuery.refetch()} />
-          </div>}
-        </section>
-      </main>
-      <Footer />
-    </div>
-  );
-}
-
-function EventSignInGate({ isAr }: { isAr: boolean }) {
-  return <div className="min-h-screen bg-[#f3f8f6]" dir={isAr ? "rtl" : "ltr"}>
-    <Navigation />
-    <main className="grid min-h-screen place-items-center px-4 pt-16">
-      <Card className="w-full max-w-lg border-0 p-7 text-center shadow-xl shadow-emerald-950/5 sm:p-9">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-emerald-100 text-emerald-800"><LogIn className="h-8 w-8" /></div>
-        <h1 className="mt-5 text-2xl font-black">{isAr ? "ابدأ رحلة الفعالية بحساب LIM" : "Start the event journey with LIM"}</h1>
-        <p className="mt-3 leading-7 text-slate-600">{isAr ? "استخدم رقم جوالك لتسجيل الدخول أو إنشاء حساب. هذا يضمن أن نتائج X18 تظهر لك وحدك هنا وفي صفحة «صحتي»." : "Sign in or create an account with your mobile number. This ensures only you can view your X18 results here and in My Health."}</p>
-        <Link href="/login?redirect=/events" className="mt-6 inline-flex h-12 items-center justify-center rounded-lg bg-emerald-700 px-5 font-bold text-white transition hover:bg-emerald-800"><LogIn className="me-2 h-5 w-5" />{isAr ? "تسجيل الدخول أو إنشاء حساب" : "Sign in or create an account"}</Link>
-      </Card>
-    </main>
-    <Footer />
-  </div>;
-}
-
-function JourneySteps({ isAr, active }: { isAr: boolean; active: number }) {
-  const steps = [
-    { icon: ClipboardList, ar: "تسجيل الفعالية", en: "Event check-in" },
-    { icon: QrCode, ar: "مسح رمز الجوال", en: "Mobile QR scan" },
-    { icon: HeartPulse, ar: "النتائج في LIM", en: "Results in LIM" },
+  const completedSteps = hasResult ? 5 : Object.keys(session?.answers ?? {}).length > 2 ? 3 : session ? 1 : 0;
+  const journeySteps: { id: string; label: string; hint: string; icon: typeof UserRound; target: Screen }[] = [
+    { id: "registration", label: "البيانات الشخصية", hint: "تم حفظ بياناتك", icon: UserRound, target: "journey" },
+    { id: "lifestyle", label: "تقييم نمط الحياة", hint: "نحو 10 دقائق", icon: HeartPulse, target: "lifestyle" },
+    { id: "device", label: "تحليل عناصر الجسم", hint: "امسح رمز جوالك قبل القياس", icon: QrCode, target: "device" },
+    { id: "doctor", label: "الاستشارة الطبية", hint: hasResult ? "نتائجك جاهزة للاستشارة" : "يمكن المتابعة أثناء انتظار النتيجة", icon: Stethoscope, target: "queue" },
+    { id: "report", label: "التقرير النهائي", hint: hasResult ? "نتائجك جاهزة" : "يظهر بعد وصول القياس", icon: FileHeart, target: "report" },
   ];
-  return <div className="mb-8 grid gap-3 sm:grid-cols-3">{steps.map((step, index) => {
-    const Icon = step.icon;
-    const done = active > index + 1;
-    const current = active === index + 1;
-    return <div key={step.en} className={`flex items-center gap-3 rounded-2xl border p-4 ${done ? "border-emerald-200 bg-emerald-50" : current ? "border-lime-300 bg-white shadow-sm" : "border-slate-200 bg-white/60"}`}><div className={`grid h-10 w-10 place-items-center rounded-xl ${done ? "bg-emerald-700 text-white" : current ? "bg-lime-300 text-emerald-950" : "bg-slate-100 text-slate-400"}`}>{done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}</div><div><p className="text-xs text-slate-500">{isAr ? `الخطوة ${index + 1}` : `Step ${index + 1}`}</p><p className="font-bold">{isAr ? step.ar : step.en}</p></div></div>;
-  })}</div>;
-}
 
-function EventCheckInForm({ isAr, form, update, toggleGoal, canSubmit, pending, onSubmit }: {
-  isAr: boolean;
-  form: EventForm;
-  update: <K extends keyof EventForm>(key: K, value: EventForm[K]) => void;
-  toggleGoal: (goal: string) => void;
-  canSubmit: boolean;
-  pending: boolean;
-  onSubmit: () => void;
-}) {
-  return <Card className="mx-auto max-w-3xl border-0 p-5 shadow-xl shadow-emerald-950/5 sm:p-8">
-    <div className="mb-7 flex items-start gap-4"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><ClipboardList className="h-6 w-6" /></div><div><p className="text-sm font-bold text-emerald-700">{isAr ? "الخطوة الأولى" : "Step one"}</p><h2 className="text-2xl font-black">{isAr ? "بيانات فعالية LIM" : "LIM event details"}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{isAr ? "هذه البيانات تخص تنظيم الفعالية. اسم وعمر وجنس تقرير X18 تظهر كما يرسلها الجهاز نفسه." : "These fields support the event. The name, age, and sex on an X18 report are always shown exactly as the device submits them."}</p></div></div>
-    <div className="grid gap-5 sm:grid-cols-2">
-      <Field label={isAr ? "الاسم" : "Name"}><Input value={form.displayName} onChange={(event) => update("displayName", event.target.value)} placeholder={isAr ? "مثال: عبداللطيف" : "e.g. Abdulaziz"} /></Field>
-      <Field label={isAr ? "العمر" : "Age"}><Input value={form.age} inputMode="numeric" onChange={(event) => update("age", event.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="18" /></Field>
-      <fieldset className="space-y-2"><legend className="text-sm font-medium">{isAr ? "الجنس" : "Gender"}</legend><div className="grid grid-cols-2 gap-3"><ChoiceButton active={form.sex === "male"} onClick={() => update("sex", "male")}>{isAr ? "ذكر" : "Male"}</ChoiceButton><ChoiceButton active={form.sex === "female"} onClick={() => update("sex", "female")}>{isAr ? "أنثى" : "Female"}</ChoiceButton></div></fieldset>
-      <Field label={isAr ? "المدينة (اختياري)" : "City (optional)"}><div className="relative"><MapPin className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="ps-9" value={form.city} onChange={(event) => update("city", event.target.value)} placeholder={isAr ? "جدة" : "Jeddah"} /></div></Field>
-      <Field label={isAr ? "أيام النشاط أسبوعيًا (اختياري)" : "Active days per week (optional)"}><Input value={form.activityDays} inputMode="numeric" onChange={(event) => update("activityDays", event.target.value.replace(/\D/g, "").slice(0, 1))} placeholder="3" /></Field>
-      <Field label={isAr ? "متوسط ساعات النوم (اختياري)" : "Average sleep hours (optional)"}><Input value={form.sleepHours} inputMode="numeric" onChange={(event) => update("sleepHours", event.target.value.replace(/[^\d.]/g, "").slice(0, 4))} placeholder="7" /></Field>
+  const canRegister = useMemo(() => (
+    Number(registration.age) >= 18
+    && Boolean(registration.sex)
+    && phonePattern.test(registration.phone.replace(/\s/g, ""))
+    && registration.phone.replace(/\s/g, "") === registration.phoneConfirm.replace(/\s/g, "")
+    && registration.consent
+  ), [registration]);
+
+  const reset = () => {
+    localStorage.removeItem(storageKey);
+    setAccessToken(null);
+    setRegistration(emptyRegistration);
+    setAnswers({ importance: 5, confidence: 5 });
+    setLifestyleIndex(0);
+    setError("");
+    setScreen("register");
+  };
+  const go = (next: Screen) => { setError(""); setScreen(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+  if (accessToken && sessionQuery.isLoading) return <LoadingShell />;
+
+  return <main dir="rtl" className="min-h-screen bg-[#f3f8f6] text-[#123a34] print:bg-white">
+    <div className="mx-auto min-h-screen w-full max-w-[560px] bg-[#f8fbfa] shadow-[0_0_60px_rgba(13,59,50,.08)] print:max-w-none print:shadow-none">
+      <EventHeader onHome={session ? () => go("journey") : undefined} />
+      {screen === "register" && <RegistrationView form={registration} setForm={setRegistration} error={error} saving={createSession.isPending} onSubmit={() => {
+        if (!canRegister || !registration.sex) return;
+        setError("");
+        createSession.mutate({ firstName: registration.firstName.trim() || undefined, age: Number(registration.age), sex: registration.sex, phone: registration.phone, city: registration.city.trim() || undefined, consent: true });
+      }} />}
+      {screen === "journey" && session && <JourneyView session={session} steps={journeySteps} completeCount={completedSteps} onOpen={(target, index) => {
+        if (index <= completedSteps || (target === "queue" && completedSteps >= 2)) go(target);
+      }} onReset={reset} />}
+      {screen === "lifestyle" && session && <LifestyleView answers={answers} sectionIndex={lifestyleIndex} setSectionIndex={setLifestyleIndex} onBack={() => go("journey")} onSave={() => saveLifestyle.mutate({ accessToken: session.token, answers })} saving={saveLifestyle.isPending} />}
+      {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} />}
+      {screen === "queue" && session && <QueueView hasResults={hasResult} onBack={() => go("journey")} code={session.code} onReport={() => go("report")} />}
+      {screen === "report" && session && <ReportView session={session} readings={physicalReadings} onBack={() => go("journey")} />}
+      {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
     </div>
-    <fieldset className="mt-6 space-y-3"><legend className="text-sm font-medium">{isAr ? "ما الذي تود التركيز عليه؟ (اختياري)" : "What would you like to focus on? (optional)"}</legend><div className="grid gap-3 sm:grid-cols-2">{goals.map((goal) => <button key={goal.value} type="button" onClick={() => toggleGoal(goal.value)} className={`rounded-xl border px-4 py-3 text-start text-sm font-bold transition ${form.goals.includes(goal.value) ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300"}`}>{form.goals.includes(goal.value) && <CheckCircle2 className="me-2 inline h-4 w-4" />}{isAr ? goal.ar : goal.en}</button>)}</div></fieldset>
-    <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 p-4"><Checkbox checked={form.consent} onCheckedChange={(value) => update("consent", value === true)} className="mt-0.5" /><span className="text-sm leading-6 text-slate-600">{isAr ? "أوافق على حفظ نموذج الفعالية في حساب LIM الخاص بي وربط نتيجة القياس بحسابي. لا يُعد هذا النموذج تشخيصًا طبيًا." : "I agree to save this event form in my LIM account and link my measurement to my account. This form is not a medical diagnosis."}</span></label>
-    <Button onClick={onSubmit} disabled={!canSubmit || pending} className="mt-7 h-13 w-full bg-emerald-700 text-base font-bold hover:bg-emerald-800">{pending ? <Loader2 className="me-2 h-5 w-5 animate-spin" /> : <QrCode className="me-2 h-5 w-5" />}{isAr ? "حفظ وعرض رمز الجوال" : "Save and show mobile QR"}</Button>
-  </Card>;
+  </main>;
 }
 
-function QrMeasurementPanel({ isAr, machineUserId, name }: { isAr: boolean; machineUserId: string | null | undefined; name: string }) {
-  return <Card className="border-0 p-5 shadow-xl shadow-emerald-950/5 sm:p-7">
-    <div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-lime-200 text-emerald-950"><QrCode className="h-6 w-6" /></div><div><p className="text-sm font-bold text-emerald-700">{isAr ? "الخطوة الثانية" : "Step two"}</p><h2 className="text-xl font-black">{isAr ? "امسح رمز جوالك على X18" : "Scan your mobile QR at X18"}</h2></div></div>
-    {machineUserId ? <><div className="my-6 rounded-[28px] border border-emerald-100 bg-white p-4"><QRCodeSVG value={machineUserId} size={260} level="M" includeMargin className="mx-auto h-auto w-full max-w-[260px]" title="LIM mobile identity QR" /></div><div className="rounded-2xl bg-emerald-50 p-4"><p className="text-sm font-bold text-emerald-900">{isAr ? "الرقم الذي سيظهر في خانة ID بالجهاز" : "The number the device will show in its ID field"}</p><p dir="ltr" className="mt-1 text-2xl font-black tracking-wide text-emerald-800">{machineUserId}</p><p className="mt-3 text-sm leading-6 text-emerald-800/80">{isAr ? `أدخل الاسم والعمر والجنس في شاشة الجهاز عند طلبها. سيظهر ${name || "المشارك"} في نموذج الفعالية فقط؛ أما هوية التقرير فتأتي من جهاز X18.` : "Enter name, age, and gender on the device when prompted. The report identity comes from the X18 itself."}</p></div></> : <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">{isAr ? "أضف رقم جوال سعودي صحيحًا في حساب LIM أولًا، ثم عُد إلى رحلة الفعالية." : "Add a valid Saudi mobile number to your LIM account, then return to the event journey."}</div>}
-  </Card>;
+function LoadingShell() { return <main dir="rtl" className="grid min-h-screen place-items-center bg-[#f3f8f6] text-[#123a34]"><div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-sm"><Loader2 className="h-5 w-5 animate-spin" />جارٍ استرجاع جلسة الفعالية…</div></main>; }
+
+function EventHeader({ onHome }: { onHome?: () => void }) { return <header className="sticky top-0 z-20 border-b border-[#d9e8e3] bg-white/95 px-5 py-4 backdrop-blur print:static"><div className="flex items-center justify-between"><button type="button" onClick={onHome} className="flex items-center gap-3 text-right"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dff33d] text-[#103d36] shadow-[0_8px_24px_rgba(191,211,36,.28)]"><HeartPulse className="h-7 w-7" strokeWidth={2.2} /></span><span><span className="block text-xl font-black leading-none">ليم <span className="tracking-wide">LIM</span></span><span className="mt-1 block text-sm text-[#64847d]">رحلتك الصحية في الفعالية</span></span></button><span className="rounded-full border border-[#d8e8e3] bg-[#f6faf8] px-3 py-1.5 text-xs font-bold text-[#52736c]">فعاليات LIM</span></div></header>; }
+
+function RegistrationView({ form, setForm, error, saving, onSubmit }: { form: Registration; setForm: React.Dispatch<React.SetStateAction<Registration>>; error: string; saving: boolean; onSubmit: () => void }) {
+  const update = <K extends keyof Registration>(key: K, value: Registration[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const phone = form.phone.replace(/\s/g, "");
+  const valid = Number(form.age) >= 18 && Boolean(form.sex) && phonePattern.test(phone) && phone === form.phoneConfirm.replace(/\s/g, "") && form.consent;
+  return <section className="px-5 pb-12 pt-7"><Hero eyebrow="الخطوة الأولى" title="ابدأ رحلتك بصورة أوضح لصحتك" copy="سجّل بياناتك الأساسية، ثم أكمل التقييم والقياسات واحفظ تقريرك في جوالك." />
+    <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-5 rounded-[28px] border border-[#dce9e5] bg-white p-5 shadow-[0_12px_35px_rgba(18,58,52,.06)]"><div><h2 className="text-xl font-black">بيانات المشارك</h2><p className="mt-1 text-sm leading-6 text-[#6c8882]">تُحفظ في جلسة الفعالية الخاصة بك. لا يلزم تسجيل دخول تطبيق LIM هنا.</p></div>
+      <Field label="الاسم الأول (اختياري)"><Input value={form.firstName} onChange={(event) => update("firstName", event.target.value)} placeholder="مثال: عبداللطيف" /></Field>
+      <div className="grid grid-cols-2 gap-3"><Field label="العمر"><Input inputMode="numeric" value={form.age} onChange={(event) => update("age", event.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="18+" /></Field><fieldset className="space-y-2"><legend className="text-sm font-medium">الجنس</legend><div className="grid grid-cols-2 gap-2"><Choice active={form.sex === "male"} onClick={() => update("sex", "male")}>ذكر</Choice><Choice active={form.sex === "female"} onClick={() => update("sex", "female")}>أنثى</Choice></div></fieldset></div>
+      <Field label="رقم الجوال"><Input dir="ltr" inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="05XXXXXXXX" className="text-left" /></Field>
+      <Field label="تأكيد رقم الجوال"><Input dir="ltr" inputMode="tel" value={form.phoneConfirm} onChange={(event) => update("phoneConfirm", event.target.value)} placeholder="أعد كتابة الرقم" className="text-left" /></Field>
+      <Field label="المدينة (اختياري)"><Input value={form.city} onChange={(event) => update("city", event.target.value)} /></Field>
+      <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#f3f8f6] p-4"><Checkbox checked={form.consent} onCheckedChange={(value) => update("consent", value === true)} className="mt-1" /><span className="text-sm leading-6 text-[#45665f]">أوافق على استخدام بياناتي لإتمام التقييم وربط نتائج الفحص بهذه الجلسة وفق سياسة الخصوصية.</span></label>
+      {error && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
+      <PrimaryButton disabled={!valid || saving}>{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <>إنشاء جلستي الصحية<ChevronLeft className="mr-2 h-5 w-5" /></>}</PrimaryButton>
+    </form></section>;
 }
 
-function ResultsPanel({ isAr, loading, hasResults, readings, onRefresh }: {
-  isAr: boolean;
-  loading: boolean;
-  hasResults: boolean;
-  readings: Array<React.ComponentProps<typeof BodyCompositionReport>["readings"][number]>;
-  onRefresh: () => void;
-}) {
-  if (hasResults) return <div className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold text-emerald-700">{isAr ? "الخطوة الثالثة" : "Step three"}</p><h2 className="text-2xl font-black">{isAr ? "نتيجة قياسك من LIM" : "Your LIM measurement result"}</h2></div><Button variant="outline" onClick={() => window.print()} className="print:hidden">{isAr ? "طباعة التقرير" : "Print report"}</Button></div><BodyCompositionReport readings={readings} language={isAr ? "ar" : "en"} /></div>;
-  return <Card className="border-0 p-7 shadow-xl shadow-emerald-950/5"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><Activity className="h-7 w-7" /></div><h2 className="mt-5 text-2xl font-black">{isAr ? "بانتظار نتيجة جهاز X18" : "Waiting for the X18 result"}</h2><p className="mt-3 max-w-xl leading-7 text-slate-600">{isAr ? "بعد إكمال القياس، يرسل الجهاز النتيجة مباشرة إلى LIM باستخدام رابط الرفع المشترك. يتم التحقق من النتيجة هنا تلقائيًا كل 10 ثوانٍ." : "After measurement, the device uploads directly to LIM using the shared upload URL. This page automatically checks for your result every 10 seconds."}</p><Button variant="outline" onClick={onRefresh} disabled={loading} className="mt-5">{loading ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Activity className="me-2 h-4 w-4" />}{isAr ? "تحديث الآن" : "Refresh now"}</Button><p className="mt-5 text-xs leading-5 text-slate-400">{isAr ? "إذا لم تظهر النتيجة، تأكد من أن الجهاز مسح الرقم الظاهر في QR وأن إعدادات الجهاز تستخدم رابط LIM الصحيح." : "If no result appears, confirm the device scanned the QR number and is configured with the correct LIM upload URL."}</p></Card>;
+function JourneyView({ session, steps, completeCount, onOpen, onReset }: { session: StoredSession; steps: { id: string; label: string; hint: string; icon: typeof UserRound; target: Screen }[]; completeCount: number; onOpen: (target: Screen, index: number) => void; onReset: () => void }) {
+  const progress = Math.round((completeCount / steps.length) * 100);
+  return <section className="px-5 pb-14 pt-7"><div className="mb-7 rounded-[28px] bg-[#123f37] p-6 text-white shadow-[0_18px_45px_rgba(11,55,47,.15)]"><p className="text-sm font-bold text-[#dff33d]">{session.firstName ? `أهلًا ${session.firstName}` : "أهلًا بك"}</p><h1 className="mt-2 text-[1.7rem] font-black">رحلتك الصحية اليوم</h1><div className="mt-6 flex items-center justify-between text-sm"><span className="text-[#d5e5e1]">اكتملت {completeCount} من {steps.length}</span><strong className="text-[#dff33d]">{progress}%</strong></div><Progress value={progress} className="mt-3 h-2.5 bg-white/15 [&_[data-slot=progress-indicator]]:bg-[#dff33d]" /><p className="mt-5 text-sm leading-6 text-[#c8dcd7]">أكمل كل خطوة بالترتيب. تُحفظ بيانات النموذج في هذه الجلسة فقط.</p></div>
+    <div className="space-y-3">{steps.map((step, index) => { const done = index < completeCount; const active = index === completeCount || (step.id === "doctor" && completeCount >= 2) || (step.id === "report" && completeCount >= 4); const Icon = step.icon; return <button key={step.id} type="button" onClick={() => onOpen(step.target, index)} disabled={!active && !done} className={`flex w-full items-center gap-4 rounded-[22px] border p-4 text-right ${done ? "border-[#8acdbf] bg-[#e7f6f1]" : active ? "border-[#c8dc2f] bg-white shadow-[0_10px_30px_rgba(18,58,52,.08)]" : "border-[#dfe9e6] bg-[#f1f5f4] opacity-65"}`}><span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${done ? "bg-[#197f6f] text-white" : active ? "bg-[#dff33d] text-[#123a34]" : "bg-[#dfe8e5] text-[#78928c]"}`}>{done ? <Check className="h-6 w-6" strokeWidth={3} /> : <Icon className="h-6 w-6" />}</span><span className="min-w-0 flex-1"><span className="block text-base font-black">{step.label}</span><span className="mt-1 block text-sm text-[#718b85]">{done ? "مكتملة" : step.hint}</span></span>{active && <ChevronLeft className="h-5 w-5" />}</button>; })}</div>
+    <div className="mt-6 flex items-center justify-between rounded-2xl border border-[#dae8e4] bg-white p-4 text-sm"><div><strong className="block">رمز الجلسة</strong><span dir="ltr" className="font-mono font-bold">{session.code}</span></div><button type="button" onClick={onReset} className="flex items-center gap-1 text-xs text-[#6e8781]"><RotateCcw className="h-4 w-4" />جلسة جديدة</button></div>
+  </section>;
 }
 
-function ChoiceButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className={`h-11 rounded-xl border text-sm font-bold transition ${active ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300"}`}>{active && <CheckCircle2 className="me-1 inline h-4 w-4" />}{children}</button>;
+function LifestyleView({ answers, sectionIndex, setSectionIndex, onBack, onSave, saving }: { answers: EventAnswers; sectionIndex: number; setSectionIndex: React.Dispatch<React.SetStateAction<number>>; onBack: () => void; onSave: () => void; saving: boolean }) {
+  const section = eventLifestyleSections[sectionIndex];
+  const complete = section.questions.every((question) => question.type === "multi" ? Array.isArray(answers[question.id]) : answers[question.id] !== undefined && answers[question.id] !== "");
+  const priorities = [answers.priority1, answers.priority2, answers.priority3];
+  const setAnswer = (id: string, value: EventAnswers[string]) => { answers[id] = value; };
+  const [, repaint] = useState(0);
+  const updateAnswer = (id: string, value: EventAnswers[string]) => { setAnswer(id, value); repaint((valueNow) => valueNow + 1); };
+  return <section className="px-5 pb-14 pt-6"><BackButton onClick={sectionIndex ? () => setSectionIndex((current) => current - 1) : onBack} /><div className="mb-6"><div className="flex items-center justify-between text-sm font-bold"><span>{section.title}</span><span className="text-[#6c8882]">{sectionIndex + 1} من {eventLifestyleSections.length}</span></div><Progress value={((sectionIndex + 1) / eventLifestyleSections.length) * 100} className="mt-3 h-2" /><p className="mt-3 text-sm leading-6 text-[#6c8882]">{section.intro}</p></div>
+    <div className="space-y-5">{section.questions.map((question, questionIndex) => <div key={question.id} className="rounded-[24px] border border-[#dce9e5] bg-white p-5 shadow-[0_8px_25px_rgba(18,58,52,.05)]"><p className="mb-4 font-black leading-7"><span className="ml-2 text-[#197f6f]">{questionIndex + 1}.</span>{question.text}</p>
+      {question.type === "slider" && <div><input aria-label={question.text} type="range" min={question.min} max={question.max} value={Number(answers[question.id] ?? 5)} onChange={(event) => updateAnswer(question.id, Number(event.target.value))} className="w-full accent-[#197f6f]" /><div className="mt-2 flex justify-between text-xs text-[#708a84]"><span>0</span><strong className="text-xl text-[#123a34]">{String(answers[question.id] ?? 5)}</strong><span>10</span></div></div>}
+      {question.type === "number" && <div className="flex items-center gap-3"><Input type="number" min={question.min} max={question.max} value={String(answers[question.id] ?? "")} onChange={(event) => updateAnswer(question.id, Number(event.target.value))} className="h-12 text-center text-lg font-bold" /><span className="min-w-14 text-sm text-[#6c8882]">{question.suffix}</span></div>}
+      {(question.type === "radio" || question.type === "priority") && <div className="grid gap-2">{question.options?.map((option) => { const unavailable = question.type === "priority" && priorities.includes(option.value) && answers[question.id] !== option.value; return <button disabled={unavailable} key={option.value} type="button" onClick={() => updateAnswer(question.id, option.value)} className={`rounded-xl border px-4 py-3 text-right text-sm leading-6 ${answers[question.id] === option.value ? "border-[#197f6f] bg-[#e7f6f1] font-bold text-[#126b5d]" : unavailable ? "border-[#e7ecea] bg-[#f5f7f6] text-[#a4b2ae]" : "border-[#d8e6e2] bg-white"}`}>{option.label}</button>; })}</div>}
+      {question.type === "multi" && <div className="grid gap-2">{question.options?.map((option) => { const current = Array.isArray(answers[question.id]) ? answers[question.id] as string[] : []; const selected = current.includes(option.value); return <button key={option.value} type="button" onClick={() => updateAnswer(question.id, selected ? current.filter((item) => item !== option.value) : [...current, option.value])} className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-right text-sm ${selected ? "border-[#197f6f] bg-[#e7f6f1] font-bold" : "border-[#d8e6e2]"}`}><span className={`grid h-5 w-5 place-items-center rounded-md border ${selected ? "border-[#197f6f] bg-[#197f6f] text-white" : "border-[#a9bdb8]"}`}>{selected && <Check className="h-3.5 w-3.5" />}</span>{option.label}</button>; })}</div>}
+    </div>)}</div>
+    <PrimaryButton disabled={!complete || saving} onClick={() => sectionIndex < eventLifestyleSections.length - 1 ? setSectionIndex((current) => current + 1) : onSave()} className="mt-6">{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : sectionIndex < eventLifestyleSections.length - 1 ? <>التالي<ChevronLeft className="mr-2 h-5 w-5" /></> : <>حفظ التقييم<Check className="mr-2 h-5 w-5" /></>}</PrimaryButton>
+  </section>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block space-y-2"><Label>{label}</Label>{children}</label>;
+function DeviceView({ session, readings, loading, onBack, onRefresh }: { session: StoredSession; readings: Array<React.ComponentProps<typeof BodyCompositionReport>["readings"][number]>; loading: boolean; onBack: () => void; onRefresh: () => void }) {
+  const hasResult = readings.length > 0;
+  return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="mb-5 rounded-[28px] border border-[#dce9e5] bg-white p-5 shadow-[0_8px_25px_rgba(18,58,52,.05)]"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dff33d] text-[#123a34]"><QrCode className="h-6 w-6" /></span><div><h1 className="text-xl font-black">رمز جوالك للفحص</h1><p className="mt-1 text-sm leading-6 text-[#6c8882]">امسح الرمز بقارئ جهاز تحليل الجسم قبل بدء القياس.</p></div></div>
+    {session.deviceUserId ? <><div className="my-5 rounded-2xl border border-[#dce9e5] bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={260} level="M" includeMargin className="mx-auto h-auto w-full max-w-[260px]" /></div><p className="rounded-xl bg-[#f3f8f6] p-3 text-center text-sm leading-6 text-[#45665f]">سيظهر الرقم نفسه في خانة <b dir="ltr">ID</b> على الجهاز: <b dir="ltr" className="text-[#123a34]">{session.deviceUserId}</b></p></> : <p role="alert" className="mt-4 rounded-xl bg-[#fff0ed] p-3 text-sm text-[#a43f30]">تعذر تجهيز رمز الجهاز لهذه الجلسة.</p>}
+  </div>
+  {hasResult ? <><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-black">نتيجة تحليل الجسم</h2><Button variant="outline" onClick={() => window.print()} className="print:hidden">طباعة</Button></div><BodyCompositionReport readings={readings} language="ar" /></> : <div className="rounded-[28px] bg-[#123f37] p-6 text-white"><Activity className="h-8 w-8 text-[#dff33d]" /><h2 className="mt-4 text-xl font-black">بانتظار نتيجة الجهاز</h2><p className="mt-2 leading-7 text-[#d2e1dd]">بعد القياس يرسل X18 النتيجة مباشرة إلى نظام LIM. ستظهر هنا تلقائيًا، ويمكنك المتابعة إلى الاستشارة أثناء الانتظار.</p><Button variant="outline" onClick={onRefresh} disabled={loading} className="mt-5 border-white/30 text-white hover:bg-white/10">{loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}تحديث النتائج</Button></div>}
+  </section>;
 }
+
+function QueueView({ hasResults, onBack, code, onReport }: { hasResults: boolean; onBack: () => void; code: string; onReport: () => void }) { return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="rounded-[30px] bg-[#123f37] p-7 text-center text-white"><span className="mx-auto grid h-20 w-20 place-items-center rounded-[24px] bg-[#dff33d] text-[#123a34]"><Stethoscope className="h-10 w-10" /></span><h1 className="mt-6 text-2xl font-black">الاستشارة الطبية</h1><p className="mt-3 leading-7 text-[#d2e1dd]">{hasResults ? "نتائجك جاهزة للاستشارة. قدّم رمز الجلسة للفريق الصحي عند الحاجة." : "يمكنك متابعة تنظيم الاستشارة أثناء انتظار نتيجة القياس."}</p><div className="mx-auto mt-6 w-fit rounded-2xl bg-white/10 px-5 py-3"><span className="block text-xs text-[#bcd1cc]">رمز الجلسة</span><strong dir="ltr" className="mt-1 block font-mono text-lg text-[#dff33d]">{code}</strong></div></div><PrimaryButton onClick={onReport} className="mt-6">عرض التقرير</PrimaryButton></section>; }
+
+function ReportView({ session, readings, onBack }: { session: StoredSession; readings: Array<React.ComponentProps<typeof BodyCompositionReport>["readings"][number]>; onBack: () => void }) { const lifestyle = scoreEventLifestyle(session.answers); return <section className="px-5 pb-14 pt-6 print:px-0"><div className="print:hidden"><BackButton onClick={onBack} /></div><div className="rounded-[28px] border border-[#dce9e5] bg-white p-5"><p className="text-sm font-bold text-[#197f6f]">التقرير الصحي</p><h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1><p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p><div className="mt-6"><div className="flex items-end justify-between"><h2 className="font-black">تقييم نمط الحياة</h2><strong className="text-2xl text-[#197f6f]">{lifestyle.overall}<span className="text-sm">/100</span></strong></div><div className="mt-4 space-y-3">{Object.entries(lifestyle.domains).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{({ nutrition: "التغذية", activity: "النشاط", sleep: "النوم", mood: "المزاج والضغوط", connection: "المعنى والترابط", substances: "تجنب المواد الضارة" } as Record<string, string>)[key]}</span><strong>{value}/10</strong></div><Progress value={value * 10} className="h-2" /></div>)}</div></div>{readings.length > 0 && <div className="mt-7"><BodyCompositionReport readings={readings} language="ar" /></div>}<p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p></div><Button type="button" onClick={() => window.print()} className="mt-5 h-13 w-full rounded-2xl bg-[#197f6f] font-bold print:hidden">طباعة التقرير</Button></section>; }
+
+function Hero({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <div className="mb-7 rounded-[28px] bg-[#123f37] p-6 text-white shadow-[0_18px_45px_rgba(11,55,47,.15)]"><div className="mb-7 flex items-center justify-between"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-[#dff33d]">{eyebrow}</span><Activity className="h-6 w-6 text-[#dff33d]" /></div><h1 className="text-[1.7rem] font-black leading-tight">{title}</h1><p className="mt-3 text-base leading-7 text-[#d4e3df]">{copy}</p><div className="mt-5 flex items-center gap-2 text-sm text-[#c6d9d4]"><ClipboardCheck className="h-5 w-5 text-[#dff33d]" /><span>تُحفظ كل خطوة تلقائيًا</span></div></div>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
+function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" onClick={onClick} className={`h-12 rounded-xl border text-sm font-bold ${active ? "border-[#197f6f] bg-[#e4f4ef] text-[#126b5d]" : "border-[#cedfd9] bg-white text-[#536f69]"}`}>{children}</button>; }
+function PrimaryButton({ children, className = "", ...props }: React.ComponentProps<typeof Button>) { return <Button {...props} className={`h-14 w-full rounded-2xl bg-[#dff33d] text-base font-black text-[#123a34] shadow-[0_8px_20px_rgba(195,214,37,.25)] hover:bg-[#d3ea2d] disabled:bg-[#dfe7e4] disabled:text-[#8aa09a] ${className}`}>{children}</Button>; }
+function BackButton({ onClick }: { onClick: () => void }) { return <button type="button" onClick={onClick} className="mb-5 flex items-center gap-2 text-sm font-bold text-[#58756e]"><ArrowRight className="h-4 w-4" />العودة إلى الرحلة</button>; }

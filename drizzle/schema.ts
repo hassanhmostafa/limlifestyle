@@ -118,13 +118,17 @@ export type HealthReading = typeof healthReadings.$inferSelect;
 export type InsertHealthReading = typeof healthReadings.$inferInsert;
 
 /**
- * A privacy-safe event check-in. Health results stay exclusively in
- * `health_readings`; this table stores only the event form and the linkage to
- * the participant's LIM account.
+ * Standalone browser sessions for the LIM Events web experience. The browser
+ * holds only the opaque token; health results remain exclusively in
+ * `health_readings` and are joined internally through `userId`.
  */
 export const eventParticipantSessions = mysqlTable("event_participant_sessions", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
+  /** SHA-256 of an opaque browser token. The raw token is never stored. */
+  accessTokenHash: varchar("accessTokenHash", { length: 64 }).notNull().unique(),
+  /** Human-friendly reference used by the event team, not an access credential. */
+  code: varchar("code", { length: 32 }).notNull().unique(),
   eventCode: varchar("eventCode", { length: 64 }).notNull().default("lim-events"),
   displayName: varchar("displayName", { length: 255 }),
   age: int("age"),
@@ -136,9 +140,7 @@ export const eventParticipantSessions = mysqlTable("event_participant_sessions",
   latestRecordNo: varchar("latestRecordNo", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [
-  uniqueIndex("event_participant_sessions_user_event_unique").on(table.userId, table.eventCode),
-]);
+});
 
 export type EventParticipantSession = typeof eventParticipantSessions.$inferSelect;
 export type InsertEventParticipantSession = typeof eventParticipantSessions.$inferInsert;
