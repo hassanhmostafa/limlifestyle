@@ -78,6 +78,7 @@ function SegmentCard({ label, value, area, mode }: { label: string; value?: stri
     <div className={`lim-segment-card lim-segment-${area} lim-segment-${mode}`}>
       <span>{label}</span>
       <strong dir="ltr">{formatted === null ? "غير متوفر" : `${formatted} kg`}</strong>
+      <i className="lim-segment-target" aria-hidden="true" />
     </div>
   );
 }

@@ -24,6 +24,7 @@
 - [x] Deliver Events muscle/fat art through a first-party `/api/events/anatomy/:kind` image proxy rather than a signed storage redirect, ensuring Safari can render the image after production publishing.
 - [x] On an Events result, use the device-reported name when present and the Events-form name when the device omitted it; keep the participant on their body report after a result arrives and show an explicit LIM-styled **الانتقال إلى الاستشارة الطبية** button.
 - [x] Enlarge the Events muscle/fat figures and reposition their callouts to match the arms, trunk, and legs rather than the transparent margin around the supplied artwork.
+- [x] Use angled, endpoint-marked Events anatomy connectors: arm and leg cards exit horizontally then angle down to the limb; the trunk card exits horizontally then angles up to the torso.
 - [x] Add persisted, explicit Events milestones: **التقرير النهائي** completes the consultation and opens the report; **إنهاء الرحلة** completes the report and marks all five journey steps finished.
 
 ## Required field verification after deployment
