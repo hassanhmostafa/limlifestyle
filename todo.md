@@ -26,6 +26,7 @@
 - [x] Enlarge the Events muscle/fat figures and reposition their callouts to match the arms, trunk, and legs rather than the transparent margin around the supplied artwork.
 - [x] Use angled, endpoint-marked Events anatomy connectors: arm and leg cards exit horizontally then angle down to the limb; the trunk card exits horizontally then angles up to the torso.
 - [x] Render the Events body chart at one fixed mobile geometry in both the immediate measurement view and final report: smaller figure and labels, wider horizontal connector space, and no nested report-card width reduction.
+- [x] Make the Events anatomy chart a single fixed-ratio board: artwork, labels, leader lines, target dots, and label text all use container-relative dimensions and resize together without screen-specific positioning.
 - [x] Add persisted, explicit Events milestones: **التقرير النهائي** completes the consultation and opens the report; **إنهاء الرحلة** completes the report and marks all five journey steps finished.
 
 ## Required field verification after deployment
