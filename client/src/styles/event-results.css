@@ -62,6 +62,9 @@
      viewport-specific position: labels, leaders, targets and artwork scale together. */
   --leader-short: 12cqw;
   --leader-diagonal: 12cqw;
+  --arm-leader-short: 8cqw;
+  --arm-leader-diagonal: 7cqw;
+  --leg-leader: 9cqw;
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1.4;
@@ -84,16 +87,22 @@
 .lim-segment-left-arm { top: 27%; left: 0; }
 .lim-segment-right-arm { top: 27%; right: 0; }
 .lim-segment-trunk { top: 45%; right: 0; }
-.lim-segment-left-leg { top: 66%; left: 0; }
-.lim-segment-right-leg { top: 66%; right: 0; }
-.lim-segment-left-arm::after, .lim-segment-left-leg::after { right: calc(-1 * var(--leader-short)); }
-.lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: calc(-1 * var(--leader-short)); }
-.lim-segment-left-arm::before, .lim-segment-left-leg::before { right: calc(-1 * (var(--leader-short) + var(--leader-diagonal))); top: 50%; transform: rotate(38deg); transform-origin: left center; }
-.lim-segment-right-arm::before, .lim-segment-right-leg::before { left: calc(-1 * (var(--leader-short) + var(--leader-diagonal))); top: 50%; transform: rotate(-38deg); transform-origin: right center; }
+.lim-segment-left-leg { top: 59%; left: 0; }
+.lim-segment-right-leg { top: 59%; right: 0; }
+.lim-segment-left-arm::after { right: calc(-1 * var(--arm-leader-short)); width: var(--arm-leader-short); }
+.lim-segment-right-arm::after { left: calc(-1 * var(--arm-leader-short)); width: var(--arm-leader-short); }
+.lim-segment-left-leg::after { right: calc(-1 * var(--leg-leader)); width: var(--leg-leader); }
+.lim-segment-right-leg::after { left: calc(-1 * var(--leg-leader)); width: var(--leg-leader); }
+.lim-segment-trunk::after { left: calc(-1 * var(--leader-short)); }
+.lim-segment-left-arm::before { right: calc(-1 * (var(--arm-leader-short) + var(--arm-leader-diagonal))); width: var(--arm-leader-diagonal); top: 50%; transform: rotate(38deg); transform-origin: left center; }
+.lim-segment-right-arm::before { left: calc(-1 * (var(--arm-leader-short) + var(--arm-leader-diagonal))); width: var(--arm-leader-diagonal); top: 50%; transform: rotate(-38deg); transform-origin: right center; }
 .lim-segment-trunk::before { left: calc(-1 * (var(--leader-short) + var(--leader-diagonal))); top: 50%; transform: rotate(38deg); transform-origin: right center; }
-.lim-segment-left-arm .lim-segment-target, .lim-segment-left-leg .lim-segment-target { right: calc(-1 * (var(--leader-short) + 11.2cqw)); top: calc(50% + 5.7cqw); }
-.lim-segment-right-arm .lim-segment-target, .lim-segment-right-leg .lim-segment-target { left: calc(-1 * (var(--leader-short) + 11.2cqw)); top: calc(50% + 5.7cqw); }
-.lim-segment-trunk .lim-segment-target { left: calc(-1 * (var(--leader-short) + 11.2cqw)); top: calc(50% - 9.1cqw); }
+.lim-segment-left-leg::before, .lim-segment-right-leg::before { display: none; }
+.lim-segment-left-arm .lim-segment-target { right: calc(-1 * (var(--arm-leader-short) + 5.2cqw)); top: calc(50% + 3.1cqw); }
+.lim-segment-right-arm .lim-segment-target { left: calc(-1 * (var(--arm-leader-short) + 5.2cqw)); top: calc(50% + 3.1cqw); }
+.lim-segment-left-leg .lim-segment-target { right: calc(-1 * var(--leg-leader)); top: calc(50% - 1.7cqw); }
+.lim-segment-right-leg .lim-segment-target { left: calc(-1 * var(--leg-leader)); top: calc(50% - 1.7cqw); }
+.lim-segment-trunk .lim-segment-target { left: -25cqw; top: calc(50% - 9.1cqw); }
 .lim-segment-fat { border-color: var(--lim-coral); }
 .lim-segment-fat::after, .lim-segment-fat::before, .lim-segment-fat .lim-segment-target { background: var(--lim-coral); }
 .lim-segment-card span { display: block; color: #2b5148; font-size: clamp(.65rem, 3.7cqw, 1rem); line-height: 1.2; }
