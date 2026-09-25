@@ -511,7 +511,10 @@ export async function createEventParticipantSession(data: InsertEventParticipant
 
 export async function updateEventParticipantSession(
   accessTokenHash: string,
-  data: Partial<Pick<InsertEventParticipantSession, "answers" | "status" | "latestRecordNo">>,
+  data: Partial<Pick<
+    InsertEventParticipantSession,
+    "answers" | "status" | "latestRecordNo" | "consultationCompletedAt" | "reportCompletedAt"
+  >>,
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

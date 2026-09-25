@@ -127,6 +127,8 @@ export const eventsRouter = router({
       status: session.status,
       answers: session.answers ?? {},
       latestRecordNo: session.latestRecordNo,
+      consultationCompletedAt: session.consultationCompletedAt,
+      reportCompletedAt: session.reportCompletedAt,
       deviceUserId: user?.phone ? toMachineUserId(user.phone) : null,
     };
   }),
@@ -138,6 +140,42 @@ export const eventsRouter = router({
       const updated = await updateEventParticipantSession(tokenHash(input.accessToken), { answers: input.answers });
       if (!updated || updated.id !== session.id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save lifestyle answers." });
       return { success: true, answers: updated.answers ?? {} };
+    }),
+
+  /** Marks the consultation as complete only after the current session has a result. */
+  completeConsultation: publicProcedure
+    .input(eventTokenInput)
+    .mutation(async ({ input }) => {
+      const session = await requireEventSession(input.accessToken);
+      if (!session.latestRecordNo) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A body measurement is required before completing the consultation." });
+      }
+      const completedAt = session.consultationCompletedAt ?? new Date();
+      const updated = await updateEventParticipantSession(tokenHash(input.accessToken), {
+        consultationCompletedAt: completedAt,
+      });
+      if (!updated || updated.id !== session.id) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to complete the consultation." });
+      }
+      return { success: true, consultationCompletedAt: updated.consultationCompletedAt };
+    }),
+
+  /** Marks the report as read after its consultation milestone is complete. */
+  completeReport: publicProcedure
+    .input(eventTokenInput)
+    .mutation(async ({ input }) => {
+      const session = await requireEventSession(input.accessToken);
+      if (!session.latestRecordNo || !session.consultationCompletedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Complete the consultation before finishing the report." });
+      }
+      const completedAt = session.reportCompletedAt ?? new Date();
+      const updated = await updateEventParticipantSession(tokenHash(input.accessToken), {
+        reportCompletedAt: completedAt,
+      });
+      if (!updated || updated.id !== session.id) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to finish the report." });
+      }
+      return { success: true, reportCompletedAt: updated.reportCompletedAt };
     }),
 
   /**

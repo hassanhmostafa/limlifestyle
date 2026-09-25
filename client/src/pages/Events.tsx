@@ -51,6 +51,8 @@ type StoredSession = {
   status: "checked_in" | "measured";
   answers: EventAnswers;
   deviceUserId: string | null;
+  consultationCompletedAt: Date | string | null;
+  reportCompletedAt: Date | string | null;
 };
 
 const storageKey = "lim-events-session-token";
@@ -99,6 +101,22 @@ export default function Events() {
     onError: (eventError) => setError(eventError.message),
   });
   const generateTestMeasurement = trpc.events.generateTestMeasurement.useMutation();
+  const completeConsultation = trpc.events.completeConsultation.useMutation({
+    onSuccess: async () => {
+      await sessionQuery.refetch();
+      go("report");
+      toast.success("تم إكمال الاستشارة الطبية");
+    },
+    onError: (eventError) => setError(eventError.message),
+  });
+  const completeReport = trpc.events.completeReport.useMutation({
+    onSuccess: async () => {
+      await sessionQuery.refetch();
+      go("journey");
+      toast.success("اكتملت رحلتك الصحية");
+    },
+    onError: (eventError) => setError(eventError.message),
+  });
 
   const apiSession = sessionQuery.data;
   const session: StoredSession | null = apiSession && accessToken ? {
@@ -112,6 +130,8 @@ export default function Events() {
     status: apiSession.status,
     answers: apiSession.answers as EventAnswers,
     deviceUserId: apiSession.deviceUserId,
+    consultationCompletedAt: apiSession.consultationCompletedAt,
+    reportCompletedAt: apiSession.reportCompletedAt,
   } : null;
   const physicalReadings = resultQuery.data?.readings ?? [];
   const hasResult = physicalReadings.length > 0;
@@ -131,7 +151,13 @@ export default function Events() {
     if (session.status === "measured") setScreen((current) => current === "register" ? "device" : current);
   }, [session?.code]);
 
-  const completedSteps = completedEventJourneySteps(Boolean(session), session?.answers, hasResult);
+  const completedSteps = completedEventJourneySteps(
+    Boolean(session),
+    session?.answers,
+    hasResult,
+    Boolean(session?.consultationCompletedAt),
+    Boolean(session?.reportCompletedAt),
+  );
   const journeySteps: { id: string; label: string; hint: string; icon: typeof UserRound; target: Screen }[] = [
     { id: "registration", label: "البيانات الشخصية", hint: "تم حفظ بياناتك", icon: UserRound, target: "journey" },
     { id: "lifestyle", label: "تقييم نمط الحياة", hint: "نحو 10 دقائق", icon: HeartPulse, target: "lifestyle" },
@@ -192,8 +218,8 @@ export default function Events() {
           setError(eventError instanceof Error ? eventError.message : "تعذر إنشاء نتيجة الاختبار.");
         }
       }} />}
-      {screen === "queue" && session && <QueueView hasResults={hasResult} onBack={() => go("journey")} code={session.code} onReport={() => go("report")} />}
-      {screen === "report" && session && <ReportView session={session} readings={physicalReadings} onBack={() => go("journey")} />}
+      {screen === "queue" && session && <QueueView hasResults={hasResult} completing={completeConsultation.isPending} onBack={() => go("journey")} code={session.code} onComplete={() => completeConsultation.mutate({ accessToken: session.token })} />}
+      {screen === "report" && session && <ReportView session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} />}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
     </div>
   </main>;
@@ -256,9 +282,9 @@ function DeviceView({ session, readings, loading, testing, onBack, onRefresh, on
   </section>;
 }
 
-function QueueView({ hasResults, onBack, code, onReport }: { hasResults: boolean; onBack: () => void; code: string; onReport: () => void }) { return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="rounded-[30px] bg-[#123f37] p-7 text-center text-white"><span className="mx-auto grid h-20 w-20 place-items-center rounded-[24px] bg-[#dff33d] text-[#123a34]"><Stethoscope className="h-10 w-10" /></span><h1 className="mt-6 text-2xl font-black">الاستشارة الطبية</h1><p className="mt-3 leading-7 text-[#d2e1dd]">{hasResults ? "نتائجك جاهزة للاستشارة. قدّم رمز الجلسة للفريق الصحي عند الحاجة." : "يمكنك متابعة تنظيم الاستشارة أثناء انتظار نتيجة القياس."}</p><div className="mx-auto mt-6 w-fit rounded-2xl bg-white/10 px-5 py-3"><span className="block text-xs text-[#bcd1cc]">رمز الجلسة</span><strong dir="ltr" className="mt-1 block font-mono text-lg text-[#dff33d]">{code}</strong></div></div><PrimaryButton onClick={onReport} className="mt-6">عرض التقرير</PrimaryButton></section>; }
+function QueueView({ hasResults, completing, onBack, code, onComplete }: { hasResults: boolean; completing: boolean; onBack: () => void; code: string; onComplete: () => void }) { return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="rounded-[30px] bg-[#123f37] p-7 text-center text-white"><span className="mx-auto grid h-20 w-20 place-items-center rounded-[24px] bg-[#dff33d] text-[#123a34]"><Stethoscope className="h-10 w-10" /></span><h1 className="mt-6 text-2xl font-black">الاستشارة الطبية</h1><p className="mt-3 leading-7 text-[#d2e1dd]">{hasResults ? "نتائجك جاهزة للاستشارة. قدّم رمز الجلسة للفريق الصحي عند الحاجة." : "يمكنك متابعة تنظيم الاستشارة أثناء انتظار نتيجة القياس."}</p><div className="mx-auto mt-6 w-fit rounded-2xl bg-white/10 px-5 py-3"><span className="block text-xs text-[#bcd1cc]">رمز الجلسة</span><strong dir="ltr" className="mt-1 block font-mono text-lg text-[#dff33d]">{code}</strong></div></div><PrimaryButton disabled={!hasResults || completing} onClick={onComplete} className="mt-6">{completing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <FileHeart className="ml-2 h-5 w-5" />}التقرير النهائي<ChevronLeft className="mr-2 h-5 w-5" /></PrimaryButton>{!hasResults && <p className="mt-3 text-center text-xs leading-5 text-[#718b85]">يتاح التقرير النهائي بعد وصول نتيجة تحليل الجسم.</p>}</section>; }
 
-function ReportView({ session, readings, onBack }: { session: StoredSession; readings: DashboardReading[]; onBack: () => void }) { const lifestyle = scoreEventLifestyle(session.answers); return <section className="px-5 pb-14 pt-6 print:px-0"><div className="print:hidden"><BackButton onClick={onBack} /></div><div className="rounded-[28px] border border-[#dce9e5] bg-white p-5"><p className="text-sm font-bold text-[#197f6f]">التقرير الصحي</p><h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1><p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p><div className="mt-6"><div className="flex items-end justify-between"><h2 className="font-black">تقييم نمط الحياة</h2><strong className="text-2xl text-[#197f6f]">{lifestyle.overall}<span className="text-sm">/100</span></strong></div><div className="mt-4 space-y-3">{Object.entries(lifestyle.domains).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{({ nutrition: "التغذية", activity: "النشاط", sleep: "النوم", mood: "المزاج والضغوط", connection: "المعنى والترابط", substances: "تجنب المواد الضارة" } as Record<string, string>)[key]}</span><strong>{value}/10</strong></div><Progress value={value * 10} className="h-2" /></div>)}</div></div>{readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}<p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p></div><Button type="button" onClick={() => window.print()} className="mt-5 h-13 w-full rounded-2xl bg-[#197f6f] font-bold print:hidden">طباعة التقرير</Button></section>; }
+function ReportView({ session, readings, finishing, onBack, onFinish }: { session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void }) { const lifestyle = scoreEventLifestyle(session.answers); return <section className="px-5 pb-14 pt-6 print:px-0"><div className="print:hidden"><BackButton onClick={onBack} /></div><div className="rounded-[28px] border border-[#dce9e5] bg-white p-5"><p className="text-sm font-bold text-[#197f6f]">التقرير الصحي</p><h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1><p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p><div className="mt-6"><div className="flex items-end justify-between"><h2 className="font-black">تقييم نمط الحياة</h2><strong className="text-2xl text-[#197f6f]">{lifestyle.overall}<span className="text-sm">/100</span></strong></div><div className="mt-4 space-y-3">{Object.entries(lifestyle.domains).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{({ nutrition: "التغذية", activity: "النشاط", sleep: "النوم", mood: "المزاج والضغوط", connection: "المعنى والترابط", substances: "تجنب المواد الضارة" } as Record<string, string>)[key]}</span><strong>{value}/10</strong></div><Progress value={value * 10} className="h-2" /></div>)}</div></div>{readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}<p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p></div><Button type="button" onClick={() => window.print()} className="mt-5 h-13 w-full rounded-2xl bg-[#197f6f] font-bold print:hidden">طباعة التقرير</Button><PrimaryButton disabled={finishing || Boolean(session.reportCompletedAt)} onClick={onFinish} className="mt-4 print:hidden">{finishing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />}{session.reportCompletedAt ? "اكتملت الرحلة" : "إنهاء الرحلة"}</PrimaryButton></section>; }
 
 function Hero({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <div className="mb-7 rounded-[28px] bg-[#123f37] p-6 text-white shadow-[0_18px_45px_rgba(11,55,47,.15)]"><div className="mb-7 flex items-center justify-between"><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-[#dff33d]">{eyebrow}</span><Activity className="h-6 w-6 text-[#dff33d]" /></div><h1 className="text-[1.7rem] font-black leading-tight">{title}</h1><p className="mt-3 text-base leading-7 text-[#d4e3df]">{copy}</p><div className="mt-5 flex items-center gap-2 text-sm text-[#c6d9d4]"><ClipboardCheck className="h-5 w-5 text-[#dff33d]" /><span>تُحفظ كل خطوة تلقائيًا</span></div></div>; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }

@@ -57,16 +57,18 @@
 .lim-distribution-tabs button { border-radius: 999px !important; font-weight: 800; }
 .lim-distribution-muscle .lim-distribution-tabs button[data-state="active"] { color: #fff !important; background: var(--lim-forest) !important; }
 .lim-distribution-fat .lim-distribution-tabs button[data-state="active"] { color: #fff !important; background: var(--lim-coral) !important; }
-.lim-anatomy-stage { position: relative; height: 580px; min-height: 0; direction: ltr; isolation: isolate; }
-.lim-anatomy-figure { position: absolute; z-index: 1; top: 12px; bottom: 12px; left: 50%; display: grid; width: 44%; min-width: 0; place-items: center; overflow: visible; transform: translateX(-50%); }
+.lim-anatomy-stage { position: relative; height: 600px; min-height: 0; direction: ltr; isolation: isolate; }
+/* The supplied X18 artwork includes generous transparent margins. Give it a
+   larger central canvas so the visible body lines up with the arm/trunk/leg callouts. */
+.lim-anatomy-figure { position: absolute; z-index: 1; top: 0; bottom: 0; left: 50%; display: grid; width: min(68%, 310px); min-width: 0; place-items: center; overflow: visible; transform: translateX(-50%); }
 .lim-anatomy-figure img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 15px 14px rgba(27, 57, 48, .13)); }
 .lim-segment-card { position: absolute; z-index: 2; width: 26%; padding: 11px 9px; border: 1.5px solid #8fcf38; border-radius: 13px; background: rgba(255, 255, 255, .93); text-align: center; direction: rtl; box-shadow: 0 8px 18px rgba(30, 74, 56, .06); }
 .lim-segment-card::after { content: ""; position: absolute; top: 50%; width: 42px; height: 1.5px; background: #8fcf38; }
-.lim-segment-left-arm { top: 29%; left: 0; }
-.lim-segment-right-arm { top: 29%; right: 0; }
-.lim-segment-trunk { top: 47%; right: 0; }
-.lim-segment-left-leg { top: 70%; left: 0; }
-.lim-segment-right-leg { top: 70%; right: 0; }
+.lim-segment-left-arm { top: 34%; left: 0; }
+.lim-segment-right-arm { top: 34%; right: 0; }
+.lim-segment-trunk { top: 51%; right: 0; }
+.lim-segment-left-leg { top: 73%; left: 0; }
+.lim-segment-right-leg { top: 73%; right: 0; }
 .lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -42px; }
 .lim-segment-right-arm::after, .lim-segment-right-leg::after, .lim-segment-trunk::after { left: -42px; }
 .lim-segment-fat { border-color: var(--lim-coral); }
@@ -103,8 +105,8 @@
   .lim-results-brand { grid-column: 2; grid-row: 2; }
   .lim-download-button { grid-column: 1; grid-row: 2; justify-self: start; }
   .lim-top-metrics, .lim-composition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lim-anatomy-stage { height: 520px; }
-  .lim-anatomy-figure { top: 8px; bottom: 8px; width: 42%; }
+  .lim-anatomy-stage { height: 570px; }
+  .lim-anatomy-figure { top: 0; bottom: 0; width: min(70%, 300px); }
   .lim-segment-card { width: 27%; padding: 9px 5px; }
   .lim-segment-card::after { width: 28px; }
   .lim-segment-left-arm::after, .lim-segment-left-leg::after { right: -28px; }
@@ -129,7 +131,8 @@
   .lim-results-brand { grid-column: 2; grid-row: 2; }
   .lim-download-button { grid-column: 1; grid-row: 2; justify-self: start; }
   .lim-top-metrics, .lim-composition-grid, .lim-quick-grid, .lim-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lim-anatomy-stage { height: 485px; }
+  .lim-anatomy-stage { height: 545px; }
+  .lim-anatomy-figure { width: min(72%, 290px); }
   .lim-quick-indicator { flex-direction: column; align-items: flex-start; }
   .lim-bmr-banner { grid-template-columns: auto minmax(0, 1fr); padding: 12px; }
   .lim-bmr-banner > p { grid-column: 1 / -1; border: 0; padding: 0; }

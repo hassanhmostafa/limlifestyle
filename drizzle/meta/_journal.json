@@ -71,6 +71,13 @@
       "when": 1790345556838,
       "tag": "0009_x18_test_upload_source",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1790351468308,
+      "tag": "0010_event_completion_milestones",
+      "breakpoints": true
     }
   ]
 }

@@ -38,6 +38,8 @@ const eventSession = {
   answers: {},
   status: "checked_in" as const,
   latestRecordNo: null,
+  consultationCompletedAt: null,
+  reportCompletedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -135,5 +137,53 @@ describe("standalone events results", () => {
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(undefined);
     const caller = appRouter.createCaller(anonymousContext);
     await expect(caller.events.results({ accessToken: "x".repeat(43) })).rejects.toThrow("event session");
+  });
+});
+
+describe("standalone Events completion milestones", () => {
+  it("moves from an associated measurement through consultation then final report", async () => {
+    const measuredSession = { ...eventSession, status: "measured" as const, latestRecordNo: "EVENT-RECORD-1" };
+    const consultationAt = new Date("2026-09-25T15:00:00Z");
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(measuredSession);
+    mockedDb.updateEventParticipantSession.mockResolvedValue({
+      ...measuredSession,
+      consultationCompletedAt: consultationAt,
+    });
+
+    const caller = appRouter.createCaller(anonymousContext);
+    const consultation = await caller.events.completeConsultation({ accessToken: "z".repeat(43) });
+    expect(consultation.success).toBe(true);
+    expect(mockedDb.updateEventParticipantSession).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ consultationCompletedAt: expect.any(Date) }),
+    );
+
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
+      ...measuredSession,
+      consultationCompletedAt: consultationAt,
+    });
+    const reportAt = new Date("2026-09-25T15:05:00Z");
+    mockedDb.updateEventParticipantSession.mockResolvedValue({
+      ...measuredSession,
+      consultationCompletedAt: consultationAt,
+      reportCompletedAt: reportAt,
+    });
+    const report = await caller.events.completeReport({ accessToken: "z".repeat(43) });
+    expect(report.success).toBe(true);
+    expect(mockedDb.updateEventParticipantSession).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ reportCompletedAt: expect.any(Date) }),
+    );
+  });
+
+  it("does not permit the report milestone before consultation", async () => {
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
+      ...eventSession,
+      status: "measured" as const,
+      latestRecordNo: "EVENT-RECORD-1",
+    });
+    const caller = appRouter.createCaller(anonymousContext);
+    await expect(caller.events.completeReport({ accessToken: "z".repeat(43) }))
+      .rejects.toThrow("Complete the consultation");
   });
 });

@@ -138,6 +138,9 @@ export const eventParticipantSessions = mysqlTable("event_participant_sessions",
   answers: json("answers").$type<Record<string, string | number | string[]>>(),
   status: mysqlEnum("status", ["checked_in", "measured"]).default("checked_in").notNull(),
   latestRecordNo: varchar("latestRecordNo", { length: 64 }),
+  /** Explicit participant actions after an associated X18 measurement arrives. */
+  consultationCompletedAt: timestamp("consultationCompletedAt"),
+  reportCompletedAt: timestamp("reportCompletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

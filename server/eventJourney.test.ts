@@ -15,6 +15,11 @@ describe("completedEventJourneySteps", () => {
     expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true)).toBe(3);
   });
 
+  it("only finishes consultation and report after their explicit participant actions", () => {
+    expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true, true)).toBe(4);
+    expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true, true, true)).toBe(5);
+  });
+
   it("handles newly created and absent sessions", () => {
     expect(completedEventJourneySteps(true, {}, false)).toBe(1);
     expect(completedEventJourneySteps(false, undefined, false)).toBe(0);
