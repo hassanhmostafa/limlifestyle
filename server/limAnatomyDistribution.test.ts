@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { LIMAnatomyDistribution } from "../client/src/components/LIMAnatomyDistribution";
 
 describe("LIMAnatomyDistribution", () => {
@@ -35,5 +37,11 @@ describe("LIMAnatomyDistribution", () => {
     expect(markup).toContain("lim-segment-fat");
     expect(markup).toContain("/api/events/anatomy/fat");
     expect(markup).toContain("Trunk");
+  });
+
+  it("keeps fat leader lines visible outside the Events report color scope", () => {
+    const css = readFileSync(resolve(process.cwd(), "client/src/styles/event-results.css"), "utf8");
+    expect(css).toContain(".lim-segment-fat::after, .lim-segment-fat::before, .lim-segment-fat .lim-segment-target");
+    expect(css).toContain("var(--lim-coral, #ef806d)");
   });
 });

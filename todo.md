@@ -36,6 +36,7 @@
 - [x] Make the My Health hero actions phone-safe: on narrow screens **Download Report** and **Log Reading** stack at full width within the hero, preventing horizontal overflow, Safari page zoom-out, and clipped button edges.
 - [x] Standardize primary controls and hero gradients across the main LIM app on the Events palette: lime primary calls to action with forest text, and deep forest supporting actions/panels. Remove the saturated turquoise green used by the previous light-blue-to-emerald conversion.
 - [x] Extend the shared trunk callout as one connected 50° leader-and-dot vector so its endpoint is horizontally centered on the upper abdomen, just above the navel, in both Events and My Health anatomy boards.
+- [x] Shorten the shared trunk vector by approximately 1 mm while retaining its connected dot, and add a coral fallback color to the shared fat leaders so both the line segments and dots render in My Health as well as Events.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.

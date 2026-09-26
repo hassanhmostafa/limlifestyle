@@ -67,11 +67,11 @@
   --arm-target: 15.3cqw;
   --leg-leader: 18cqw;
   --leg-target: 19.7cqw;
-  /* The trunk leader and dot describe the same 50° vector. Its extended
-     endpoint is centered over the upper abdomen, just above the navel. */
-  --trunk-leader-diagonal: 22cqw;
-  --trunk-target: 27.9cqw;
-  --trunk-target-rise: 18.6cqw;
+  /* The trunk leader and dot describe the same 50° vector. Its endpoint is
+     centered over the upper abdomen, just above the navel. */
+  --trunk-leader-diagonal: 21cqw;
+  --trunk-target: 27.3cqw;
+  --trunk-target-rise: 17.8cqw;
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1.4;
@@ -110,8 +110,10 @@
 .lim-segment-left-leg .lim-segment-target { right: calc(-1 * var(--leg-target)); top: calc(50% - 1.7cqw); }
 .lim-segment-right-leg .lim-segment-target { left: calc(-1 * var(--leg-target)); top: calc(50% - 1.7cqw); }
 .lim-segment-trunk .lim-segment-target { left: calc(-1 * var(--trunk-target)); top: calc(50% - var(--trunk-target-rise)); }
-.lim-segment-fat { border-color: var(--lim-coral); }
-.lim-segment-fat::after, .lim-segment-fat::before, .lim-segment-fat .lim-segment-target { background: var(--lim-coral); }
+.lim-segment-fat { border-color: var(--lim-coral, #ef806d); }
+/* My Health renders the shared board outside `.lim-results-page`; a fallback
+   keeps the fat leaders visible there instead of resolving to transparent. */
+.lim-segment-fat::after, .lim-segment-fat::before, .lim-segment-fat .lim-segment-target { background: var(--lim-coral, #ef806d); }
 .lim-segment-card span { display: block; color: #2b5148; font-size: clamp(.65rem, 3.7cqw, 1rem); line-height: 1.2; }
 .lim-segment-card strong { display: block; margin-top: .7cqw; color: var(--lim-forest); font-size: clamp(.78rem, 4.5cqw, 1.18rem); line-height: 1; white-space: nowrap; }
 .lim-anatomy-note { margin: 3px 0 0; color: #667b74; font-size: .78rem; line-height: 1.7; text-align: center; }
