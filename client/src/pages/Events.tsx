@@ -67,6 +67,7 @@ const phonePattern = /^((\+966)|(00966)|(966)|(0))5\d{8}$/;
  * in the shared LIM health backend.
  */
 export default function Events() {
+  const eventProfile = trpc.eventAdmin.publicProfile.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   // Track is an organizer concern: links may scope registration, never a participant choice.
   const trackParam = new URLSearchParams(window.location.search).get("track");
   const trackId = trackParam && /^[1-9]\d*$/.test(trackParam) && Number.isSafeInteger(Number(trackParam))
@@ -152,17 +153,19 @@ export default function Events() {
     if (session.status === "measured") setScreen((current) => current === "register" ? "device" : current);
   }, [session?.code]);
 
+  const lifestyleEnabled = (apiSession?.questionnaireIds ?? ["lifestyle"]).includes("lifestyle");
   const baseCompletedSteps = completedEventJourneySteps(
     Boolean(session),
     session?.answers,
     hasResult,
     Boolean(care?.approvedAt),
     Boolean(care?.approvedAt && session?.reportCompletedAt),
+    lifestyleEnabled,
   );
   const completedSteps = baseCompletedSteps + (care?.nursingEnabled && (care.nursingCompletedAt || care.approvedAt) ? 1 : 0);
   const journeySteps: { id: string; label: string; hint: string; icon: typeof UserRound; target: Screen }[] = [
     { id: "registration", label: "البيانات الشخصية", hint: "تم حفظ بياناتك", icon: UserRound, target: "journey" },
-    { id: "lifestyle", label: "تقييم نمط الحياة", hint: "نحو 10 دقائق", icon: HeartPulse, target: "lifestyle" },
+    ...(lifestyleEnabled ? [{ id: "lifestyle", label: "تقييم نمط الحياة", hint: "نحو 10 دقائق", icon: HeartPulse, target: "lifestyle" as Screen }] : []),
     { id: "device", label: "تحليل عناصر الجسم", hint: "امسح رمز جوالك قبل القياس", icon: QrCode, target: "device" },
     ...(care?.nursingEnabled ? [{ id: "nursing", label: "محطة التمريض", hint: care.nursingCompletedAt ? "تم اعتماد القياسات" : "توجّه لمحطة التمريض", icon: HeartPulse, target: "nursing" as Screen }] : []),
     { id: "doctor", label: "الاستشارة الطبية", hint: hasResult ? "نتائجك جاهزة للاستشارة" : "يمكن المتابعة أثناء انتظار النتيجة", icon: Stethoscope, target: "queue" },
@@ -193,13 +196,19 @@ export default function Events() {
   return <main dir="rtl" className="min-h-screen bg-[#f3f8f6] text-[#123a34] print:bg-white">
     <div className="mx-auto min-h-screen w-full max-w-[560px] bg-[#f8fbfa] shadow-[0_0_60px_rgba(13,59,50,.08)] print:max-w-none print:shadow-none">
       <EventHeader onHome={session ? () => go("journey") : undefined} />
-      {screen === "register" && <RegistrationView form={registration} setForm={setRegistration} error={error} saving={createSession.isPending} onSubmit={() => {
+      {screen === "register" && eventProfile.data && <section className="space-y-3 px-5 pt-5">
+        {eventProfile.data.poster && <img src={eventProfile.data.poster} alt="بوستر الفعالية" className="w-full rounded-3xl object-contain" />}
+        <h1 className="text-2xl font-bold">{eventProfile.data.name}</h1>
+        <p>{eventProfile.data.location}{eventProfile.data.organizer && ` · ${eventProfile.data.organizer}`}</p>
+        {eventProfile.data.startsOn && <p>{eventProfile.data.startsOn} — {eventProfile.data.endsOn}</p>}
+      </section>}
+      {screen === "register" && eventProfile.data?.closed ? <p role="status" className="m-5 rounded-3xl bg-white p-6">انتهى التسجيل في هذه الفعالية. شكرًا لاهتمامك.</p> : screen === "register" && <RegistrationView form={registration} setForm={setRegistration} error={error} saving={createSession.isPending} onSubmit={() => {
         if (!canRegister || !registration.sex) return;
         setError("");
         createSession.mutate({ firstName: registration.firstName.trim() || undefined, age: Number(registration.age), sex: registration.sex, phone: registration.phone, city: registration.city.trim() || undefined, consent: true, trackId });
       }} />}
       {screen === "journey" && session && <JourneyView session={session} steps={journeySteps} completeCount={completedSteps} onOpen={(target, index) => {
-        if (index <= completedSteps || (target === "queue" && completedSteps >= 2)) go(target);
+        if (index <= completedSteps || (target === "queue" && completedSteps >= (lifestyleEnabled ? 2 : 1))) go(target);
       }} onReset={reset} />}
       {screen === "lifestyle" && session && <LifestyleView answers={answers} sectionIndex={lifestyleIndex} setSectionIndex={setLifestyleIndex} onBack={() => go("journey")} onSave={() => saveLifestyle.mutate({ accessToken: session.token, answers })} saving={saveLifestyle.isPending} />}
       {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} testing={generateTestMeasurement.isPending} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onViewConsultation={() => go(care?.nursingEnabled && !care.nursingCompletedAt ? "nursing" : "queue")} onGenerateTest={async () => {
@@ -224,7 +233,7 @@ export default function Events() {
       {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { careQuery.refetch(); sessionQuery.refetch(); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>متابعة إلى الطبيب</PrimaryButton>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
       {screen === "report" && session && (care?.approvedAt ? <>
         <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">نصائح الطبيب</h2><p className="whitespace-pre-wrap rounded-2xl bg-white p-5">{care.advice}</p><p className="text-sm">اعتمدها: {care.doctorName}</p>{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
-        <ReportView session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} />
+        <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} />
       </> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
     </div>
@@ -288,7 +297,7 @@ function DeviceView({ session, readings, loading, testing, onBack, onRefresh, on
   </section>;
 }
 
-function ReportView({ session, readings, finishing, onBack, onFinish }: { session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void }) {
+function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, onFinish }: { lifestyleEnabled: boolean; session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void }) {
   const lifestyle = scoreEventLifestyle(session.answers);
   return <section className="px-5 pb-14 pt-6 print:px-0">
     <div className="print:hidden"><BackButton onClick={onBack} /></div>
@@ -296,10 +305,10 @@ function ReportView({ session, readings, finishing, onBack, onFinish }: { sessio
       <p className="text-sm font-bold text-[#197f6f]">التقرير الصحي</p>
       <h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1>
       <p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p>
-      <div className="mt-6">
+      {lifestyleEnabled && <div className="mt-6">
         <div className="flex items-end justify-between"><h2 className="font-black">تقييم نمط الحياة</h2><strong className="text-2xl text-[#197f6f]">{lifestyle.overall}<span className="text-sm">/100</span></strong></div>
         <div className="mt-4 space-y-3">{Object.entries(lifestyle.domains).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{({ nutrition: "التغذية", activity: "النشاط", sleep: "النوم", mood: "المزاج والضغوط", connection: "المعنى والترابط", substances: "تجنب المواد الضارة" } as Record<string, string>)[key]}</span><strong>{value}/10</strong></div><Progress value={value * 10} className="h-2" /></div>)}</div>
-      </div>
+      </div>}
     </div>
     {/* This deliberately shares the exact same parent width as DeviceView.
         It prevents the report's extra padded card from reflowing the anatomy stage. */}

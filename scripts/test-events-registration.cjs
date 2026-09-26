@@ -6,11 +6,11 @@ const superjson = require('superjson');
 (async () => {
   const browser = await chromium.launch({headless:true, ...(process.env.CHROME_EXECUTABLE ? {executablePath:process.env.CHROME_EXECUTABLE, args:['--no-sandbox']} : {})});
   try {
-    for (const scenario of ['generic', 'scoped', 'retry']) {
+    for (const scenario of ['generic', 'scoped', 'retry', 'no-questionnaire']) {
       const context = await browser.newContext({viewport:{width:390,height:844}, isMobile:true, hasTouch:true});
       const page = await context.newPage();
       let attempts = 0, tracksRequests = 0, sent;
-      const session = {code:'UI-TEST',firstName:'تجربة',age:40,sex:'male',city:'جدة',status:'registered',answers:{},deviceUserId:'0500000000',trackId:7,trackName:'المسار 7',consultationCompletedAt:null,reportCompletedAt:null};
+      const session = {code:'UI-TEST',firstName:'تجربة',age:40,sex:'male',city:'جدة',status:'registered',answers:{},deviceUserId:'0500000000',trackId:7,trackName:'المسار 7',questionnaireIds:scenario==='no-questionnaire'?[]:['lifestyle'],consultationCompletedAt:null,reportCompletedAt:null};
       await page.route('**/api/trpc/**', async route => {
         const request = route.request(), url = new URL(request.url());
         const names = decodeURIComponent(url.pathname.split('/api/trpc/')[1]).split(',');
@@ -45,13 +45,16 @@ const superjson = require('superjson');
         assert.equal(await page.getByPlaceholder('05XXXXXXXX',{exact:true}).inputValue(),'0500000000');
         await submit.click();
       }
-      const next=page.getByRole('button').filter({hasText:'تقييم نمط الحياة'});
+      const next=page.getByRole('button').filter({hasText:scenario==='no-questionnaire'?'تحليل عناصر الجسم':'تقييم نمط الحياة'});
       await next.waitFor(); await next.click();
-      await page.getByRole('progressbar').waitFor({state:'visible'});
+      if(scenario==='no-questionnaire') {
+        await page.getByRole('heading',{name:'رمز جوالك للفحص'}).waitFor();
+        assert.equal(await page.getByRole('button').filter({hasText:'تقييم نمط الحياة'}).count(),0);
+      } else await page.getByRole('progressbar').waitFor({state:'visible'});
       if (process.env.UI_SCREENSHOT && scenario==='generic') await page.screenshot({path:process.env.UI_SCREENSHOT,fullPage:true});
       assert.equal(sent.trackId,scenario==='scoped'?7:undefined);
       assert.equal(tracksRequests,0);
-      console.log('PASS mobile registration -> lifestyle:',scenario);
+      console.log('PASS mobile registration -> next configured step:',scenario);
       await context.close();
     }
   } finally { await browser.close(); }

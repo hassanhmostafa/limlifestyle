@@ -92,6 +92,13 @@
       "when": 1790351468310,
       "tag": "0012_event_tracks_staff_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1790351468311,
+      "tag": "0013_event_admin_profile",
+      "breakpoints": true
     }
   ]
 }

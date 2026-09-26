@@ -17,6 +17,8 @@ import { healthAccessRouter } from "./routers/healthAccess";
 import { eventTeamRouter } from "./routers/eventTeam";
 import { eventsRouter } from "./routers/events";
 
+import { eventAdminRouter } from "./routers/eventAdmin";
+
 export const appRouter = router({
   system: systemRouter,
   kiosks: kiosksRouter,
@@ -33,6 +35,7 @@ export const appRouter = router({
   healthAccess: healthAccessRouter,
   events: eventsRouter,
   eventTeam: eventTeamRouter,
+  eventAdmin: eventAdminRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

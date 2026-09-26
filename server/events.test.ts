@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import * as db from "./db";
+import { requireOpenEvent } from "./eventAdminDb";
+vi.mock("./eventAdminDb", () => ({ requireOpenEvent: vi.fn() }));
 import * as tracks from "./eventTracksDb";
 vi.mock("./eventTracksDb", () => ({ selectRegistrationTrack: vi.fn(), requireTrack: vi.fn(), listTracks: vi.fn() }));
 import { readCare } from "./eventCareDb";
@@ -35,6 +37,7 @@ const eventSession = {
   code: "LIM-111111-42",
   eventCode: "lim-events",
   trackId: 1,
+  questionnaireIds: ["lifestyle"],
   displayName: "Event Participant",
   age: 30,
   sex: "male" as const,
@@ -51,6 +54,7 @@ const eventSession = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(requireOpenEvent).mockResolvedValue({questionnaireIds:["lifestyle"],closed:0} as never);
   vi.mocked(tracks.selectRegistrationTrack).mockResolvedValue({ id: 1, name: "المسار 1", eventCode: "lim-events", active: 1 });
   vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, approvedAt: null } as never);
   mockedDb.getUserByPhone.mockResolvedValue({
@@ -82,6 +86,19 @@ describe("standalone events.createSession", () => {
     }));
   });
 
+  it("does not create a participant or visit after the event is closed", async () => {
+    vi.mocked(requireOpenEvent).mockRejectedValue(new Error("انتهى التسجيل"));
+    const caller=appRouter.createCaller(anonymousContext);
+    await expect(caller.events.createSession({age:30,sex:"male",phone:"0501234567",consent:true})).rejects.toThrow("انتهى التسجيل");
+    expect(mockedDb.createMachinePhoneUser).not.toHaveBeenCalled();
+    expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
+  });
+  it("snapshots an empty questionnaire selection for a new visit", async () => {
+    vi.mocked(requireOpenEvent).mockResolvedValue({questionnaireIds:[],closed:0} as never);
+    mockedDb.createEventParticipantSession.mockResolvedValue({...eventSession,questionnaireIds:[]});
+    await appRouter.createCaller(anonymousContext).events.createSession({age:30,sex:"male",phone:"0501234567",consent:true});
+    expect(mockedDb.createEventParticipantSession).toHaveBeenCalledWith(expect.objectContaining({questionnaireIds:[]}));
+  });
   it("rejects invalid event phone numbers", async () => {
     const caller = appRouter.createCaller(anonymousContext);
     await expect(caller.events.createSession({

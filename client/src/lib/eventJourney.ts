@@ -12,11 +12,13 @@ export function completedEventJourneySteps(
   hasCurrentSessionMeasurement: boolean,
   consultationCompleted = false,
   reportCompleted = false,
+  lifestyleEnabled = true,
 ) {
   if (!hasSession) return 0;
-  if (reportCompleted) return 5;
-  if (consultationCompleted) return 4;
-  if (hasCurrentSessionMeasurement) return 3;
+  if (reportCompleted) return lifestyleEnabled ? 5 : 4;
+  if (consultationCompleted) return lifestyleEnabled ? 4 : 3;
+  if (hasCurrentSessionMeasurement) return lifestyleEnabled ? 3 : 2;
+  if (!lifestyleEnabled) return 1;
   const hasLifestyle = Object.keys(answers ?? {}).length > 2;
   return hasLifestyle ? 2 : 1;
 }

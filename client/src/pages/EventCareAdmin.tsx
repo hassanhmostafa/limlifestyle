@@ -1,3 +1,4 @@
+import EventAdminPanel from "@/components/EventAdminPanel";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
@@ -51,7 +52,7 @@ export default function EventCareAdmin() {
     <main dir="rtl" className="min-h-screen bg-[#f3f8f6] p-5 text-[#123a34]">
       <div className="mx-auto max-w-3xl space-y-5">
         <h1 className="text-2xl font-bold">ليم · إعداد دورة الفعالية</h1>
-        <p>إعداد محطة التمريض وصلاحيات الفريق للفعالية الحالية.</p>
+        <p>بيانات الفعالية ومحتواها ومحطة التمريض وصلاحيات الفريق.</p>
         {settings.isLoading ? (
           <p>جارٍ التحميل…</p>
         ) : settings.error ? (
@@ -66,6 +67,7 @@ export default function EventCareAdmin() {
           </>
         ) : (
           <>
+            <EventAdminPanel />
             <section className="space-y-4 rounded-3xl bg-white p-6">
               <label className="flex gap-3 text-lg font-bold">
                 <input

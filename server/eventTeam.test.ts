@@ -20,6 +20,7 @@ vi.mock("./eventTracksDb", () => ({
 import type { TrpcContext } from "./_core/context";
 import { validateMeasurements } from "../shared/eventCare";
 vi.mock("./eventCareDb", () => ({
+  EVENT_CODE: "lim-events",
   findSession: vi.fn(),
   readCare: vi.fn(),
   updateCare: vi.fn(),
