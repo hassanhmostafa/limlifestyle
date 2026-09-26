@@ -45,11 +45,12 @@ export async function requireTrack(id: number, active = true) {
 export async function selectRegistrationTrack(id?: number) {
   if (id !== undefined) return requireTrack(id);
   const tracks = await listTracks(true);
-  if (tracks.length !== 1)
+  if (tracks.length === 0)
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "اختر المسار الذي وجّهك له منظم الفعالية",
+      message: "التسجيل غير متاح حاليًا. يرجى التواصل مع منظم الفعالية.",
     });
+  // Generic event links use the first active track; organizer links retain their explicit scope.
   return tracks[0];
 }
 export async function createTrack(name: string) {

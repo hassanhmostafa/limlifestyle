@@ -67,10 +67,10 @@ const phonePattern = /^((\+966)|(00966)|(966)|(0))5\d{8}$/;
  * in the shared LIM health backend.
  */
 export default function Events() {
-  const availableTracks = trpc.events.tracks.useQuery(undefined, { retry: false });
-  const [selectedTrack, setSelectedTrack] = useState(() => new URLSearchParams(window.location.search).get("track") ?? "");
-  const trackId = selectedTrack ? Number(selectedTrack) : availableTracks.data?.length === 1 ? availableTracks.data[0].id : undefined;
-  const validTrack = availableTracks.data?.some(t => t.id === trackId) ?? false;
+  // Track is an organizer concern: links may scope registration, never a participant choice.
+  const trackParam = new URLSearchParams(window.location.search).get("track");
+  const trackId = trackParam && /^[1-9]\d*$/.test(trackParam) && Number.isSafeInteger(Number(trackParam))
+    ? Number(trackParam) : undefined;
   const [screen, setScreen] = useState<Screen>("register");
   const [registration, setRegistration] = useState<Registration>(emptyRegistration);
   const [accessToken, setAccessToken] = useState<string | null>(() => localStorage.getItem(storageKey));
@@ -93,7 +93,7 @@ export default function Events() {
       setScreen("journey");
       toast.success("تم إنشاء جلستك الصحية");
     },
-    onError: (eventError) => setError(eventError.message),
+    onError: (eventError) => setError(eventError.data?.code === "INTERNAL_SERVER_ERROR" ? "تعذر حفظ التسجيل حاليًا. حاول مرة أخرى، وإذا استمرت المشكلة تواصل مع منظم الفعالية. بياناتك ما زالت محفوظة في النموذج." : eventError.message),
   });
   const saveLifestyle = trpc.events.saveLifestyle.useMutation({
     onSuccess: () => {
@@ -193,10 +193,8 @@ export default function Events() {
   return <main dir="rtl" className="min-h-screen bg-[#f3f8f6] text-[#123a34] print:bg-white">
     <div className="mx-auto min-h-screen w-full max-w-[560px] bg-[#f8fbfa] shadow-[0_0_60px_rgba(13,59,50,.08)] print:max-w-none print:shadow-none">
       <EventHeader onHome={session ? () => go("journey") : undefined} />
-      {screen === "register" && <section className="mx-5 mt-5 rounded-2xl bg-white p-4"><label htmlFor="event-track" className="font-bold">مسارك في الفعالية</label><select id="event-track" className="mt-2 w-full rounded-xl border p-3" value={trackId ?? ""} onChange={e => setSelectedTrack(e.target.value)} disabled={createSession.isPending}><option value="">اختر المسار</option>{availableTracks.data?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select><p className="mt-2 text-sm text-slate-500">اختر المسار الذي وجّهك له منظم الفعالية.</p>{availableTracks.error && <p role="alert">تعذر تحميل المسارات. <button onClick={() => availableTracks.refetch()} className="underline">إعادة المحاولة</button></p>}{availableTracks.data?.length === 0 && <p>التسجيل غير متاح؛ لا توجد مسارات مفعّلة حاليًا.</p>}</section>}
-      {session && apiSession?.trackName && <p className="mx-5 mt-4 rounded-xl bg-emerald-50 p-3 font-bold">{apiSession.trackName}</p>}
-      {screen === "register" && <RegistrationView form={registration} setForm={setRegistration} error={error} saving={createSession.isPending} blocked={!validTrack} onSubmit={() => {
-        if (!canRegister || !registration.sex || !validTrack) return;
+      {screen === "register" && <RegistrationView form={registration} setForm={setRegistration} error={error} saving={createSession.isPending} onSubmit={() => {
+        if (!canRegister || !registration.sex) return;
         setError("");
         createSession.mutate({ firstName: registration.firstName.trim() || undefined, age: Number(registration.age), sex: registration.sex, phone: registration.phone, city: registration.city.trim() || undefined, consent: true, trackId });
       }} />}
@@ -237,7 +235,7 @@ function LoadingShell() { return <main dir="rtl" className="grid min-h-screen pl
 
 function EventHeader({ onHome }: { onHome?: () => void }) { return <header className="sticky top-0 z-20 border-b border-[#d9e8e3] bg-white/95 px-5 py-4 backdrop-blur print:static"><div className="flex items-center justify-between"><button type="button" onClick={onHome} className="flex items-center gap-3 text-right"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dff33d] text-[#103d36] shadow-[0_8px_24px_rgba(191,211,36,.28)]"><HeartPulse className="h-7 w-7" strokeWidth={2.2} /></span><span><span className="block text-xl font-black leading-none">ليم <span className="tracking-wide">LIM</span></span><span className="mt-1 block text-sm text-[#64847d]">رحلتك الصحية في الفعالية</span></span></button><span className="rounded-full border border-[#d8e8e3] bg-[#f6faf8] px-3 py-1.5 text-xs font-bold text-[#52736c]">فعاليات LIM</span></div></header>; }
 
-function RegistrationView({ form, setForm, error, saving, blocked, onSubmit }: { form: Registration; setForm: React.Dispatch<React.SetStateAction<Registration>>; error: string; saving: boolean; blocked: boolean; onSubmit: () => void }) {
+function RegistrationView({ form, setForm, error, saving, onSubmit }: { form: Registration; setForm: React.Dispatch<React.SetStateAction<Registration>>; error: string; saving: boolean; onSubmit: () => void }) {
   const update = <K extends keyof Registration>(key: K, value: Registration[K]) => setForm((current) => ({ ...current, [key]: value }));
   const phone = form.phone.replace(/\s/g, "");
   const valid = Number(form.age) >= 18 && Boolean(form.sex) && phonePattern.test(phone) && phone === form.phoneConfirm.replace(/\s/g, "") && form.consent;
@@ -250,7 +248,7 @@ function RegistrationView({ form, setForm, error, saving, blocked, onSubmit }: {
       <Field label="المدينة (اختياري)"><Input value={form.city} onChange={(event) => update("city", event.target.value)} /></Field>
       <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#f3f8f6] p-4"><Checkbox checked={form.consent} onCheckedChange={(value) => update("consent", value === true)} className="mt-1" /><span className="text-sm leading-6 text-[#45665f]">أوافق على استخدام بياناتي لإتمام التقييم وربط نتائج الفحص بهذه الجلسة وإتاحتها لفريق التمريض والطبيب المصرح لهم في هذه الفعالية وفق سياسة الخصوصية.</span></label>
       {error && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
-      <PrimaryButton disabled={!valid || saving || blocked}>{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <>إنشاء جلستي الصحية<ChevronLeft className="mr-2 h-5 w-5" /></>}</PrimaryButton>
+      <PrimaryButton disabled={!valid || saving}>{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <>إنشاء جلستي الصحية<ChevronLeft className="mr-2 h-5 w-5" /></>}</PrimaryButton>
     </form></section>;
 }
 
