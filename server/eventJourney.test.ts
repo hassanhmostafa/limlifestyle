@@ -15,7 +15,7 @@ describe("completedEventJourneySteps", () => {
     expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true)).toBe(3);
   });
 
-  it("only finishes consultation and report after their explicit participant actions", () => {
+  it("finishes consultation after doctor approval and report after participant acknowledgement", () => {
     expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true, true)).toBe(4);
     expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true, true, true)).toBe(5);
   });

@@ -1,5 +1,52 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, json, date, uniqueIndex } from "drizzle-orm/mysql-core";
 
+// Event operations are separate from the main app's expert/patient grants.
+export const eventSettings = mysqlTable("event_settings", {
+  eventCode: varchar("eventCode", { length: 64 }).primaryKey(),
+  nursingEnabled: int("nursingEnabled").notNull().default(0),
+  testIds: json("testIds").$type<string[]>().notNull(),
+});
+export const eventStaff = mysqlTable("event_staff", {
+  id: int("id").autoincrement().primaryKey(),
+  eventCode: varchar("eventCode", { length: 64 }).notNull(),
+  userId: int("userId"),
+  trackId: int("trackId"),
+  name: varchar("name", { length: 255 }),
+  codeHash: varchar("codeHash", { length: 64 }).unique("event_staff_code_unique"),
+  credentialVersion: int("credentialVersion").notNull().default(1),
+  duty: mysqlEnum("duty", ["nurse", "doctor"]).notNull(),
+  active: int("active").notNull().default(1),
+}, t => [uniqueIndex("event_staff_user_unique").on(t.eventCode, t.userId)]);
+export const eventTracks = mysqlTable("event_tracks", {
+  id: int("id").autoincrement().primaryKey(),
+  eventCode: varchar("eventCode", { length: 64 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  active: int("active").notNull().default(1),
+}, t => [uniqueIndex("event_track_name_unique").on(t.eventCode, t.name)]);
+export const eventStaffSessions = mysqlTable("event_staff_sessions", {
+  tokenHash: varchar("tokenHash", { length: 64 }).primaryKey(),
+  staffId: int("staffId").notNull(),
+  credentialVersion: int("credentialVersion").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+});
+export const eventCare = mysqlTable("event_care", {
+  sessionId: int("sessionId").primaryKey(),
+  // Snapshot taken on first access so later settings changes do not lose work.
+  nursingEnabled: int("nursingEnabled").notNull(),
+  testIds: json("testIds").$type<string[]>().notNull(),
+  measurements: json("measurements").$type<Record<string, Record<string, string>>>().notNull(),
+  nurseNotes: text("nurseNotes"),
+  nurseUserId: int("nurseUserId"),
+  nurseStaffId: int("nurseStaffId"),
+  nursingCompletedAt: timestamp("nursingCompletedAt"),
+  advice: text("advice"),
+  doctorUserId: int("doctorUserId"),
+  doctorStaffId: int("doctorStaffId"),
+  doctorName: varchar("doctorName", { length: 255 }),
+  approvedAt: timestamp("approvedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 /**
  * Core user table backing auth flow.
  * Extend this file with additional tables as your product grows.
@@ -130,6 +177,7 @@ export const eventParticipantSessions = mysqlTable("event_participant_sessions",
   /** Human-friendly reference used by the event team, not an access credential. */
   code: varchar("code", { length: 32 }).notNull().unique(),
   eventCode: varchar("eventCode", { length: 64 }).notNull().default("lim-events"),
+  trackId: int("trackId"),
   displayName: varchar("displayName", { length: 255 }),
   age: int("age"),
   sex: mysqlEnum("sex", ["male", "female"]),

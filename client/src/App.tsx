@@ -20,6 +20,8 @@ import Login from "./pages/Login";
 import KioskLogin from "./pages/KioskLogin";
 import MachineSimulator from "./pages/MachineSimulator";
 import KioskQR from "./pages/KioskQR";
+import EventTeam from "./pages/EventTeam";
+import EventCareAdmin from "./pages/EventCareAdmin";
 import Events from "./pages/Events";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { shouldShowInstallPrompt } from "./lib/appRoute";
@@ -43,6 +45,8 @@ function Router() {
       <Route path={"/kiosk-login"} component={KioskLogin} />
       <Route path={"/machine-simulator"} component={MachineSimulator} />
       <Route path={"/kiosk-qr"} component={KioskQR} />
+      <Route path={"/events/team"} component={EventTeam} />
+      <Route path={"/events/care-admin"} component={EventCareAdmin} />
       <Route path={"/events"} component={Events} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
