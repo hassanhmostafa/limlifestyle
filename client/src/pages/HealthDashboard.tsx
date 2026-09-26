@@ -809,28 +809,28 @@ export default function HealthDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8faf4]">
+    <div className="min-h-screen flex flex-col overflow-x-clip bg-[#f8faf4]">
       <Navigation />
 
       <main className="flex-1 pt-20">
         {/* Header */}
         <section className="bg-gradient-to-r from-[#073f35] via-[#075847] to-[#2d775d] py-10 text-white">
-          <div className="container flex items-center justify-between">
-            <div>
+          <div className="container flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h1 className="text-3xl font-bold mb-1">{t.health_title}</h1>
               <p className="text-[#e5f0d4]">{language === "ar" ? "راجع نتائج القياس التي أرسلها جهاز X18" : "Review the measurement details submitted by the X18 device"}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               <Button
                 variant="outline"
-                className="border-white/35 bg-transparent text-white hover:bg-white/10"
+                className="w-full justify-center border-white/35 bg-transparent px-3 text-white hover:bg-white/10 sm:w-auto sm:px-4"
                 onClick={handleDownloadPDF}
                 disabled={!readings || readings.length === 0 || downloading}
               >
                 {downloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                 {downloading ? "Generating..." : "Download Report"}
               </Button>
-              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]" onClick={() => setShowLog(true)}>
+              <Button className="w-full justify-center bg-[#dff45a] px-3 text-[#073f35] hover:bg-[#cde944] sm:w-auto sm:px-4" onClick={() => setShowLog(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 {t.health_logReading}
               </Button>
