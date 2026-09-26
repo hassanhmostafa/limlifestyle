@@ -1,3 +1,4 @@
+import EventPdfButton from "@/components/EventPdfButton";
 import React, { useState } from "react";
 import {
   Activity,
@@ -5,7 +6,6 @@ import {
   CalendarDays,
   ChevronDown,
   Dna,
-  Download,
   Droplets,
   Flame,
   HeartPulse,
@@ -140,7 +140,7 @@ export function EventBodyResults({ readings, participant }: { readings: Dashboar
   const hasVitals = eventResultCategories.vitals.some(([key]) => eventNumeric(values[key]) !== null);
 
   return (
-    <section className="lim-results-page" dir="rtl">
+    <section data-pdf-report className="lim-results-page" dir="rtl">
       <header className="lim-results-header">
         <div className="lim-results-brand" aria-label="ليم LIM">
           <span><HeartPulse size={22} /></span>
@@ -156,9 +156,7 @@ export function EventBodyResults({ readings, participant }: { readings: Dashboar
             {participantSexLabel && <span>{participantSexLabel}</span>}
           </p>}
         </div>
-        <button type="button" className="lim-download-button lim-print-hide" onClick={() => window.print()}>
-          <Download size={19} /> تحميل التقرير
-        </button>
+        <EventPdfButton className="lim-download-button lim-print-hide" filename="lim-body-results.pdf" />
       </header>
 
       <div className="lim-top-metrics">

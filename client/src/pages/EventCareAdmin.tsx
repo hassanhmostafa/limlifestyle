@@ -1,3 +1,4 @@
+import EventAdminLaunch from "@/components/EventAdminLaunch";
 import EventAdminPanel from "@/components/EventAdminPanel";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -209,9 +210,7 @@ export default function EventCareAdmin() {
                 </DialogContent>
               </Dialog>
             )}
-            <a className="inline-block underline" href="/events/team">
-              رابط دخول الفريق
-            </a>
+            <EventAdminLaunch />
             {message && <p role="status">{message}</p>}
           </>
         )}

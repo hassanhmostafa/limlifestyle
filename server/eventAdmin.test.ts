@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventAdminRouter, eventProfileInput, validatePoster } from './routers/eventAdmin';
 import * as store from './eventAdminDb';
+import { listTracks } from './eventTracksDb';
+vi.mock('./eventTracksDb',()=>({listTracks:vi.fn()}));
 import type { TrpcContext } from './_core/context';
 import { eventReportCsv } from '../shared/eventReport';
 vi.mock('./eventAdminDb',()=>({readEventProfile:vi.fn(),updateEventProfile:vi.fn(),eventReportSummary:vi.fn(),eventReportPage:vi.fn()}));
@@ -18,9 +20,22 @@ describe('event administration',()=>{
       await expect(caller.setClosed({closed:true})).rejects.toThrow();
       await expect(caller.report({after:0,limit:50})).rejects.toThrow();
       await expect(caller.summary()).rejects.toThrow();
+      await expect(caller.start()).rejects.toThrow();
     }
     expect(store.updateEventProfile).not.toHaveBeenCalled();
     expect(store.eventReportPage).not.toHaveBeenCalled();
+  });
+  it('starts only a configured event with an active track',async()=>{
+    vi.mocked(store.readEventProfile).mockResolvedValue({...profile,closed:1} as any);
+    vi.mocked(listTracks).mockResolvedValue([]);
+    await expect(admin.start()).rejects.toThrow();
+    expect(store.updateEventProfile).not.toHaveBeenCalled();
+    vi.mocked(listTracks).mockResolvedValue([{id:1}] as any);
+    await admin.start();
+    expect(listTracks).toHaveBeenCalledWith(true);
+    expect(store.updateEventProfile).toHaveBeenCalledWith({closed:0});
+    vi.mocked(store.readEventProfile).mockResolvedValue({...profile,name:''} as any);
+    await expect(admin.start()).rejects.toThrow();
   });
   it('validates dates and does not silently activate unimplemented clinical questionnaires',()=>{
     expect(eventProfileInput.safeParse({...profile,endsOn:'2026-09-25'}).success).toBe(false);

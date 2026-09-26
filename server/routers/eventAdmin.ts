@@ -1,3 +1,4 @@
+import { listTracks } from "../eventTracksDb";
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, superAdminProcedure } from '../_core/trpc';
@@ -28,6 +29,12 @@ export const eventAdminRouter = router({
   }),
   setClosed: superAdminProcedure.input(z.object({closed:z.boolean()})).mutation(async({input})=>{
     await store.updateEventProfile({closed:Number(input.closed)});return {success:true};
+  }),
+  start: superAdminProcedure.mutation(async()=>{
+    const profile=await store.readEventProfile();
+    if(!eventProfileInput.safeParse(profile).success) throw new TRPCError({code:'BAD_REQUEST',message:'أكمل بيانات الفعالية وتواريخها وموقعها والجهة المنظمة واحفظها أولًا'});
+    if(!(await listTracks(true)).length) throw new TRPCError({code:'BAD_REQUEST',message:'فعّل مسارًا واحدًا على الأقل قبل بدء الفعالية'});
+    await store.updateEventProfile({closed:0});return {success:true};
   }),
   summary: superAdminProcedure.query(()=>store.eventReportSummary()),
   report: superAdminProcedure.input(z.object({after:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(50).default(50)}))

@@ -6,7 +6,9 @@ const assert=require('node:assert/strict');
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE,args:['--no-sandbox']}: {})});
  try {
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,acceptDownloads:true});
-  const page=await context.newPage();
+  await context.route('https://fonts.googleapis.com/**',r=>r.abort());
+  await context.route('https://fonts.gstatic.com/**',r=>r.abort());
+  const page=await context.newPage();page.setDefaultTimeout(15000);
   let profile={eventCode:'lim-events',name:'فعالية ليم',startsOn:null,endsOn:null,location:'',organizer:'',questionnaireIds:['lifestyle'],poster:null,closed:0};
   const counts={visits:2,participants:2,measured:1,nursing:1,approved:1,finished:1};
   const calls=[];
@@ -21,6 +23,7 @@ const assert=require('node:assert/strict');
     else if(name==='eventAdmin.save'){profile={...profile,...data};value={success:true};}
     else if(name==='eventAdmin.poster'){profile.poster=data.dataUrl;value={success:true};}
     else if(name==='eventAdmin.setClosed'){profile.closed=Number(data.closed);value={success:true};}
+    else if(name==='eventAdmin.start'){profile.closed=0;value={success:true};}
     else if(name==='eventAdmin.summary')value=counts;
     else if(name==='eventAdmin.report')value={records:[{code:'TEST-1',name:'بيانات تجريبية',phone:'0500000000',advice:'نصائح تجريبية',readings:[]}],nextCursor:null};
     return {result:{data:superjson.serialize(value)}};
@@ -60,6 +63,17 @@ const assert=require('node:assert/strict');
   const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'تنزيل جدول المشاركين CSV'}).click();
   const file=await downloaded;assert.equal(file.suggestedFilename(),'lim-event-report.csv');
   assert.ok(calls.includes('eventAdmin.report'));
+  await page.getByRole('button',{name:'بدء الفعالية',exact:true}).click();
+  await page.getByRole('link',{name:'فتح صفحة المستفيد',exact:true}).waitFor();
+  assert.equal(await page.getByRole('link',{name:'دخول الطبيب والتمريض',exact:true}).getAttribute('href'),'/events/team');
+  assert.ok(calls.includes('eventAdmin.start'));
+  console.log('PASS start event and large team entry');
+  page.on('console',m=>{if(m.type()==='error')console.log('BROWSER',m.text());});
+  const pdfDownload=page.waitForEvent('download',{timeout:30000});
+  await page.getByRole('button',{name:'تحميل الملخص للطباعة PDF',exact:true}).click();
+  const pdf=await pdfDownload.catch(async e=>{console.log('PDF ALERT',await page.getByRole('alert').allTextContents());console.log('PDF ERROR',await page.evaluate(async()=>{try{await (await import('/src/lib/eventPdf.ts')).downloadEventPdf(document.querySelector('#event-print-report'),'debug.pdf');return 'ok';}catch(e){return e.stack;}}));throw e;});await pdf.saveAs('/tmp/lim-summary-test.pdf');
+  assert.equal(require('node:fs').readFileSync('/tmp/lim-summary-test.pdf').subarray(0,4).toString(),'%PDF');
+  console.log('PASS real PDF generation and download');
   if(process.env.UI_SCREENSHOT)await page.screenshot({path:process.env.UI_SCREENSHOT,fullPage:true});
   console.log('PASS report CSV download');
  }finally{await browser.close();}
