@@ -99,6 +99,13 @@
       "when": 1790351468311,
       "tag": "0013_event_admin_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1790351468312,
+      "tag": "0014_event_otp",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { EventOtpVerification } from "@/components/EventOtpVerification";
 import EventPdfButton from "@/components/EventPdfButton";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -68,6 +69,9 @@ const phonePattern = /^((\+966)|(00966)|(966)|(0))5\d{8}$/;
  * in the shared LIM health backend.
  */
 export default function Events() {
+  const otpStatus = trpc.events.otpStatus.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const [otpChallenge, setOtpChallenge] = useState<{ token: string; phone: string } | null>(null);
+  const sendOtp = trpc.events.sendOtp.useMutation();
   const eventProfile = trpc.eventAdmin.publicProfile.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   // Track is an organizer concern: links may scope registration, never a participant choice.
   const trackParam = new URLSearchParams(window.location.search).get("track");
@@ -95,8 +99,13 @@ export default function Events() {
       setScreen("journey");
       toast.success("تم إنشاء جلستك الصحية");
     },
-    onError: (eventError) => setError(eventError.data?.code === "INTERNAL_SERVER_ERROR" ? "تعذر حفظ التسجيل حاليًا. حاول مرة أخرى، وإذا استمرت المشكلة تواصل مع منظم الفعالية. بياناتك ما زالت محفوظة في النموذج." : eventError.message),
+    onError: (eventError) => setError(otpChallenge && eventError.data?.code === "INTERNAL_SERVER_ERROR" ? "تعذر حفظ الجلسة بعد التحقق. بياناتك محفوظة؛ اطلب رمزًا جديدًا وأعد المحاولة." : eventError.data?.code === "INTERNAL_SERVER_ERROR" ? "تعذر حفظ التسجيل حاليًا. حاول مرة أخرى، وإذا استمرت المشكلة تواصل مع منظم الفعالية. بياناتك ما زالت محفوظة في النموذج." : eventError.message),
   });
+  const registerParticipant = (otpChallengeToken?: string) => {
+    if (!registration.sex) return;
+    setError("");
+    createSession.mutate({ firstName: registration.firstName.trim() || undefined, age: Number(registration.age), sex: registration.sex, phone: registration.phone, city: registration.city.trim() || undefined, consent: true, trackId, otpChallengeToken });
+  };
   const saveLifestyle = trpc.events.saveLifestyle.useMutation({
     onSuccess: () => {
       sessionQuery.refetch();
@@ -203,11 +212,16 @@ export default function Events() {
         <p>{eventProfile.data.location}{eventProfile.data.organizer && ` · ${eventProfile.data.organizer}`}</p>
         {eventProfile.data.startsOn && <p>{eventProfile.data.startsOn} — {eventProfile.data.endsOn}</p>}
       </section>}
-      {screen === "register" && eventProfile.data?.closed ? <p role="status" className="m-5 rounded-3xl bg-white p-6">انتهى التسجيل في هذه الفعالية. شكرًا لاهتمامك.</p> : screen === "register" && <RegistrationView form={registration} setForm={setRegistration} error={error} saving={createSession.isPending} onSubmit={() => {
-        if (!canRegister || !registration.sex) return;
+      {screen === "register" && eventProfile.data?.closed ? <p role="status" className="m-5 rounded-3xl bg-white p-6">انتهى التسجيل في هذه الفعالية. شكرًا لاهتمامك.</p> : screen === "register" && (otpChallenge ? <EventOtpVerification phone={otpChallenge.phone} initialToken={otpChallenge.token} saving={createSession.isPending} error={error} onVerified={registerParticipant} onBack={() => { setOtpChallenge(null); setError(""); }} /> : <>
+      {otpStatus.isError && <p role="alert" className="m-5">تعذر تحميل إعدادات التسجيل. <button className="underline" onClick={() => otpStatus.refetch()}>إعادة المحاولة</button></p>}
+      <RegistrationView form={registration} setForm={setRegistration} error={error} blocked={otpStatus.isError} saving={createSession.isPending || sendOtp.isPending || otpStatus.isLoading} onSubmit={async () => {
+        if (!canRegister || !registration.sex || !otpStatus.data || sendOtp.isPending) return;
         setError("");
-        createSession.mutate({ firstName: registration.firstName.trim() || undefined, age: Number(registration.age), sex: registration.sex, phone: registration.phone, city: registration.city.trim() || undefined, consent: true, trackId });
-      }} />}
+        if (!otpStatus.data.enabled) { registerParticipant(); return; }
+        const phone = registration.phone;
+        try { const sent = await sendOtp.mutateAsync({ phone }); setRegistration(current => ({ ...current, phone, phoneConfirm: phone })); setOtpChallenge({ token: sent.challengeToken, phone }); }
+        catch (e) { setError(e instanceof Error ? e.message : "تعذر إرسال رمز التحقق."); }
+      }} /></>)}
       {screen === "journey" && session && <JourneyView session={session} steps={journeySteps} completeCount={completedSteps} onOpen={(target, index) => {
         if (index <= completedSteps || (target === "queue" && completedSteps >= (lifestyleEnabled ? 2 : 1))) go(target);
       }} onReset={reset} />}
@@ -245,7 +259,7 @@ function LoadingShell() { return <main dir="rtl" className="grid min-h-screen pl
 
 function EventHeader({ onHome }: { onHome?: () => void }) { return <header className="sticky top-0 z-20 border-b border-[#d9e8e3] bg-white/95 px-5 py-4 backdrop-blur print:static"><div className="flex items-center justify-between"><button type="button" onClick={onHome} className="flex items-center gap-3 text-right"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dff33d] text-[#103d36] shadow-[0_8px_24px_rgba(191,211,36,.28)]"><HeartPulse className="h-7 w-7" strokeWidth={2.2} /></span><span><span className="block text-xl font-black leading-none">ليم <span className="tracking-wide">LIM</span></span><span className="mt-1 block text-sm text-[#64847d]">رحلتك الصحية في الفعالية</span></span></button><span className="rounded-full border border-[#d8e8e3] bg-[#f6faf8] px-3 py-1.5 text-xs font-bold text-[#52736c]">فعاليات LIM</span></div></header>; }
 
-function RegistrationView({ form, setForm, error, saving, onSubmit }: { form: Registration; setForm: React.Dispatch<React.SetStateAction<Registration>>; error: string; saving: boolean; onSubmit: () => void }) {
+function RegistrationView({ form, setForm, error, saving, blocked, onSubmit }: { blocked?: boolean; form: Registration; setForm: React.Dispatch<React.SetStateAction<Registration>>; error: string; saving: boolean; onSubmit: () => void }) {
   const update = <K extends keyof Registration>(key: K, value: Registration[K]) => setForm((current) => ({ ...current, [key]: value }));
   const phone = form.phone.replace(/\s/g, "");
   const valid = Number(form.age) >= 18 && Boolean(form.sex) && phonePattern.test(phone) && phone === form.phoneConfirm.replace(/\s/g, "") && form.consent;
@@ -258,7 +272,7 @@ function RegistrationView({ form, setForm, error, saving, onSubmit }: { form: Re
       <Field label="المدينة (اختياري)"><Input value={form.city} onChange={(event) => update("city", event.target.value)} /></Field>
       <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#f3f8f6] p-4"><Checkbox checked={form.consent} onCheckedChange={(value) => update("consent", value === true)} className="mt-1" /><span className="text-sm leading-6 text-[#45665f]">أوافق على استخدام بياناتي لإتمام التقييم وربط نتائج الفحص بهذه الجلسة وإتاحتها لفريق التمريض والطبيب المصرح لهم في هذه الفعالية وفق سياسة الخصوصية.</span></label>
       {error && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
-      <PrimaryButton disabled={!valid || saving}>{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <>إنشاء جلستي الصحية<ChevronLeft className="mr-2 h-5 w-5" /></>}</PrimaryButton>
+      <PrimaryButton disabled={!valid || saving || blocked}>{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <>إنشاء جلستي الصحية<ChevronLeft className="mr-2 h-5 w-5" /></>}</PrimaryButton>
     </form></section>;
 }
 

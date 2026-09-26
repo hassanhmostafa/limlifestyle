@@ -70,6 +70,16 @@ beforeEach(() => {
 });
 
 describe("standalone events.createSession", () => {
+  it("enforces OTP on the server before looking up or creating a participant", async () => {
+    vi.stubEnv("EVENTS_OTP_ENABLED", "true");
+    vi.stubEnv("AUTHENTICA_API_KEY", "test-only-key");
+    try {
+      await expect(appRouter.createCaller(anonymousContext).events.createSession({ age: 40, sex: "male", phone: "0501234567", consent: true })).rejects.toThrow("رمز التحقق");
+      expect(mockedDb.getUserByPhone).not.toHaveBeenCalled();
+      expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it("creates a browser-owned event session and returns the Saudi mobile QR value without main-app authentication", async () => {
     mockedDb.createEventParticipantSession.mockResolvedValue(eventSession);
     const caller = appRouter.createCaller(anonymousContext);

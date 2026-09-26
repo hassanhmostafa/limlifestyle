@@ -1,3 +1,4 @@
+import { otpEnabled, sendEventOtp, verifyEventOtp, consumeEventOtp } from "../eventOtp";
 import { requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
 import { listTracks, requireTrack, selectRegistrationTrack } from "../eventTracksDb";
@@ -58,6 +59,15 @@ async function requireEventSession(accessToken: string) {
  * reading in health_readings for both products to use.
  */
 export const eventsRouter = router({
+  otpStatus: publicProcedure.query(() => ({ enabled: otpEnabled() })),
+  sendOtp: publicProcedure.input(z.object({ phone: z.string().min(8).max(32) })).mutation(async ({ input, ctx }) => {
+    await requireOpenEvent();
+    return sendEventOtp(input.phone, ctx.req.ip || ctx.req.socket?.remoteAddress || "unknown");
+  }),
+  verifyOtp: publicProcedure.input(z.object({ phone: z.string().min(8).max(32), challengeToken: z.string().min(32).max(128), code: z.string().regex(/^\d{4,8}$/) })).mutation(async ({ input }) => {
+    await requireOpenEvent();
+    return verifyEventOtp(input.phone, input.challengeToken, input.code);
+  }),
   tracks: publicProcedure.query(async () => (await listTracks(true)).map(t => ({ id: t.id, name: t.name }))),
   createSession: publicProcedure
     .input(z.object({
@@ -67,6 +77,7 @@ export const eventsRouter = router({
       phone: z.string().trim().min(8).max(32),
       city: z.string().trim().max(128).optional(),
       consent: z.literal(true),
+      otpChallengeToken: z.string().min(32).max(128).optional(),
       trackId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ input }) => {
@@ -76,6 +87,8 @@ export const eventsRouter = router({
       if (!normalizedPhone.ok) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid Saudi mobile number." });
       }
+
+      await consumeEventOtp(normalizedPhone.e164, input.otpChallengeToken);
 
       // The event website is independent from main-app sign-in, but it still
       // allocates the same internal LIM participant record. A later main-app
