@@ -73,13 +73,14 @@ describe("database authorization predicates", () => {
       expect(q.sql).toContain("`event_staff`.`credentialVersion` + 1");
     expect(updates[1].params).toContain(0);
   });
-  it("requires explicit selection with multiple active tracks", async () => {
+  it("assigns generic registration to the first active track and rejects invalid explicit tracks", async () => {
     rows = [
       [1, "lim-events", "الأول", 1],
       [2, "lim-events", "الثاني", 1],
     ];
-    await expect(selectRegistrationTrack()).rejects.toThrow("اختر المسار");
+    expect((await selectRegistrationTrack()).id).toBe(1);
     rows = [];
+    await expect(selectRegistrationTrack()).rejects.toThrow("التسجيل غير متاح");
     await expect(selectRegistrationTrack(9)).rejects.toThrow("المسار غير متاح");
     expect(queries.at(-1)?.sql).toContain("`event_tracks`.`active` = ?");
   });
