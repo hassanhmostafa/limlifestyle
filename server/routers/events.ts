@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import { listTracks, requireTrack, selectRegistrationTrack } from "../eventTracksDb";
+import { readCare } from "../eventCareDb";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
@@ -55,6 +57,7 @@ async function requireEventSession(accessToken: string) {
  * reading in health_readings for both products to use.
  */
 export const eventsRouter = router({
+  tracks: publicProcedure.query(async () => (await listTracks(true)).map(t => ({ id: t.id, name: t.name }))),
   createSession: publicProcedure
     .input(z.object({
       firstName: z.string().trim().max(255).optional(),
@@ -63,8 +66,10 @@ export const eventsRouter = router({
       phone: z.string().trim().min(8).max(32),
       city: z.string().trim().max(128).optional(),
       consent: z.literal(true),
+      trackId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ input }) => {
+      const track = await selectRegistrationTrack(input.trackId);
       const normalizedPhone = normalizeSaudiMobilePhone(input.phone);
       if (!normalizedPhone.ok) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid Saudi mobile number." });
@@ -88,6 +93,7 @@ export const eventsRouter = router({
         accessTokenHash: tokenHash(accessToken),
         code: createEventCode(),
         eventCode: EVENT_CODE,
+        trackId: track.id,
         displayName: input.firstName || null,
         age: input.age,
         sex: input.sex,
@@ -98,6 +104,7 @@ export const eventsRouter = router({
       });
       if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the event session." });
 
+      await readCare(session.id);
       return {
         accessToken,
         session: {
@@ -118,8 +125,11 @@ export const eventsRouter = router({
   getSession: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
     const user = await getUserById(session.userId);
+    const track = session.trackId ? await requireTrack(session.trackId, false) : null;
     return {
       code: session.code,
+      trackId: session.trackId,
+      trackName: track?.name ?? null,
       firstName: session.displayName,
       age: session.age,
       sex: session.sex,
@@ -142,30 +152,32 @@ export const eventsRouter = router({
       return { success: true, answers: updated.answers ?? {} };
     }),
 
-  /** Marks the consultation as complete only after the current session has a result. */
-  completeConsultation: publicProcedure
-    .input(eventTokenInput)
-    .mutation(async ({ input }) => {
-      const session = await requireEventSession(input.accessToken);
-      if (!session.latestRecordNo) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "A body measurement is required before completing the consultation." });
-      }
-      const completedAt = session.consultationCompletedAt ?? new Date();
-      const updated = await updateEventParticipantSession(tokenHash(input.accessToken), {
-        consultationCompletedAt: completedAt,
-      });
-      if (!updated || updated.id !== session.id) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to complete the consultation." });
-      }
-      return { success: true, consultationCompletedAt: updated.consultationCompletedAt };
-    }),
+  // Retained for old clients; only the assigned doctor may approve via eventTeam.
+  completeConsultation: publicProcedure.input(eventTokenInput).mutation(() => {
+    throw new TRPCError({ code: "FORBIDDEN", message: "يعتمد الطبيب الاستشارة من صفحة الفريق" });
+  }),
+  care: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
+    const session = await requireEventSession(input.accessToken);
+    const care = await readCare(session.id);
+    return {
+      nursingEnabled: Boolean(care.nursingEnabled),
+      nursingCompletedAt: care.nursingCompletedAt,
+      approvedAt: care.approvedAt,
+      // Draft advice never leaves the staff workspace.
+      advice: care.approvedAt ? care.advice : null,
+      doctorName: care.approvedAt ? care.doctorName : null,
+      measurements: care.nursingCompletedAt ? care.measurements : {},
+      nurseNotes: care.nursingCompletedAt ? care.nurseNotes : null,
+    };
+  }),
 
   /** Marks the report as read after its consultation milestone is complete. */
   completeReport: publicProcedure
     .input(eventTokenInput)
     .mutation(async ({ input }) => {
       const session = await requireEventSession(input.accessToken);
-      if (!session.latestRecordNo || !session.consultationCompletedAt) {
+      const care = await readCare(session.id);
+      if (!session.latestRecordNo || !care.approvedAt) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Complete the consultation before finishing the report." });
       }
       const completedAt = session.reportCompletedAt ?? new Date();

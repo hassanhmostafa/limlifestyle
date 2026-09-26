@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import * as db from "./db";
+import * as tracks from "./eventTracksDb";
+vi.mock("./eventTracksDb", () => ({ selectRegistrationTrack: vi.fn(), requireTrack: vi.fn(), listTracks: vi.fn() }));
+import { readCare } from "./eventCareDb";
+vi.mock("./eventCareDb", () => ({ readCare: vi.fn() }));
 
 vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
@@ -30,6 +34,7 @@ const eventSession = {
   accessTokenHash: "a".repeat(64),
   code: "LIM-111111-42",
   eventCode: "lim-events",
+  trackId: 1,
   displayName: "Event Participant",
   age: 30,
   sex: "male" as const,
@@ -46,6 +51,8 @@ const eventSession = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(tracks.selectRegistrationTrack).mockResolvedValue({ id: 1, name: "المسار 1", eventCode: "lim-events", active: 1 });
+  vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, approvedAt: null } as never);
   mockedDb.getUserByPhone.mockResolvedValue({
     id: 42, openId: "phone:+966501234567", name: "Event Participant", phone: "+966501234567", email: null,
     loginMethod: "machine_phone_pending", passwordHash: null, role: "user", adminType: null, specialty: null, bio: null,
@@ -151,12 +158,9 @@ describe("standalone Events completion milestones", () => {
     });
 
     const caller = appRouter.createCaller(anonymousContext);
-    const consultation = await caller.events.completeConsultation({ accessToken: "z".repeat(43) });
-    expect(consultation.success).toBe(true);
-    expect(mockedDb.updateEventParticipantSession).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ consultationCompletedAt: expect.any(Date) }),
-    );
+    await expect(caller.events.completeConsultation({ accessToken: "z".repeat(43) })).rejects.toThrow("يعتمد الطبيب");
+    expect(mockedDb.updateEventParticipantSession).not.toHaveBeenCalled();
+    vi.mocked(readCare).mockResolvedValue({ approvedAt: consultationAt } as never);
 
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
       ...measuredSession,

@@ -3,9 +3,8 @@ import type { EventAnswers } from "./eventLifestyle";
 /**
  * Registration is step 1 and a saved lifestyle questionnaire is step 2.
  * Body analysis is complete only once the X18 upload is explicitly associated
- * with this exact event session. Consultation and the final report are
- * participant actions after the measurement, completed only when the
- * participant presses their respective final-action buttons.
+ * with this exact event session. Consultation completion is doctor-authorized; the final milestone records
+ * that the participant has read the approved report.
  */
 export function completedEventJourneySteps(
   hasSession: boolean,

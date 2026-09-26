@@ -78,6 +78,20 @@
       "when": 1790351468308,
       "tag": "0010_event_completion_milestones",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1790351468309,
+      "tag": "0011_event_care_cycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1790351468310,
+      "tag": "0012_event_tracks_staff_codes",
+      "breakpoints": true
     }
   ]
 }
