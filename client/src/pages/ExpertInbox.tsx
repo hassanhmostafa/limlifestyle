@@ -172,7 +172,7 @@ export default function ExpertInbox() {
                 {isAr ? "سجّل الدخول لعرض الرسائل" : "Sign in to view messages"}
               </h2>
               <a href="/login">
-                <Button className="bg-emerald-500 hover:bg-emerald-600">
+                <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                   {isAr ? "تسجيل الدخول" : "Sign In"}
                 </Button>
               </a>
@@ -201,7 +201,7 @@ export default function ExpertInbox() {
       <Navigation />
 
       <main className="flex-1 pt-20">
-        <section className="bg-gradient-to-r from-teal-700 to-teal-900 text-white py-8">
+        <section className="bg-gradient-to-r from-[#073f35] to-[#2d775d] text-white py-8">
           <div className="container">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
@@ -361,7 +361,7 @@ export default function ExpertInbox() {
                                 <div
                                   className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
                                     isMine
-                                      ? "bg-teal-600 text-white rounded-br-sm"
+                                      ? "bg-[#075847] text-white rounded-br-sm"
                                       : "bg-gray-100 text-gray-800 rounded-bl-sm"
                                   }`}
                                 >
@@ -375,7 +375,7 @@ export default function ExpertInbox() {
                                       rel="noopener noreferrer"
                                       className={`flex items-center gap-2 mt-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
                                         isMine
-                                          ? "bg-teal-500 hover:bg-teal-400 text-white"
+                                          ? "bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
                                           : "bg-white hover:bg-gray-50 text-teal-700 border border-gray-200"
                                       }`}
                                     >
@@ -441,7 +441,7 @@ export default function ExpertInbox() {
                             rows={1}
                           />
                           <Button
-                            className="bg-teal-600 hover:bg-teal-700 self-end"
+                            className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] self-end"
                             size="sm"
                             onClick={handleSend}
                             disabled={(!messageText.trim() && !pendingFile) || isSending}

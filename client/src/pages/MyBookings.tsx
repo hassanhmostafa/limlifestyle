@@ -96,7 +96,7 @@ export default function MyBookings() {
                 : "You need to be signed in to view your bookings."}
             </p>
             <a href="/login">
-              <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                 {isAr ? "تسجيل الدخول" : "Sign In"}
               </Button>
             </a>

@@ -330,13 +330,13 @@ function BmiComparisonCard({ bmiData, bmiLoading }: { bmiData: BmiDataState; bmi
       <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden mb-1">
         <div className="absolute top-0 h-full bg-green-200 rounded-full"
           style={{ left: `${healthyMinPct}%`, width: `${healthyMaxPct - healthyMinPct}%` }} />
-        <div className="absolute top-0 h-full w-1 bg-emerald-500" style={{ left: `${idealPct}%` }} />
+        <div className="absolute top-0 h-full w-1 bg-[#075847]" style={{ left: `${idealPct}%` }} />
         <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white shadow"
           style={{ left: `calc(${actualPct}% - 8px)`, backgroundColor: classColor }} />
       </div>
       <div className="flex justify-between text-xs text-gray-400 mt-1">
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-green-200"></span> Healthy zone</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-1 h-3 bg-emerald-500"></span> Ideal</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-1 h-3 bg-[#075847]"></span> Ideal</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-gray-400"></span> Your BMI</span>
       </div>
 
@@ -404,7 +404,7 @@ function MetricChartCard({ title, chartId, weekData, monthData, yearData, render
               key={r}
               onClick={() => setRange(r)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                range === r ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                range === r ? "bg-[#dff45a] text-[#073f35]" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}
             >
               {r === "1W" ? "Weekly" : r === "1M" ? "Monthly" : "Yearly"}
@@ -796,7 +796,7 @@ export default function HealthDashboard() {
             <h1 className="text-2xl font-bold mb-2">{t.health_title}</h1>
             <p className="text-gray-600 mb-6">{t.health_signInPrompt}</p>
             <a href="/login">
-              <Button className="bg-emerald-500 hover:bg-emerald-600">
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                 <LogIn className="w-4 h-4 mr-2" />
                 {t.health_signInBtn}
               </Button>
@@ -897,7 +897,7 @@ export default function HealthDashboard() {
               { key: "weight",        label: "Weight",         color: "#87bd37" },
               { key: "bmi",           label: "BMI",            color: "#8b5cf6" },
               { key: "temperature",   label: "Temperature",    color: "#f97316" },
-              { key: "healthScore",   label: "Health Score",   color: "#10b981" },
+              { key: "healthScore",   label: "Health Score",   color: "#075847" },
             ] as const).map(({ key, label, color }) => (
               <button
                 key={key}
@@ -1066,7 +1066,7 @@ export default function HealthDashboard() {
             {/* Health Score */}
             {visibleCharts.healthScore && <MetricChartCard
               title="Health Score"
-              color="#10b981"
+              color="#075847"
               chartId="chart-score"
               weekData={weekData}
               monthData={monthData}
@@ -1076,8 +1076,8 @@ export default function HealthDashboard() {
                   <AreaChart data={data}>
                     <defs>
                       <linearGradient id="gradScore" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.18} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#075847" stopOpacity={0.18} />
+                        <stop offset="95%" stopColor="#075847" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1085,7 +1085,7 @@ export default function HealthDashboard() {
                     <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
                     <Tooltip />
                     <Legend />
-                    <Area type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2} fill="url(#gradScore)" dot={false} name="Health Score" />
+                    <Area type="monotone" dataKey="score" stroke="#075847" strokeWidth={2} fill="url(#gradScore)" dot={false} name="Health Score" />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -1157,11 +1157,11 @@ export default function HealthDashboard() {
               { id: "pdf-chart-score", title: "Health Score", renderChart: (d: object[]) => (
                 <ResponsiveContainer width={560} height={180}>
                   <AreaChart data={d}>
-                    <defs><linearGradient id="pdfGradScore" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.18}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient></defs>
+                    <defs><linearGradient id="pdfGradScore" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#075847" stopOpacity={0.18}/><stop offset="95%" stopColor="#075847" stopOpacity={0}/></linearGradient></defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
                     <XAxis dataKey="date" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}} domain={[0,100]}/>
                     <Tooltip/><Legend/>
-                    <Area type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2} fill="url(#pdfGradScore)" dot={false} name="Health Score"/>
+                    <Area type="monotone" dataKey="score" stroke="#075847" strokeWidth={2} fill="url(#pdfGradScore)" dot={false} name="Health Score"/>
                   </AreaChart>
                 </ResponsiveContainer>
               )},
@@ -1185,7 +1185,7 @@ export default function HealthDashboard() {
               <Card className="p-10 border-0 shadow-sm text-center">
                 <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 mb-4">{t.health_noReadings}</p>
-                <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={() => setShowLog(true)}>
+                <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]" onClick={() => setShowLog(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   {t.health_logReading}
                 </Button>
@@ -1304,7 +1304,7 @@ export default function HealthDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowLog(false); setForm(emptyForm); }}>Cancel</Button>
-            <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={handleSubmit} disabled={logMutation.isPending || !form.kioskId}>
+            <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]" onClick={handleSubmit} disabled={logMutation.isPending || !form.kioskId}>
               {logMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Save Reading
             </Button>

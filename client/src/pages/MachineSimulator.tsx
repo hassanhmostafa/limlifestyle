@@ -255,7 +255,7 @@ export default function MachineSimulator() {
           <CardContent className="pt-8 pb-8 text-center space-y-4">
             <p className="text-gray-600">You must be signed in to use the machine simulator.</p>
             <a href={getLoginUrl()}>
-              <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">Sign In</Button>
+              <Button className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">Sign In</Button>
             </a>
           </CardContent>
         </Card>
@@ -286,7 +286,7 @@ export default function MachineSimulator() {
             </div>
             <Button
               onClick={() => setState("scanning")}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-lg py-6"
+              className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] text-lg py-6"
             >
               Touch to Start Session
             </Button>
@@ -339,7 +339,7 @@ export default function MachineSimulator() {
                   Stop Camera
                 </Button>
               ) : (
-                <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-12 text-base" onClick={startScanner}>
+                <Button className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] h-12 text-base" onClick={startScanner}>
                   <Camera className="w-5 h-5 mr-2" />
                   Activate Camera to Scan
                 </Button>
@@ -420,7 +420,7 @@ export default function MachineSimulator() {
                      ))}
                    </div>
                    <Link href="/health" className="block">
-                     <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
+                     <Button className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                        View in My Health
                      </Button>
                    </Link>
@@ -497,7 +497,7 @@ export default function MachineSimulator() {
                 </div>
               ) : (
                 <Button
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-12 text-base"
+                  className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] h-12 text-base"
                   onClick={() => guestMeasurementMutation.mutate()}
                   disabled={guestMeasurementMutation.isPending}
                 >

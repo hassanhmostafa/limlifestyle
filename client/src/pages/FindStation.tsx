@@ -57,7 +57,7 @@ export default function FindStation() {
 
       <main className="flex-1 pt-20">
         {/* Header */}
-        <section className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-12">
+        <section className="bg-gradient-to-r from-[#073f35] to-[#2d775d] text-white py-12">
           <div className="container flex items-end justify-between">
             <div>
               <h1 className="text-4xl font-bold mb-2">{t.findStation_title}</h1>
@@ -80,7 +80,7 @@ export default function FindStation() {
                   className="pl-10"
                 />
               </div>
-              <Button className="bg-emerald-500 hover:bg-emerald-600">{t.home_searchBtn}</Button>
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">{t.home_searchBtn}</Button>
             </div>
           </div>
         </section>
@@ -157,7 +157,7 @@ export default function FindStation() {
                         )}
 
                         <Link href={`/station/${kiosk.id}`}>
-                          <Button size="sm" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
+                          <Button size="sm" className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                             {t.findStation_viewDetails}
                           </Button>
                         </Link>

@@ -66,7 +66,7 @@ export default function ExpertRegistration() {
                   : "You need to be signed in to apply as a health expert."}
               </p>
               <a href="/login">
-                <Button className="bg-emerald-500 hover:bg-emerald-600">
+                <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                   {isAr ? "تسجيل الدخول" : "Sign In"}
                 </Button>
               </a>
@@ -95,7 +95,7 @@ export default function ExpertRegistration() {
                   : "Your expert profile is active. Go to your inbox to chat with users."}
               </p>
               <Link href="/expert-inbox">
-                <Button className="bg-emerald-500 hover:bg-emerald-600">
+                <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                   {isAr ? "الذهاب إلى صندوق الوارد" : "Go to Expert Inbox"}
                 </Button>
               </Link>
@@ -252,7 +252,7 @@ export default function ExpertRegistration() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-emerald-500 hover:bg-emerald-600"
+                  className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
                   disabled={submitMutation.isPending}
                 >
                   {submitMutation.isPending

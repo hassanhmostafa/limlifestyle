@@ -210,7 +210,7 @@ export default function KioskLogin() {
           {/* Header */}
           <div className="text-center mb-2">
             <div className="inline-flex items-center gap-2 mb-2">
-              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-[#dff45a] rounded-xl flex items-center justify-center">
                 <Heart className="w-5 h-5 text-white" />
               </div>
               <span className="text-2xl font-bold text-gray-900">LIM</span>
@@ -296,7 +296,7 @@ export default function KioskLogin() {
                     </Button>
                   ) : (
                     <Button
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-11 text-base font-medium"
+                      className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] h-11 text-base font-medium"
                       onClick={startScanner}
                     >
                       <Camera className="w-4 h-4 mr-2" />
@@ -337,7 +337,7 @@ export default function KioskLogin() {
 
                   <Button
                     type="submit"
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-11 text-base font-medium"
+                    className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] h-11 text-base font-medium"
                     disabled={!manualDeviceId || createSessionMutation.isPending}
                   >
                     {createSessionMutation.isPending ? (
@@ -360,7 +360,7 @@ export default function KioskLogin() {
                   isAr ? "أجرِ القياسات — ستظهر النتائج تلقائياً في التطبيق" : "Complete measurements — results appear automatically in the app",
                 ].map((step, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-5 h-5 rounded-full bg-[#dff45a] text-[#073f35] text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
                       {i + 1}
                     </div>
                     <p className="text-sm text-gray-600">{step}</p>
@@ -413,7 +413,7 @@ export default function KioskLogin() {
                 </ol>
               </div>
               <Button
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+                className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
                 onClick={() => navigate("/health")}
               >
                 {isAr ? "الذهاب إلى لوحة الصحة" : "Go to Health Dashboard"}
@@ -465,7 +465,7 @@ export default function KioskLogin() {
         {/* Header */}
         <div className="text-center mb-2">
           <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-[#dff45a] rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5 text-white" />
             </div>
             <span className="text-2xl font-bold text-gray-900">LIM</span>
@@ -491,7 +491,7 @@ export default function KioskLogin() {
             {/* User info card */}
             {user && (
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
-                <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-[#075847] rounded-full flex items-center justify-center flex-shrink-0">
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div className="min-w-0">
@@ -519,7 +519,7 @@ export default function KioskLogin() {
 
             {/* Confirm button */}
             <Button
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-11 text-base font-medium"
+              className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] h-11 text-base font-medium"
               onClick={handleConfirm}
               disabled={confirmMutation.isPending}
             >

@@ -359,7 +359,7 @@ export default function Admin() {
             <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
             <p className="text-gray-600 mb-6">This page is restricted to administrators only.</p>
             <Link href="/">
-              <Button className="bg-emerald-500 hover:bg-emerald-600">Go Home</Button>
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">Go Home</Button>
             </Link>
           </div>
         </main>
@@ -594,7 +594,7 @@ export default function Admin() {
                               <div className="flex gap-2 shrink-0">
                                 <Button
                                   size="sm"
-                                  className="bg-green-500 hover:bg-green-600 text-white"
+                                  className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
                                   onClick={() => approveExpertMutation.mutate({ requestId: req.id })}
                                   disabled={approveExpertMutation.isPending || rejectExpertMutation.isPending}
                                 >
@@ -862,7 +862,7 @@ export default function Admin() {
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseForm}>Cancel</Button>
             <Button
-              className="bg-emerald-500 hover:bg-emerald-600"
+              className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
               onClick={handleSubmit}
               disabled={isBusy || !formData.name || !formData.address || !formData.latitude || !formData.longitude}
             >

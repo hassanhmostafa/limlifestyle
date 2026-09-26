@@ -34,6 +34,7 @@
 - [x] Add persisted, explicit Events milestones: **التقرير النهائي** completes the consultation and opens the report; **إنهاء الرحلة** completes the report and marks all five journey steps finished.
 - [x] Rebrand the main LIM experience from light blue to the Events forest, lime, ivory, and coral visual system; replace the detached My Health body silhouette and five metric cards with the same shared, responsive professional muscle/fat anatomy board used in Events. The trunk leader and dot share one endpoint and land above the navel.
 - [x] Make the My Health hero actions phone-safe: on narrow screens **Download Report** and **Log Reading** stack at full width within the hero, preventing horizontal overflow, Safari page zoom-out, and clipped button edges.
+- [x] Standardize primary controls and hero gradients across the main LIM app on the Events palette: lime primary calls to action with forest text, and deep forest supporting actions/panels. Remove the saturated turquoise green used by the previous light-blue-to-emerald conversion.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.

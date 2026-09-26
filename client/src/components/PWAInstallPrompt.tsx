@@ -97,7 +97,7 @@ export function IOSInstallModal({ onClose }: { onClose: () => void }) {
           </li>
         </ol>
         <Button
-          className="w-full mt-5 bg-emerald-500 hover:bg-emerald-600 text-white"
+          className="w-full mt-5 bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
           onClick={onClose}
         >
           Got it
@@ -155,7 +155,7 @@ export default function PWAInstallPrompt() {
               <Button
                 size="sm"
                 onClick={handleInstall}
-                className="mt-2 h-7 text-xs bg-emerald-500 hover:bg-emerald-600 text-white gap-1"
+                className="mt-2 h-7 text-xs bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] gap-1"
               >
                 {isIOS ? <Share className="w-3 h-3" /> : <Download className="w-3 h-3" />}
                 {isIOS ? "How to install" : "Install"}

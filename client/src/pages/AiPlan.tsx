@@ -33,7 +33,7 @@ const planOptions: { type: PlanType; icon: React.ReactNode; label: string; label
     labelAr: "خطة صحية",
     desc: "Exercise routines, lifestyle habits, sleep & stress management tailored to your vitals.",
     descAr: "تمارين رياضية وعادات صحية وإدارة النوم والتوتر مخصصة لمؤشراتك الصحية.",
-    color: "from-emerald-500 to-emerald-600",
+    color: "from-[#073f35] to-[#2d775d]",
   },
   {
     type: "diet",
@@ -42,7 +42,7 @@ const planOptions: { type: PlanType; icon: React.ReactNode; label: string; label
     labelAr: "خطة غذائية",
     desc: "7-day meal plan with Saudi-friendly foods, portion sizes, and hydration goals.",
     descAr: "خطة وجبات لمدة 7 أيام بأطعمة سعودية مناسبة وأحجام حصص وأهداف ترطيب.",
-    color: "from-emerald-500 to-teal-600",
+    color: "from-[#073f35] to-[#2d775d]",
   },
   {
     type: "combined",
@@ -183,7 +183,7 @@ export default function AiPlan() {
                 : "Please sign in to access your AI-powered personalized health and diet plans."}
             </p>
             <Button
-              className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white"
+              className="bg-gradient-to-r from-[#073f35] to-[#2d775d] text-white"
               onClick={() => (window.location.href = "/login")}
             >
               {isAr ? "تسجيل الدخول" : "Sign In"}
@@ -240,7 +240,7 @@ export default function AiPlan() {
                   {isAr ? option.descAr : option.desc}
                 </div>
                 {selectedType === option.type && (
-                  <div className="absolute top-3 right-3 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                  <div className="absolute top-3 right-3 w-5 h-5 bg-[#075847] rounded-full flex items-center justify-center">
                     <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>

@@ -208,7 +208,7 @@ export function BodyCompositionReport({ readings, language }: { readings: Dashbo
   return (
     <section className="space-y-6" dir={language === "ar" ? "rtl" : "ltr"}>
       <Card className="overflow-hidden border-0 shadow-md">
-        <div className="bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-700 p-5 text-white sm:p-7">
+        <div className="bg-gradient-to-br from-[#073f35] via-[#075847] to-[#2d775d] p-5 text-white sm:p-7">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
             <div>
               <div className="mb-2 flex items-center gap-2 text-emerald-100"><Sparkles className="h-4 w-4"/><span className="text-xs font-semibold uppercase tracking-[0.16em]">{language === "ar" ? "بيانات توضيحية من جهاز X18" : "X18 measurement report"}</span></div>

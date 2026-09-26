@@ -144,7 +144,7 @@ export function KioskDevicesTab() {
           </h2>
           <div className="flex flex-wrap justify-end gap-2">
             <Button
-              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
               onClick={openAdd}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -303,7 +303,7 @@ export function KioskDevicesTab() {
               Cancel
             </Button>
             <Button
-              className="bg-emerald-500 hover:bg-emerald-600"
+              className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
               onClick={handleSubmit}
               disabled={isBusy || (!editingId && !form.deviceId.trim())}
             >
@@ -333,7 +333,7 @@ export function KioskDevicesTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIssuedCredential(null)}>I copied it</Button>
-            <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={copyCredential}>
+            <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]" onClick={copyCredential}>
               <Copy className="w-4 h-4 mr-2" /> Copy Key
             </Button>
           </DialogFooter>

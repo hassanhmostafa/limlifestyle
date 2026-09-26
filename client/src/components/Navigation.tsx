@@ -171,7 +171,7 @@ export default function Navigation() {
                 </Button>
               </Link>
               <Link href="/login">
-                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">{t.nav_getStarted}</Button>
+                <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">{t.nav_getStarted}</Button>
               </Link>
             </>
           )}
@@ -293,7 +293,7 @@ export default function Navigation() {
                     <Button variant="ghost" className="w-full">{t.nav_signIn}</Button>
                   </Link>
                   <Link href="/login" className="flex-1">
-                    <Button className="w-full bg-emerald-500 hover:bg-emerald-600">{t.nav_getStarted}</Button>
+                    <Button className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">{t.nav_getStarted}</Button>
                   </Link>
                 </>
               )}

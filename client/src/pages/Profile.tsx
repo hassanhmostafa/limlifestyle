@@ -73,7 +73,7 @@ export default function Profile() {
               {isAr ? "سجّل الدخول لإدارة ملفك الشخصي" : "Sign in to manage your profile"}
             </h2>
             <a href="/login">
-              <Button className="bg-emerald-500 hover:bg-emerald-600">
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                 {isAr ? "تسجيل الدخول" : "Sign In"}
               </Button>
             </a>
@@ -245,7 +245,7 @@ export default function Profile() {
             <Button
               onClick={handleSave}
               disabled={updateProfile.isPending}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
             >
               <Save className="w-4 h-4 mr-2" />
               {updateProfile.isPending

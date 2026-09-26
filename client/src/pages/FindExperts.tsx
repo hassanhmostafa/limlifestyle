@@ -69,7 +69,7 @@ export default function FindExperts() {
                   : "You need to be signed in to browse and message health experts."}
               </p>
               <a href="/login">
-                <Button className="bg-emerald-500 hover:bg-emerald-600">
+                <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">
                   {isAr ? "تسجيل الدخول" : "Sign In"}
                 </Button>
               </a>
@@ -86,7 +86,7 @@ export default function FindExperts() {
 
       <main className="flex-1 pt-20">
         {/* Header */}
-        <section className="bg-gradient-to-r from-teal-700 to-teal-900 text-white py-12">
+        <section className="bg-gradient-to-r from-[#073f35] to-[#2d775d] text-white py-12">
           <div className="container max-w-4xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
@@ -163,7 +163,7 @@ export default function FindExperts() {
                           )}
                           <Button
                             size="sm"
-                            className="bg-teal-600 hover:bg-teal-700 text-white"
+                            className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
                             onClick={() => startConversation.mutate({ expertId: expert.id })}
                             disabled={startConversation.isPending || user?.id === expert.id}
                           >

@@ -34,7 +34,7 @@ export default function Home() {
         <div className="relative z-10 container max-w-4xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div className="text-white space-y-6">
-              <div className="inline-block bg-emerald-500/20 border border-emerald-400/50 rounded-full px-4 py-2 text-sm font-medium text-emerald-300">
+              <div className="inline-block bg-[#dff45a]/20 border border-emerald-400/50 rounded-full px-4 py-2 text-sm font-medium text-emerald-300">
                 {t.hero_badge}
               </div>
 
@@ -48,7 +48,7 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link href="/find-station">
-                  <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 text-white w-full sm:w-auto">
+                  <Button size="lg" className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] w-full sm:w-auto">
                     <MapPin className="w-4 h-4 mr-2" />
                     {t.hero_findStation}
                   </Button>
@@ -96,7 +96,7 @@ export default function Home() {
 
           <div className="flex gap-2">
             <Input placeholder={t.home_searchPlaceholder} className="flex-1" />
-            <Button className="bg-emerald-500 hover:bg-emerald-600">{t.home_searchBtn}</Button>
+            <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">{t.home_searchBtn}</Button>
           </div>
         </div>
       </section>
@@ -204,7 +204,7 @@ export default function Home() {
             backgroundPosition: "center",
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/80 to-emerald-900/80"></div>
+          <div className="absolute inset-0 bg-[rgba(7,63,53,0.80)]"></div>
         </div>
         <div className="relative z-10 container text-center text-white">
           <h2 className="text-4xl font-bold mb-6">{t.home_ctaTitle}</h2>

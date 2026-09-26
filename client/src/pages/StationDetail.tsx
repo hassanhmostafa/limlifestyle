@@ -108,7 +108,7 @@ export default function StationDetail() {
             <h1 className="text-2xl font-bold mb-2">{isAr ? "المحطة غير موجودة" : "Station Not Found"}</h1>
             <p className="text-gray-600 mb-4">{isAr ? "المحطة التي تبحث عنها غير موجودة." : "The station you are looking for does not exist."}</p>
             <Link href="/find-station">
-              <Button className="bg-emerald-500 hover:bg-emerald-600">{isAr ? "العودة إلى المحطات" : "Back to Stations"}</Button>
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]">{isAr ? "العودة إلى المحطات" : "Back to Stations"}</Button>
             </Link>
           </div>
         </main>
@@ -138,7 +138,7 @@ export default function StationDetail() {
 
       <main className="flex-1 pt-20">
         {/* Header */}
-        <section className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-8">
+        <section className="bg-gradient-to-r from-[#073f35] to-[#2d775d] text-white py-8">
           <div className="container">
             <Link href="/find-station">
               <Button variant="ghost" className="text-white hover:bg-white/20 mb-4">
@@ -269,7 +269,7 @@ export default function StationDetail() {
 
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <Button
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white mb-3"
+                      className="w-full bg-[#dff45a] text-[#073f35] hover:bg-[#cde944] mb-3"
                       onClick={handleOpenBooking}
                     >
                       <CalendarDays className="w-4 h-4 mr-2" />
@@ -324,7 +324,7 @@ export default function StationDetail() {
         </section>
 
         {/* CTA */}
-        <section className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-12 mt-12">
+        <section className="bg-gradient-to-r from-[#073f35] to-[#2d775d] text-white py-12 mt-12">
           <div className="container text-center">
             <h2 className="text-3xl font-bold mb-4">{isAr ? "هل أنت مستعد لفحصك الصحي؟" : "Ready for Your Health Screening?"}</h2>
             <p className="text-emerald-50 mb-6 max-w-2xl mx-auto">
@@ -378,7 +378,7 @@ export default function StationDetail() {
                   : <>Your screening slot at <span className="font-semibold">{kiosk.name}</span> has been booked for{" "}<span className="font-semibold">{selectedDate}</span> at{" "}<span className="font-semibold">{selectedSlot}</span>.</>}
               </p>
               <p className="text-sm text-gray-500">{isAr ? "يمكنك عرض حجوزاتك في ملفك الشخصي." : "You can view your bookings in your profile."}</p>
-              <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={handleCloseBooking}>
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]" onClick={handleCloseBooking}>
                 {isAr ? "تم" : "Done"}
               </Button>
             </div>
@@ -429,7 +429,7 @@ export default function StationDetail() {
                             onClick={() => setSelectedSlot(slot)}
                             className={`px-2 py-2 text-xs font-medium rounded-md border transition-colors ${
                               selectedSlot === slot
-                                ? "bg-emerald-500 text-white border-emerald-500"
+                                ? "bg-[#dff45a] text-[#073f35] border-emerald-500"
                                 : "bg-white text-gray-700 border-gray-200 hover:border-emerald-400 hover:text-emerald-600"
                             }`}
                           >
@@ -469,7 +469,7 @@ export default function StationDetail() {
               <DialogFooter>
                 <Button variant="outline" onClick={handleCloseBooking}>{isAr ? "إلغاء" : "Cancel"}</Button>
                 <Button
-                  className="bg-emerald-500 hover:bg-emerald-600"
+                  className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]"
                   onClick={handleBook}
                   disabled={!selectedDate || !selectedSlot || bookMutation.isPending}
                 >
