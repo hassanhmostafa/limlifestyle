@@ -1,5 +1,18 @@
 import { int, mysqlEnum, mysqlTable, mediumtext, text, timestamp, varchar, decimal, json, date, uniqueIndex } from "drizzle-orm/mysql-core";
 
+export const eventOtpChallenges = mysqlTable("event_otp_challenges", {
+  phoneHash: varchar("phoneHash", { length: 64 }).primaryKey(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  attempts: int("attempts").notNull().default(0),
+  state: varchar("state", { length: 16 }).notNull(),
+});
+export const eventOtpLimits = mysqlTable("event_otp_limits", {
+  bucket: varchar("bucket", { length: 64 }).primaryKey(),
+  count: int("count").notNull().default(0),
+  lastAt: timestamp("lastAt").notNull(),
+});
+
 export const eventProfiles = mysqlTable("event_profiles", {
   eventCode: varchar("eventCode", { length: 64 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull().default("فعالية ليم"),

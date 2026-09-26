@@ -18,6 +18,7 @@ const superjson = require('superjson');
         const responses = names.map((name, i) => {
           let data = null;
           if(name==='events.tracks') { tracksRequests++; throw new Error('Registration must not request track list'); }
+          if(name==='events.otpStatus') data={enabled:false};
           if(name==='events.createSession') {
             attempts++; sent=superjson.deserialize(body[i]);
             if(scenario==='retry' && attempts===1) return {error:{json:{message:'Failed query: synthetic DB failure',code:-32603,data:{code:'INTERNAL_SERVER_ERROR',httpStatus:500,path:name}}}};
