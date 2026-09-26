@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import EventPdfButton from "@/components/EventPdfButton";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Activity,
@@ -231,10 +232,10 @@ export default function Events() {
         }
       }} />}
       {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { careQuery.refetch(); sessionQuery.refetch(); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>متابعة إلى الطبيب</PrimaryButton>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
-      {screen === "report" && session && (care?.approvedAt ? <>
+      {screen === "report" && session && (care?.approvedAt ? <div data-final-report data-pdf-report>
         <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">نصائح الطبيب</h2><p className="whitespace-pre-wrap rounded-2xl bg-white p-5">{care.advice}</p><p className="text-sm">اعتمدها: {care.doctorName}</p>{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
         <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} />
-      </> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
+      </div> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
     </div>
   </main>;
@@ -270,6 +271,10 @@ function JourneyView({ session, steps, completeCount, onOpen, onReset }: { sessi
 }
 
 function LifestyleView({ answers, sectionIndex, setSectionIndex, onBack, onSave, saving }: { answers: EventAnswers; sectionIndex: number; setSectionIndex: React.Dispatch<React.SetStateAction<number>>; onBack: () => void; onSave: () => void; saving: boolean }) {
+  useLayoutEffect(() => {
+    // Both next and previous sections start at the top, before the browser paints.
+    window.scrollTo({top:0,left:0,behavior:'instant'});
+  }, [sectionIndex]);
   const section = eventLifestyleSections[sectionIndex];
   const complete = section.questions.every((question) => question.type === "multi" ? Array.isArray(answers[question.id]) : answers[question.id] !== undefined && answers[question.id] !== "");
   const priorities = [answers.priority1, answers.priority2, answers.priority3];
@@ -314,7 +319,7 @@ function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, on
         It prevents the report's extra padded card from reflowing the anatomy stage. */}
     {readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}
     <p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p>
-    <Button type="button" onClick={() => window.print()} className="mt-5 h-13 w-full rounded-2xl bg-[#197f6f] font-bold print:hidden">طباعة التقرير</Button>
+    <div className="mt-5"><EventPdfButton filename={`lim-final-${session.code}.pdf`} className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white" /></div>
     <PrimaryButton disabled={finishing || Boolean(session.reportCompletedAt)} onClick={onFinish} className="mt-4 print:hidden">{finishing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />}{session.reportCompletedAt ? "اكتملت الرحلة" : "إنهاء الرحلة"}</PrimaryButton>
   </section>;
 }

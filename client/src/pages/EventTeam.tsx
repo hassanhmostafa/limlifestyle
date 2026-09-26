@@ -1,3 +1,4 @@
+import EventLifestyleCharts from "@/components/EventLifestyleCharts";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { nursingCatalog } from "@shared/eventNursing";
@@ -385,6 +386,7 @@ export default function EventTeam() {
                         }}
                       />
                     )}
+                    <EventLifestyleCharts answers={record.data?.answers ?? {}} />
                     <details className="rounded-2xl bg-white p-5">
                       <summary className="font-bold">
                         إجابات استبيان نمط الحياة

@@ -1,3 +1,4 @@
+import EventPdfButton from "@/components/EventPdfButton";
 import { eventReportCsv } from "@shared/eventReport";
 import { useEffect, useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc';
@@ -69,13 +70,13 @@ export default function EventAdminPanel(){
       <p>الإغلاق يوقف التسجيل الجديد. يستكمل المشاركون المسجلون زياراتهم وتبقى التقارير متاحة، دون حذف أي بيانات.</p>
       {confirmClose?<div className="space-y-3 rounded-2xl bg-amber-50 p-4"><p>هل تريد إغلاق التسجيل الجديد الآن؟</p><button type="button" className={button} disabled={close.isPending} onClick={()=>close.mutate({closed:true})}>تأكيد الإغلاق</button><button type="button" className="mx-4 underline" onClick={()=>setConfirmClose(false)}>إلغاء</button></div>:<button type="button" className={button} disabled={close.isPending} onClick={()=>profile.data?.closed?close.mutate({closed:false}):setConfirmClose(true)}>{profile.data?.closed?'إعادة فتح التسجيل':'إغلاق الفعالية'}</button>}
     </section>
-    <section id="event-print-report" className={card}>
+    <section data-pdf-report id="event-print-report" className={card}>
       <style>{`@media print { body * { visibility: hidden; } #event-print-report, #event-print-report * { visibility: visible; } #event-print-report { position:absolute; inset:0; margin:0; } #event-print-report button { display:none; } }`}</style>
       <h2 className="flex items-center gap-2 text-xl font-bold"><FileDown/>تقرير الفعالية</h2>
       <p className="text-lg font-bold">{profile.data?.name}</p><p>{profile.data?.startsOn} — {profile.data?.endsOn}</p><p>{profile.data?.organizer} · {profile.data?.location}</p>
       {summary.error?<p role="alert">تعذر تحميل الإحصاءات</p>:<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{([['participants','المشاركون الفريدون'],['visits','الزيارات'],['measured','نتائج الجهاز'],['nursing','اكتمل التمريض'],['approved','تقارير اعتمدها الطبيب'],['finished','رحلات مكتملة']] as const).map(([key,title])=><div key={key} className="rounded-2xl bg-[#f3f8f6] p-4"><p className="text-sm">{title}</p><strong className="text-3xl">{summary.data?.[key]??'—'}</strong></div>)}</div>}
       <p className="text-sm text-slate-600">الملف التفصيلي مخصص للأدمن ويحتوي بيانات المشاركين واستبياناتهم ونتائج الجهاز والقياسات والنصائح المعتمدة.</p>
-      <div className="flex flex-wrap gap-3"><button type="button" className={button} onClick={()=>summary.refetch()}>تحديث الإحصاءات</button><button type="button" className={button} disabled={exporting||!summary.data} onClick={()=>void exportReport("json")}>{exporting?'جارٍ التنزيل…':'تنزيل التقرير التفصيلي JSON'}</button><button type="button" className={button} onClick={()=>window.print()}>طباعة الملخص / PDF</button><button type="button" className={button} disabled={exporting||!summary.data} onClick={()=>void exportReport("csv")}>تنزيل جدول المشاركين CSV</button></div>
+      <div data-pdf-hide className="flex flex-wrap gap-3"><button type="button" className={button} onClick={()=>summary.refetch()}>تحديث الإحصاءات</button><button type="button" className={button} disabled={exporting||!summary.data} onClick={()=>void exportReport("json")}>{exporting?'جارٍ التنزيل…':'تنزيل التقرير التفصيلي JSON'}</button><EventPdfButton className={button} label="تحميل الملخص للطباعة PDF" filename="lim-event-summary.pdf" /><button type="button" className={button} disabled={exporting||!summary.data} onClick={()=>void exportReport("csv")}>تنزيل جدول المشاركين CSV</button></div>
     </section>
   </>;
 }
