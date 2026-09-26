@@ -5,6 +5,8 @@ if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
 const connection = await mysql.createConnection(process.env.DATABASE_URL);
 try {
   for (const query of [
+    'SELECT eventCode, name, startsOn, endsOn, location, organizer, poster, questionnaireIds, closed FROM event_profiles LIMIT 0',
+    'SELECT questionnaireIds FROM event_participant_sessions LIMIT 0',
     'SELECT id, eventCode, name, active FROM event_tracks LIMIT 0',
     'SELECT eventCode, nursingEnabled, testIds FROM event_settings LIMIT 0',
     'SELECT trackId FROM event_participant_sessions LIMIT 0',
@@ -17,6 +19,6 @@ try {
   console.log('Events schema and active registration track: ready.');
 } catch (error) {
   console.error('Events deployment blocked:', error.code ?? error.message);
-  console.error('Check DATABASE_URL targets the deployed database and review migrations 0011/0012. Apply pending migrations with pnpm exec drizzle-kit migrate, then rerun pnpm db:check-events. Do not mark readiness as successful until this passes.');
+  console.error('Check DATABASE_URL targets the deployed database and review migrations 0011/0012/0013. Apply pending migrations with pnpm exec drizzle-kit migrate, then rerun pnpm db:check-events. Do not mark readiness as successful until this passes.');
   process.exitCode = 1;
 } finally { await connection.end(); }

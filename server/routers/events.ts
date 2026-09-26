@@ -1,3 +1,4 @@
+import { requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
 import { listTracks, requireTrack, selectRegistrationTrack } from "../eventTracksDb";
 import { readCare } from "../eventCareDb";
@@ -69,6 +70,7 @@ export const eventsRouter = router({
       trackId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ input }) => {
+      const profile = await requireOpenEvent();
       const track = await selectRegistrationTrack(input.trackId);
       const normalizedPhone = normalizeSaudiMobilePhone(input.phone);
       if (!normalizedPhone.ok) {
@@ -94,6 +96,7 @@ export const eventsRouter = router({
         code: createEventCode(),
         eventCode: EVENT_CODE,
         trackId: track.id,
+        questionnaireIds: profile.questionnaireIds,
         displayName: input.firstName || null,
         age: input.age,
         sex: input.sex,
@@ -129,6 +132,7 @@ export const eventsRouter = router({
     return {
       code: session.code,
       trackId: session.trackId,
+      questionnaireIds: session.questionnaireIds ?? ["lifestyle"],
       trackName: track?.name ?? null,
       firstName: session.displayName,
       age: session.age,
@@ -147,6 +151,7 @@ export const eventsRouter = router({
     .input(eventTokenInput.extend({ answers: answersSchema }))
     .mutation(async ({ input }) => {
       const session = await requireEventSession(input.accessToken);
+      if (!(session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle")) throw new TRPCError({code:"BAD_REQUEST", message:"الاستبيان غير مفعّل لهذه الزيارة"});
       const updated = await updateEventParticipantSession(tokenHash(input.accessToken), { answers: input.answers });
       if (!updated || updated.id !== session.id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save lifestyle answers." });
       return { success: true, answers: updated.answers ?? {} };

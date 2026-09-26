@@ -20,6 +20,13 @@ describe("completedEventJourneySteps", () => {
     expect(completedEventJourneySteps(true, { importance: 7, confidence: 6 }, true, true, true)).toBe(5);
   });
 
+  it("skips the questionnaire without manufacturing answers", () => {
+    expect(completedEventJourneySteps(true, {}, false, false, false, false)).toBe(1);
+    expect(completedEventJourneySteps(true, {}, true, false, false, false)).toBe(2);
+    expect(completedEventJourneySteps(true, {}, true, true, false, false)).toBe(3);
+    expect(completedEventJourneySteps(true, {}, true, true, true, false)).toBe(4);
+  });
+
   it("handles newly created and absent sessions", () => {
     expect(completedEventJourneySteps(true, {}, false)).toBe(1);
     expect(completedEventJourneySteps(false, undefined, false)).toBe(0);

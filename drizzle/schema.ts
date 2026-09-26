@@ -1,4 +1,16 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, json, date, uniqueIndex } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, mediumtext, text, timestamp, varchar, decimal, json, date, uniqueIndex } from "drizzle-orm/mysql-core";
+
+export const eventProfiles = mysqlTable("event_profiles", {
+  eventCode: varchar("eventCode", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().default("فعالية ليم"),
+  startsOn: varchar("startsOn", { length: 10 }),
+  endsOn: varchar("endsOn", { length: 10 }),
+  location: varchar("location", { length: 500 }).notNull().default(""),
+  organizer: varchar("organizer", { length: 255 }).notNull().default(""),
+  poster: mediumtext("poster"),
+  questionnaireIds: json("questionnaireIds").$type<string[]>().notNull(),
+  closed: int("closed").notNull().default(0),
+});
 
 // Event operations are separate from the main app's expert/patient grants.
 export const eventSettings = mysqlTable("event_settings", {
@@ -178,6 +190,7 @@ export const eventParticipantSessions = mysqlTable("event_participant_sessions",
   code: varchar("code", { length: 32 }).notNull().unique(),
   eventCode: varchar("eventCode", { length: 64 }).notNull().default("lim-events"),
   trackId: int("trackId"),
+  questionnaireIds: json("questionnaireIds").$type<string[]>(),
   displayName: varchar("displayName", { length: 255 }),
   age: int("age"),
   sex: mysqlEnum("sex", ["male", "female"]),
