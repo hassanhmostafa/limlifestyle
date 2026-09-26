@@ -20,6 +20,7 @@ import {
   eventResultCategories,
   type EventResultField,
 } from "@/lib/eventResultsData";
+import { LIMAnatomyDistribution } from "@/components/LIMAnatomyDistribution";
 import "@/styles/event-results.css";
 
 type Mode = "muscle" | "fat";
@@ -69,37 +70,6 @@ function MetricCard({ field, values, tone = "soft" }: { field: EventResultField;
         <span className={`lim-result-status lim-result-status-${status}`}>{badge}</span>
       ) : null}
     </article>
-  );
-}
-
-function SegmentCard({ label, value, area, mode }: { label: string; value?: string; area: string; mode: Mode }) {
-  const formatted = formatValue(value);
-  return (
-    <div className={`lim-segment-card lim-segment-${area} lim-segment-${mode}`}>
-      <span>{label}</span>
-      <strong dir="ltr">{formatted === null ? "غير متوفر" : `${formatted} kg`}</strong>
-      <i className="lim-segment-target" aria-hidden="true" />
-    </div>
-  );
-}
-
-function Distribution({ mode, values }: { mode: Mode; values: Record<string, string> }) {
-  return (
-    <div className="lim-anatomy-stage">
-      <SegmentCard area="left-arm" mode={mode} label="الذراع اليمنى" value={values[`${mode}RightArm`]} />
-      <SegmentCard area="right-arm" mode={mode} label="الذراع اليسرى" value={values[`${mode}LeftArm`]} />
-      <SegmentCard area="trunk" mode={mode} label="الجذع" value={values[`${mode}Trunk`]} />
-      <SegmentCard area="left-leg" mode={mode} label="الساق اليمنى" value={values[`${mode}RightLeg`]} />
-      <SegmentCard area="right-leg" mode={mode} label="الساق اليسرى" value={values[`${mode}LeftLeg`]} />
-      <div className="lim-anatomy-figure">
-        <img
-          src={`/api/events/anatomy/${mode}`}
-          alt={mode === "muscle" ? "رسم توضيحي محايد لتوزيع العضلات" : "رسم توضيحي محايد لتوزيع الدهون"}
-          decoding="async"
-          loading="eager"
-        />
-      </div>
-    </div>
   );
 }
 
@@ -178,7 +148,7 @@ export function EventBodyResults({ readings, participant }: { readings: Dashboar
             <TabsTrigger value="fat">الدهون</TabsTrigger>
           </TabsList>
         </Tabs>
-        <Distribution mode={mode} values={values} />
+        <LIMAnatomyDistribution mode={mode} values={values} language="ar" />
         <p className="lim-anatomy-note">رسم توضيحي لتوزيع القياسات؛ اليمين واليسار من منظور صاحب القياس.</p>
       </section>
 

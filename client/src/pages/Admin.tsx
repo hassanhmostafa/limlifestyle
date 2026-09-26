@@ -343,7 +343,7 @@ export default function Admin() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
         </main>
       </div>
     );
@@ -359,7 +359,7 @@ export default function Admin() {
             <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
             <p className="text-gray-600 mb-6">This page is restricted to administrators only.</p>
             <Link href="/">
-              <Button className="bg-cyan-500 hover:bg-cyan-600">Go Home</Button>
+              <Button className="bg-emerald-500 hover:bg-emerald-600">Go Home</Button>
             </Link>
           </div>
         </main>
@@ -394,7 +394,7 @@ export default function Admin() {
                 onClick={() => handleTabChange("users")}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === "users"
-                    ? "border-cyan-500 text-cyan-600"
+                    ? "border-emerald-500 text-emerald-600"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
@@ -409,7 +409,7 @@ export default function Admin() {
                 onClick={() => handleTabChange("expert-requests")}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === "expert-requests"
-                    ? "border-cyan-500 text-cyan-600"
+                    ? "border-emerald-500 text-emerald-600"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
@@ -429,7 +429,7 @@ export default function Admin() {
                 onClick={() => handleTabChange("kiosk-devices")}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === "kiosk-devices"
-                    ? "border-cyan-500 text-cyan-600"
+                    ? "border-emerald-500 text-emerald-600"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
@@ -482,7 +482,7 @@ export default function Admin() {
             <div className="container">
               {usersLoading ? (
                 <div className="flex items-center justify-center py-20">
-                  <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -547,7 +547,7 @@ export default function Admin() {
               </h2>
               {expertRequestsLoading ? (
                 <div className="flex justify-center py-20">
-                  <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
                 </div>
               ) : !expertRequests || expertRequests.length === 0 ? (
                 <Card>
@@ -676,7 +676,7 @@ export default function Admin() {
               {/* Current admins list */}
               <h3 className="text-sm font-semibold text-gray-600 mb-3">Current Admins</h3>
               {usersLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-cyan-500 animate-spin" /></div>
+                <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-emerald-500 animate-spin" /></div>
               ) : (
                 <div className="space-y-2">
                   {allUsers?.filter(u => u.role === "admin").map(u => (
@@ -690,7 +690,7 @@ export default function Admin() {
                           <Badge className={
                             u.adminType === "super" ? "bg-purple-100 text-purple-700 border-purple-200" :
                             u.adminType === "expert" ? "bg-teal-100 text-teal-700 border-teal-200" :
-                            u.adminType === "kiosk" ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
+                            u.adminType === "kiosk" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
                             "bg-gray-100 text-gray-500 border-gray-200"
                           }>
                             {u.adminType ?? "no type"}
@@ -767,7 +767,7 @@ export default function Admin() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-sm font-medium flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-cyan-600" />
+                  <Clock className="w-4 h-4 text-emerald-600" />
                   Operating Hours
                 </Label>
                 <Button
@@ -791,7 +791,7 @@ export default function Admin() {
                       <select
                         value={row.day}
                         onChange={(e) => updateHourRow(idx, "day", e.target.value)}
-                        className="flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                        className="flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
                       >
                         {DEFAULT_DAYS.map((d) => (
                           <option key={d} value={d}>{d}</option>
@@ -818,7 +818,7 @@ export default function Admin() {
             {/* ── Services ── */}
             <div>
               <Label className="text-sm font-medium flex items-center gap-1.5 mb-2">
-                <Stethoscope className="w-4 h-4 text-cyan-600" />
+                <Stethoscope className="w-4 h-4 text-emerald-600" />
                 Available Services
               </Label>
 
@@ -842,13 +842,13 @@ export default function Admin() {
                   {formData.services.map((svc, idx) => (
                     <span
                       key={idx}
-                      className="flex items-center gap-1 bg-cyan-50 text-cyan-700 text-sm px-3 py-1 rounded-full"
+                      className="flex items-center gap-1 bg-emerald-50 text-emerald-700 text-sm px-3 py-1 rounded-full"
                     >
                       {svc}
                       <button
                         type="button"
                         onClick={() => removeService(idx)}
-                        className="ml-1 text-cyan-400 hover:text-red-500"
+                        className="ml-1 text-emerald-400 hover:text-red-500"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -862,7 +862,7 @@ export default function Admin() {
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseForm}>Cancel</Button>
             <Button
-              className="bg-cyan-500 hover:bg-cyan-600"
+              className="bg-emerald-500 hover:bg-emerald-600"
               onClick={handleSubmit}
               disabled={isBusy || !formData.name || !formData.address || !formData.latitude || !formData.longitude}
             >

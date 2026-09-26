@@ -34,7 +34,7 @@ export default function Home() {
         <div className="relative z-10 container max-w-4xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div className="text-white space-y-6">
-              <div className="inline-block bg-cyan-500/20 border border-cyan-400/50 rounded-full px-4 py-2 text-sm font-medium text-cyan-300">
+              <div className="inline-block bg-emerald-500/20 border border-emerald-400/50 rounded-full px-4 py-2 text-sm font-medium text-emerald-300">
                 {t.hero_badge}
               </div>
 
@@ -48,7 +48,7 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link href="/find-station">
-                  <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white w-full sm:w-auto">
+                  <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 text-white w-full sm:w-auto">
                     <MapPin className="w-4 h-4 mr-2" />
                     {t.hero_findStation}
                   </Button>
@@ -64,11 +64,11 @@ export default function Home() {
 
               <div className="flex gap-8 pt-8 text-sm">
                 <div>
-                  <div className="text-3xl font-bold text-cyan-400">8+</div>
+                  <div className="text-3xl font-bold text-emerald-400">8+</div>
                   <div className="text-gray-300">{t.hero_activeStations}</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-cyan-400">50K+</div>
+                  <div className="text-3xl font-bold text-emerald-400">50K+</div>
                   <div className="text-gray-300">{t.hero_usersScreened}</div>
                 </div>
               </div>
@@ -96,7 +96,7 @@ export default function Home() {
 
           <div className="flex gap-2">
             <Input placeholder={t.home_searchPlaceholder} className="flex-1" />
-            <Button className="bg-cyan-500 hover:bg-cyan-600">{t.home_searchBtn}</Button>
+            <Button className="bg-emerald-500 hover:bg-emerald-600">{t.home_searchBtn}</Button>
           </div>
         </div>
       </section>
@@ -113,48 +113,48 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="p-8 border-0 shadow-lg hover:shadow-xl transition-shadow card-hover">
-              <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mb-6">
-                <MapPin className="w-6 h-6 text-cyan-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-6">
+                <MapPin className="w-6 h-6 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{t.feat_locations}</h3>
               <p className="text-gray-600">{t.feat_locationsDesc}</p>
             </Card>
 
             <Card className="p-8 border-0 shadow-lg hover:shadow-xl transition-shadow card-hover">
-              <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mb-6">
-                <Clock className="w-6 h-6 text-cyan-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-6">
+                <Clock className="w-6 h-6 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{t.feat_hours}</h3>
               <p className="text-gray-600">{t.feat_hoursDesc}</p>
             </Card>
 
             <Card className="p-8 border-0 shadow-lg hover:shadow-xl transition-shadow card-hover">
-              <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mb-6">
-                <Heart className="w-6 h-6 text-cyan-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-6">
+                <Heart className="w-6 h-6 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{t.feat_screening}</h3>
               <p className="text-gray-600">{t.feat_screeningDesc}</p>
             </Card>
 
             <Card className="p-8 border-0 shadow-lg hover:shadow-xl transition-shadow card-hover">
-              <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mb-6">
-                <TrendingUp className="w-6 h-6 text-cyan-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-6">
+                <TrendingUp className="w-6 h-6 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{t.feat_tracking}</h3>
               <p className="text-gray-600">{t.feat_trackingDesc}</p>
             </Card>
 
             <Card className="p-8 border-0 shadow-lg hover:shadow-xl transition-shadow card-hover">
-              <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mb-6">
-                <Shield className="w-6 h-6 text-cyan-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-6">
+                <Shield className="w-6 h-6 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{t.feat_privacy}</h3>
               <p className="text-gray-600">{t.feat_privacyDesc}</p>
             </Card>
 
             <Card className="p-8 border-0 shadow-lg hover:shadow-xl transition-shadow card-hover">
-              <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mb-6">
-                <Zap className="w-6 h-6 text-cyan-600" />
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-6">
+                <Zap className="w-6 h-6 text-emerald-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3">{t.feat_instant}</h3>
               <p className="text-gray-600">{t.feat_instantDesc}</p>
@@ -204,15 +204,15 @@ export default function Home() {
             backgroundPosition: "center",
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-900/80 to-blue-900/80"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/80 to-emerald-900/80"></div>
         </div>
         <div className="relative z-10 container text-center text-white">
           <h2 className="text-4xl font-bold mb-6">{t.home_ctaTitle}</h2>
-          <p className="text-xl mb-8 text-cyan-50 max-w-2xl mx-auto">
+          <p className="text-xl mb-8 text-emerald-50 max-w-2xl mx-auto">
             {t.home_ctaSubtitle}
           </p>
           <Link href="/find-station">
-            <Button size="lg" className="bg-white text-cyan-600 hover:bg-gray-100">
+            <Button size="lg" className="bg-white text-emerald-600 hover:bg-gray-100">
               <MapPin className="w-4 h-4 mr-2" />
               {t.home_ctaBtn}
             </Button>

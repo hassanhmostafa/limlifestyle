@@ -84,20 +84,20 @@ export function IOSInstallModal({ onClose }: { onClose: () => void }) {
         </div>
         <ol className="space-y-3 text-sm text-gray-700">
           <li className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
             <span>Tap the <strong>Share</strong> button at the bottom of Safari (the square with an arrow pointing up)</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
             <span>Scroll down and tap <strong>"Add to Home Screen"</strong></span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
             <span>Tap <strong>"Add"</strong> in the top right corner</span>
           </li>
         </ol>
         <Button
-          className="w-full mt-5 bg-cyan-500 hover:bg-cyan-600 text-white"
+          className="w-full mt-5 bg-emerald-500 hover:bg-emerald-600 text-white"
           onClick={onClose}
         >
           Got it
@@ -141,7 +141,7 @@ export default function PWAInstallPrompt() {
       {/* Bottom banner */}
       {showBanner && (
         <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-sm">
-          <div className="bg-white border border-cyan-200 rounded-2xl shadow-xl p-4 flex items-start gap-3">
+          <div className="bg-white border border-emerald-200 rounded-2xl shadow-xl p-4 flex items-start gap-3">
             <img
               src="https://d2xsxph8kpxj0f.cloudfront.net/310519663052167250/adQspJefUTFqKyf6yHum6G/pwa-icon-512-Njw5mfjYVQrS2JHikUmEfa.png"
               alt="LIM"
@@ -155,7 +155,7 @@ export default function PWAInstallPrompt() {
               <Button
                 size="sm"
                 onClick={handleInstall}
-                className="mt-2 h-7 text-xs bg-cyan-500 hover:bg-cyan-600 text-white gap-1"
+                className="mt-2 h-7 text-xs bg-emerald-500 hover:bg-emerald-600 text-white gap-1"
               >
                 {isIOS ? <Share className="w-3 h-3" /> : <Download className="w-3 h-3" />}
                 {isIOS ? "How to install" : "Install"}

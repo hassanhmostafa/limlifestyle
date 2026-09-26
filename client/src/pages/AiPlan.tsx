@@ -33,7 +33,7 @@ const planOptions: { type: PlanType; icon: React.ReactNode; label: string; label
     labelAr: "خطة صحية",
     desc: "Exercise routines, lifestyle habits, sleep & stress management tailored to your vitals.",
     descAr: "تمارين رياضية وعادات صحية وإدارة النوم والتوتر مخصصة لمؤشراتك الصحية.",
-    color: "from-cyan-500 to-blue-600",
+    color: "from-emerald-500 to-emerald-600",
   },
   {
     type: "diet",
@@ -88,14 +88,14 @@ function PlanCard({ plan, onDelete, isAr, userName }: {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1 text-sm text-cyan-600 hover:text-cyan-700 font-medium"
+              className="flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
             >
               {expanded ? (isAr ? "إخفاء" : "Hide") : (isAr ? "عرض" : "View")}
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             <button
               onClick={() => downloadAIPlanPDF(plan.content, plan.planType, userName, plan.createdAt)}
-              className="text-gray-400 hover:text-cyan-600 transition-colors"
+              className="text-gray-400 hover:text-emerald-600 transition-colors"
               title={isAr ? "تحميل PDF" : "Download PDF"}
             >
               <Download className="w-4 h-4" />
@@ -160,7 +160,7 @@ export default function AiPlan() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
         </div>
         <Footer />
       </div>
@@ -183,7 +183,7 @@ export default function AiPlan() {
                 : "Please sign in to access your AI-powered personalized health and diet plans."}
             </p>
             <Button
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
+              className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white"
               onClick={() => (window.location.href = "/login")}
             >
               {isAr ? "تسجيل الدخول" : "Sign In"}
@@ -226,7 +226,7 @@ export default function AiPlan() {
                 onClick={() => setSelectedType(option.type)}
                 className={`relative rounded-xl border-2 p-4 text-left transition-all ${
                   selectedType === option.type
-                    ? "border-cyan-500 bg-cyan-50"
+                    ? "border-emerald-500 bg-emerald-50"
                     : "border-gray-200 bg-white hover:border-gray-300"
                 }`}
               >
@@ -240,7 +240,7 @@ export default function AiPlan() {
                   {isAr ? option.descAr : option.desc}
                 </div>
                 {selectedType === option.type && (
-                  <div className="absolute top-3 right-3 w-5 h-5 bg-cyan-500 rounded-full flex items-center justify-center">
+                  <div className="absolute top-3 right-3 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
                     <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -301,7 +301,7 @@ export default function AiPlan() {
 
           {plansLoading ? (
             <div className="flex items-center justify-center py-10">
-              <Loader2 className="w-6 h-6 animate-spin text-cyan-500" />
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
             </div>
           ) : !plans || plans.length === 0 ? (
             <Card className="border-0 shadow-sm p-10 text-center text-gray-400">

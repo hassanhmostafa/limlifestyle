@@ -70,7 +70,7 @@ export default function KioskMap({ kiosks, selectedKiosk, language = "en" }: Kio
                 <strong>${distanceLabel}</strong> ${kiosk.distance?.toFixed(1)} km
               </p>
             </div>
-            <a href="/station/${kiosk.id}" style="display: inline-block; margin-top: 8px; padding: 6px 12px; background-color: #06b6d4; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500;">
+            <a href="/station/${kiosk.id}" style="display: inline-block; margin-top: 8px; padding: 6px 12px; background-color: #075847; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500;">
               ${viewDetailsLabel}
             </a>
           </div>

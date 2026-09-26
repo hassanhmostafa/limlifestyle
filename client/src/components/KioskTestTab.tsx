@@ -161,7 +161,7 @@ export function KioskTestTab() {
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <FlaskConical className="w-6 h-6 text-cyan-600" />
+            <FlaskConical className="w-6 h-6 text-emerald-600" />
             <div>
               <h2 className="text-xl font-bold text-gray-800">Kiosk Data Test Console</h2>
               <p className="text-sm text-gray-500">
@@ -182,7 +182,7 @@ export function KioskTestTab() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-cyan-500 text-white text-xs flex items-center justify-center font-bold">1</span>
+              <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center font-bold">1</span>
               Select Device & Create Session Token
             </CardTitle>
           </CardHeader>
@@ -222,7 +222,7 @@ export function KioskTestTab() {
               <Button
                 onClick={() => createSessionMutation.mutate({ deviceId })}
                 disabled={createSessionMutation.isPending || !deviceId}
-                className="bg-cyan-500 hover:bg-cyan-600"
+                className="bg-emerald-500 hover:bg-emerald-600"
               >
                 {createSessionMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -255,7 +255,7 @@ export function KioskTestTab() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-cyan-500 text-white text-xs flex items-center justify-center font-bold">2</span>
+              <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center font-bold">2</span>
               Enter Health Readings
             </CardTitle>
           </CardHeader>
@@ -286,7 +286,7 @@ export function KioskTestTab() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-cyan-500 text-white text-xs flex items-center justify-center font-bold">3</span>
+              <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center font-bold">3</span>
               Submit to /api/kiosk/data
             </CardTitle>
           </CardHeader>
@@ -310,7 +310,7 @@ export function KioskTestTab() {
             <Button
               onClick={handlePostData}
               disabled={isPosting || !sessionToken}
-              className="bg-cyan-500 hover:bg-cyan-600 w-full sm:w-auto"
+              className="bg-emerald-500 hover:bg-emerald-600 w-full sm:w-auto"
               size="lg"
             >
               {isPosting ? (

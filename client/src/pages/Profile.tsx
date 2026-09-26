@@ -56,7 +56,7 @@ export default function Profile() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-500" />
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500" />
         </div>
         <Footer />
       </div>
@@ -73,7 +73,7 @@ export default function Profile() {
               {isAr ? "سجّل الدخول لإدارة ملفك الشخصي" : "Sign in to manage your profile"}
             </h2>
             <a href="/login">
-              <Button className="bg-cyan-500 hover:bg-cyan-600">
+              <Button className="bg-emerald-500 hover:bg-emerald-600">
                 {isAr ? "تسجيل الدخول" : "Sign In"}
               </Button>
             </a>
@@ -109,7 +109,7 @@ export default function Profile() {
       <main className="flex-1 container max-w-2xl py-12 pt-24">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <User className="w-8 h-8 text-cyan-500" />
+            <User className="w-8 h-8 text-emerald-500" />
             {isAr ? "ملفي الشخصي" : "My Profile"}
           </h1>
           <p className="text-gray-500 mt-2">
@@ -197,8 +197,8 @@ export default function Profile() {
                 onClick={() => setGender("male")}
                 className={`flex items-center gap-2 px-5 py-3 rounded-xl border-2 font-medium transition-all ${
                   gender === "male"
-                    ? "border-cyan-500 bg-cyan-50 text-cyan-700"
-                    : "border-gray-200 text-gray-500 hover:border-cyan-300"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-gray-200 text-gray-500 hover:border-emerald-300"
                 }`}
               >
                 <UserCircle2 className="w-5 h-5" />
@@ -245,7 +245,7 @@ export default function Profile() {
             <Button
               onClick={handleSave}
               disabled={updateProfile.isPending}
-              className="bg-cyan-500 hover:bg-cyan-600 text-white"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
             >
               <Save className="w-4 h-4 mr-2" />
               {updateProfile.isPending
@@ -256,11 +256,11 @@ export default function Profile() {
         </Card>
 
         {/* Info card */}
-        <Card className="mt-6 p-6 border-0 bg-cyan-50 shadow-sm">
-          <h3 className="font-semibold text-cyan-800 mb-2">
+        <Card className="mt-6 p-6 border-0 bg-emerald-50 shadow-sm">
+          <h3 className="font-semibold text-emerald-800 mb-2">
             {isAr ? "لماذا نحتاج هذه المعلومات؟" : "Why do we need this?"}
           </h3>
-          <p className="text-sm text-cyan-700 leading-relaxed">
+          <p className="text-sm text-emerald-700 leading-relaxed">
             {isAr ? (
               <>
                 يتيح لنا <strong>جنسك</strong> و<strong>تاريخ ميلادك</strong> حساب{" "}

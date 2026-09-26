@@ -154,12 +154,12 @@ function HealthScoreBanner({
 
   if (!scoreData || scoreData.status === "no_readings") {
     return (
-      <Card className="p-6 border-0 shadow-sm bg-blue-50">
+      <Card className="p-6 border-0 shadow-sm bg-emerald-50">
         <div className="flex items-start gap-3">
-          <Activity className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+          <Activity className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
           <div>
-            <h3 className="font-semibold text-blue-800 mb-1">No Health Score Yet</h3>
-            <p className="text-sm text-blue-700">Log your first reading to get your overall health score.</p>
+            <h3 className="font-semibold text-emerald-800 mb-1">No Health Score Yet</h3>
+            <p className="text-sm text-emerald-700">Log your first reading to get your overall health score.</p>
           </div>
         </div>
       </Card>
@@ -215,7 +215,7 @@ function HealthScoreBanner({
                     <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
                       <div className="h-full rounded-full" style={{
                         width: `${item.value}%`,
-                        backgroundColor: item.value >= 90 ? "#22c55e" : item.value >= 75 ? "#06b6d4" : item.value >= 50 ? "#f97316" : "#ef4444",
+                        backgroundColor: item.value >= 90 ? "#22c55e" : item.value >= 75 ? "#075847" : item.value >= 50 ? "#f97316" : "#ef4444",
                       }} />
                     </div>
                     <div className="text-xs font-semibold text-gray-700">{item.value}/100</div>
@@ -299,13 +299,13 @@ function BmiComparisonCard({ bmiData, bmiLoading }: { bmiData: BmiDataState; bmi
   const idealPct = clamp(data.idealBmi);
   const actualPct = clamp(data.actualBmi);
 
-  const classColor = data.classification === "Normal" ? "#22c55e" : data.classification === "Underweight" ? "#3b82f6" : data.classification === "Overweight" ? "#f97316" : "#ef4444";
+  const classColor = data.classification === "Normal" ? "#22c55e" : data.classification === "Underweight" ? "#87bd37" : data.classification === "Overweight" ? "#f97316" : "#ef4444";
 
   return (
     <Card className="p-6 border-0 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-          <Scale className="w-5 h-5 text-blue-500" /> BMI Analysis
+          <Scale className="w-5 h-5 text-emerald-500" /> BMI Analysis
         </h3>
         <span className="text-sm font-bold px-3 py-1 rounded-full text-white" style={{ backgroundColor: classColor }}>
           {data.classification}
@@ -319,7 +319,7 @@ function BmiComparisonCard({ bmiData, bmiLoading }: { bmiData: BmiDataState; bmi
         </div>
         <div>
           <div className="text-xs text-gray-500 mb-0.5">Ideal BMI</div>
-          <div className="text-xl font-semibold text-cyan-600">{data.idealBmi.toFixed(1)}</div>
+          <div className="text-xl font-semibold text-emerald-600">{data.idealBmi.toFixed(1)}</div>
         </div>
         <div>
           <div className="text-xs text-gray-500 mb-0.5">Healthy Range</div>
@@ -330,13 +330,13 @@ function BmiComparisonCard({ bmiData, bmiLoading }: { bmiData: BmiDataState; bmi
       <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden mb-1">
         <div className="absolute top-0 h-full bg-green-200 rounded-full"
           style={{ left: `${healthyMinPct}%`, width: `${healthyMaxPct - healthyMinPct}%` }} />
-        <div className="absolute top-0 h-full w-1 bg-cyan-500" style={{ left: `${idealPct}%` }} />
+        <div className="absolute top-0 h-full w-1 bg-emerald-500" style={{ left: `${idealPct}%` }} />
         <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white shadow"
           style={{ left: `calc(${actualPct}% - 8px)`, backgroundColor: classColor }} />
       </div>
       <div className="flex justify-between text-xs text-gray-400 mt-1">
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-green-200"></span> Healthy zone</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-1 h-3 bg-cyan-500"></span> Ideal</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-1 h-3 bg-emerald-500"></span> Ideal</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-gray-400"></span> Your BMI</span>
       </div>
 
@@ -344,14 +344,14 @@ function BmiComparisonCard({ bmiData, bmiLoading }: { bmiData: BmiDataState; bmi
         <div className="mt-5 p-4 bg-gray-50 rounded-xl">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-cyan-500" /> Ideal Weight Target
+              <Target className="w-4 h-4 text-emerald-500" /> Ideal Weight Target
             </span>
-            <span className="text-sm font-bold text-cyan-600">{data.weightTarget.idealWeightKg} kg</span>
+            <span className="text-sm font-bold text-emerald-600">{data.weightTarget.idealWeightKg} kg</span>
           </div>
           <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
             <div className="h-full rounded-full transition-all duration-500" style={{
               width: `${data.weightTarget.progressPct}%`,
-              backgroundColor: data.weightTarget.direction === "at_ideal" ? "#22c55e" : data.weightTarget.progressPct >= 70 ? "#06b6d4" : data.weightTarget.progressPct >= 40 ? "#f97316" : "#ef4444",
+              backgroundColor: data.weightTarget.direction === "at_ideal" ? "#22c55e" : data.weightTarget.progressPct >= 70 ? "#075847" : data.weightTarget.progressPct >= 40 ? "#f97316" : "#ef4444",
             }} />
           </div>
           <div className="flex justify-between items-center text-xs">
@@ -404,7 +404,7 @@ function MetricChartCard({ title, chartId, weekData, monthData, yearData, render
               key={r}
               onClick={() => setRange(r)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                range === r ? "bg-cyan-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                range === r ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}
             >
               {r === "1W" ? "Weekly" : r === "1M" ? "Monthly" : "Yearly"}
@@ -780,7 +780,7 @@ export default function HealthDashboard() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
         </main>
       </div>
     );
@@ -792,11 +792,11 @@ export default function HealthDashboard() {
         <Navigation />
         <main className="flex-1 flex items-center justify-center pt-20">
           <div className="text-center max-w-md px-4">
-            <Heart className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+            <Heart className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
             <h1 className="text-2xl font-bold mb-2">{t.health_title}</h1>
             <p className="text-gray-600 mb-6">{t.health_signInPrompt}</p>
             <a href="/login">
-              <Button className="bg-cyan-500 hover:bg-cyan-600">
+              <Button className="bg-emerald-500 hover:bg-emerald-600">
                 <LogIn className="w-4 h-4 mr-2" />
                 {t.health_signInBtn}
               </Button>
@@ -809,28 +809,28 @@ export default function HealthDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-[#f8faf4]">
       <Navigation />
 
       <main className="flex-1 pt-20">
         {/* Header */}
-        <section className="bg-gradient-to-r from-cyan-600 to-blue-700 text-white py-10">
+        <section className="bg-gradient-to-r from-[#073f35] via-[#075847] to-[#2d775d] py-10 text-white">
           <div className="container flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-1">{t.health_title}</h1>
-              <p className="text-cyan-100">{language === "ar" ? "راجع نتائج القياس التي أرسلها جهاز X18" : "Review the measurement details submitted by the X18 device"}</p>
+              <p className="text-[#e5f0d4]">{language === "ar" ? "راجع نتائج القياس التي أرسلها جهاز X18" : "Review the measurement details submitted by the X18 device"}</p>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                className="border-white/40 text-white hover:bg-white/10 bg-transparent"
+                className="border-white/35 bg-transparent text-white hover:bg-white/10"
                 onClick={handleDownloadPDF}
                 disabled={!readings || readings.length === 0 || downloading}
               >
                 {downloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                 {downloading ? "Generating..." : "Download Report"}
               </Button>
-              <Button className="bg-white text-cyan-700 hover:bg-cyan-50" onClick={() => setShowLog(true)}>
+              <Button className="bg-[#dff45a] text-[#073f35] hover:bg-[#cde944]" onClick={() => setShowLog(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 {t.health_logReading}
               </Button>
@@ -841,7 +841,7 @@ export default function HealthDashboard() {
         <div className="container py-8 space-y-8">
           {/* This is the identity that X18 transmitted with the latest physical
               measurement. It is intentionally independent from the LIM account profile. */}
-          <Card className="border-0 bg-gradient-to-r from-emerald-50 to-cyan-50 p-5 shadow-sm" dir={language === "ar" ? "rtl" : "ltr"}>
+          <Card className="border-0 bg-gradient-to-r from-emerald-50 to-emerald-50 p-5 shadow-sm" dir={language === "ar" ? "rtl" : "ltr"}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{language === "ar" ? "بيانات القياس من الجهاز" : "Device-submitted measurement details"}</p>
@@ -851,7 +851,7 @@ export default function HealthDashboard() {
             </div>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الاسم المرسل من الجهاز" : "Name sent by device"}</p><p className="font-bold text-slate-800">{deviceIdentity.name || "—"}</p></div></div>
-              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700"><CalendarDays className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "العمر المرسل من الجهاز" : "Age sent by device"}</p><p className="font-bold text-slate-800">{deviceIdentity.age ?? "—"}{deviceIdentity.age !== null ? (language === "ar" ? " سنة" : " years") : ""}</p></div></div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><CalendarDays className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "العمر المرسل من الجهاز" : "Age sent by device"}</p><p className="font-bold text-slate-800">{deviceIdentity.age ?? "—"}{deviceIdentity.age !== null ? (language === "ar" ? " سنة" : " years") : ""}</p></div></div>
               <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/80 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700"><UserRound className="h-5 w-5" /></div><div><p className="text-xs text-slate-500">{language === "ar" ? "الجنس المرسل من الجهاز" : "Gender sent by device"}</p><p className="font-bold text-slate-800">{formatDeviceSex(deviceIdentity.sex, language)}</p></div></div>
             </div>
           </Card>
@@ -864,7 +864,7 @@ export default function HealthDashboard() {
             {[
               { icon: <Activity className="w-5 h-5 text-red-500" />, label: t.health_bpLabel, value: latest?.sbp ? `${latest.sbp}/${latest.dbp}` : "—", unit: "mmHg", trend: <Trend values={bpSystolicValues} /> },
               { icon: <Heart className="w-5 h-5 text-pink-500" />, label: t.health_hrLabel, value: latest?.hr ?? "—", unit: "bpm", trend: <Trend values={hrValues} /> },
-              { icon: <Scale className="w-5 h-5 text-blue-500" />, label: t.health_weightLabel, value: latest?.weight ? parseFloat(latest.weight).toFixed(1) : "—", unit: "kg", trend: <Trend values={weightValues} /> },
+              { icon: <Scale className="w-5 h-5 text-emerald-500" />, label: t.health_weightLabel, value: latest?.weight ? parseFloat(latest.weight).toFixed(1) : "—", unit: "kg", trend: <Trend values={weightValues} /> },
               { icon: <Thermometer className="w-5 h-5 text-orange-500" />, label: t.health_bmiLabel, value: latest?.bmi ? parseFloat(latest.bmi).toFixed(1) : "—", unit: "", trend: <Trend values={bmiValues} /> },
             ].map((card) => (
               <Card key={card.label} className="p-5 border-0 shadow-sm">
@@ -894,7 +894,7 @@ export default function HealthDashboard() {
             {([
               { key: "bloodPressure", label: "Blood Pressure", color: "#ef4444" },
               { key: "heartRate",     label: "Heart Rate",     color: "#ec4899" },
-              { key: "weight",        label: "Weight",         color: "#3b82f6" },
+              { key: "weight",        label: "Weight",         color: "#87bd37" },
               { key: "bmi",           label: "BMI",            color: "#8b5cf6" },
               { key: "temperature",   label: "Temperature",    color: "#f97316" },
               { key: "healthScore",   label: "Health Score",   color: "#10b981" },
@@ -982,7 +982,7 @@ export default function HealthDashboard() {
             {/* Weight */}
             {visibleCharts.weight && <MetricChartCard
               title="Weight"
-              color="#3b82f6"
+              color="#87bd37"
               chartId="chart-weight"
               weekData={weekData}
               monthData={monthData}
@@ -992,8 +992,8 @@ export default function HealthDashboard() {
                   <AreaChart data={data}>
                     <defs>
                       <linearGradient id="gradW" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#87bd37" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#87bd37" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1001,7 +1001,7 @@ export default function HealthDashboard() {
                     <YAxis tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
                     <Tooltip />
                     <Legend />
-                    <Area type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={2} fill="url(#gradW)" dot={false} name="Weight (kg)" />
+                    <Area type="monotone" dataKey="weight" stroke="#87bd37" strokeWidth={2} fill="url(#gradW)" dot={false} name="Weight (kg)" />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -1124,11 +1124,11 @@ export default function HealthDashboard() {
               { id: "pdf-chart-weight", title: "Weight", renderChart: (d: object[]) => (
                 <ResponsiveContainer width={560} height={180}>
                   <AreaChart data={d}>
-                    <defs><linearGradient id="pdfGradW" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
+                    <defs><linearGradient id="pdfGradW" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#87bd37" stopOpacity={0.15}/><stop offset="95%" stopColor="#87bd37" stopOpacity={0}/></linearGradient></defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
                     <XAxis dataKey="date" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}} domain={["auto","auto"]}/>
                     <Tooltip/><Legend/>
-                    <Area type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={2} fill="url(#pdfGradW)" dot={false} name="Weight (kg)"/>
+                    <Area type="monotone" dataKey="weight" stroke="#87bd37" strokeWidth={2} fill="url(#pdfGradW)" dot={false} name="Weight (kg)"/>
                   </AreaChart>
                 </ResponsiveContainer>
               )},
@@ -1179,13 +1179,13 @@ export default function HealthDashboard() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">{t.health_history}</h2>
             {readingsLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 text-cyan-500 animate-spin" />
+                <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
               </div>
             ) : !readings || readings.length === 0 ? (
               <Card className="p-10 border-0 shadow-sm text-center">
                 <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 mb-4">{t.health_noReadings}</p>
-                <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setShowLog(true)}>
+                <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={() => setShowLog(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   {t.health_logReading}
                 </Button>
@@ -1210,7 +1210,7 @@ export default function HealthDashboard() {
                             </span>
                           )}
                           {r.weight && (
-                            <span className="flex items-center gap-1 text-blue-600 font-medium">
+                            <span className="flex items-center gap-1 text-emerald-600 font-medium">
                               <Scale className="w-3.5 h-3.5" />
                               {parseFloat(r.weight).toFixed(1)} kg
                             </span>
@@ -1295,7 +1295,7 @@ export default function HealthDashboard() {
               </div>
             </div>
             {form.weight && form.height && (
-              <p className="text-sm text-cyan-600 font-medium">Calculated BMI: {calcBmi(form.weight, form.height)}</p>
+              <p className="text-sm text-emerald-600 font-medium">Calculated BMI: {calcBmi(form.weight, form.height)}</p>
             )}
             <div>
               <Label className="text-sm font-medium">Notes (optional)</Label>
@@ -1304,7 +1304,7 @@ export default function HealthDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowLog(false); setForm(emptyForm); }}>Cancel</Button>
-            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={handleSubmit} disabled={logMutation.isPending || !form.kioskId}>
+            <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={handleSubmit} disabled={logMutation.isPending || !form.kioskId}>
               {logMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Save Reading
             </Button>

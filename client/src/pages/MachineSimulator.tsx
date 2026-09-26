@@ -64,12 +64,12 @@ function printHealthReceipt(
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: #fff; color: #1a1a1a; padding: 32px; max-width: 480px; margin: 0 auto; }
-    .header { text-align: center; border-bottom: 2px solid #0ea5e9; padding-bottom: 20px; margin-bottom: 24px; }
+    .header { text-align: center; border-bottom: 2px solid #075847; padding-bottom: 20px; margin-bottom: 24px; }
     .station-name { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
-    .title { font-size: 22px; font-weight: 700; color: #0ea5e9; margin-bottom: 4px; }
+    .title { font-size: 22px; font-weight: 700; color: #075847; margin-bottom: 4px; }
     .subtitle { font-size: 12px; color: #94a3b8; }
     .meta { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-bottom: 20px; padding: 10px 14px; background: #f8fafc; border-radius: 8px; }
-    .patient { font-size: 13px; margin-bottom: 20px; padding: 12px 14px; background: #f0f9ff; border-left: 3px solid #0ea5e9; border-radius: 0 8px 8px 0; }
+    .patient { font-size: 13px; margin-bottom: 20px; padding: 12px 14px; background: #f0f9ff; border-left: 3px solid #075847; border-radius: 0 8px 8px 0; }
     .patient strong { display: block; font-size: 15px; color: #0c4a6e; margin-bottom: 2px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
     th { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #94a3b8; text-align: left; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
@@ -108,7 +108,7 @@ function printHealthReceipt(
   <div class="footer">
     This receipt is for informational purposes only.<br/>
     Please consult a healthcare professional for medical advice.<br/>
-    <strong style="color:#0ea5e9">LIM · limlifestyle.com</strong>
+    <strong style="color:#075847">LIM · limlifestyle.com</strong>
   </div>
   <script>window.onload = () => { window.print(); }<\/script>
 </body>
@@ -255,7 +255,7 @@ export default function MachineSimulator() {
           <CardContent className="pt-8 pb-8 text-center space-y-4">
             <p className="text-gray-600">You must be signed in to use the machine simulator.</p>
             <a href={getLoginUrl()}>
-              <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white">Sign In</Button>
+              <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">Sign In</Button>
             </a>
           </CardContent>
         </Card>
@@ -267,7 +267,7 @@ export default function MachineSimulator() {
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-6">
       {/* Header — mimics a kiosk machine UI */}
       <div className="mb-8 text-center">
-        <div className="text-cyan-400 text-sm font-mono uppercase tracking-widest mb-1">LIM Health Station</div>
+        <div className="text-emerald-400 text-sm font-mono uppercase tracking-widest mb-1">LIM Health Station</div>
         <div className="text-gray-400 text-xs font-mono">SIMULATOR MODE · Device: SIMULATOR</div>
       </div>
 
@@ -286,7 +286,7 @@ export default function MachineSimulator() {
             </div>
             <Button
               onClick={() => setState("scanning")}
-              className="w-full bg-cyan-500 hover:bg-cyan-600 text-white text-lg py-6"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-lg py-6"
             >
               Touch to Start Session
             </Button>
@@ -330,7 +330,7 @@ export default function MachineSimulator() {
               )}
 
               {claimUserQRMutation.isPending ? (
-                <div className="flex items-center justify-center gap-2 text-cyan-400">
+                <div className="flex items-center justify-center gap-2 text-emerald-400">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span className="text-sm">Identifying user…</span>
                 </div>
@@ -339,7 +339,7 @@ export default function MachineSimulator() {
                   Stop Camera
                 </Button>
               ) : (
-                <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-12 text-base" onClick={startScanner}>
+                <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-12 text-base" onClick={startScanner}>
                   <Camera className="w-5 h-5 mr-2" />
                   Activate Camera to Scan
                 </Button>
@@ -378,7 +378,7 @@ export default function MachineSimulator() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500 text-sm">Mobile</span>
-                  <span className="text-cyan-400 text-sm">{confirmedUser.phone ?? "—"}</span>
+                  <span className="text-emerald-400 text-sm">{confirmedUser.phone ?? "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500 text-sm">Token</span>
@@ -420,7 +420,7 @@ export default function MachineSimulator() {
                      ))}
                    </div>
                    <Link href="/health" className="block">
-                     <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white">
+                     <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
                        View in My Health
                      </Button>
                    </Link>
@@ -497,7 +497,7 @@ export default function MachineSimulator() {
                 </div>
               ) : (
                 <Button
-                  className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-12 text-base"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-12 text-base"
                   onClick={() => guestMeasurementMutation.mutate()}
                   disabled={guestMeasurementMutation.isPending}
                 >

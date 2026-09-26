@@ -32,6 +32,7 @@
 - [x] Align arm target dots with their diagonal leaders, raise the trunk target above the navel, and extend the leg leaders further into the mid-leg area on both Events report views.
 - [x] Extend the trunk connector and target toward the horizontal center of the body while retaining its raised upper-abdomen position.
 - [x] Add persisted, explicit Events milestones: **التقرير النهائي** completes the consultation and opens the report; **إنهاء الرحلة** completes the report and marks all five journey steps finished.
+- [x] Rebrand the main LIM experience from light blue to the Events forest, lime, ivory, and coral visual system; replace the detached My Health body silhouette and five metric cards with the same shared, responsive professional muscle/fat anatomy board used in Events. The trunk leader and dot share one endpoint and land above the navel.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.

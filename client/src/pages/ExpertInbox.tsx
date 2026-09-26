@@ -154,7 +154,7 @@ export default function ExpertInbox() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
         </div>
       </div>
     );
@@ -167,12 +167,12 @@ export default function ExpertInbox() {
         <div className="flex-1 flex items-center justify-center">
           <Card className="max-w-md w-full mx-4">
             <CardContent className="pt-8 pb-8 text-center">
-              <MessageCircle className="w-12 h-12 text-cyan-500 mx-auto mb-4" />
+              <MessageCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
               <h2 className="text-xl font-semibold mb-2">
                 {isAr ? "سجّل الدخول لعرض الرسائل" : "Sign in to view messages"}
               </h2>
               <a href="/login">
-                <Button className="bg-cyan-500 hover:bg-cyan-600">
+                <Button className="bg-emerald-500 hover:bg-emerald-600">
                   {isAr ? "تسجيل الدخول" : "Sign In"}
                 </Button>
               </a>
@@ -238,7 +238,7 @@ export default function ExpertInbox() {
 
             {convsLoadingState ? (
               <div className="flex justify-center py-20">
-                <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
               </div>
             ) : !convList || convList.length === 0 ? (
               <div className="text-center py-20">
@@ -344,7 +344,7 @@ export default function ExpertInbox() {
                       <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {msgsLoading ? (
                           <div className="flex justify-center py-8">
-                            <Loader2 className="w-6 h-6 text-cyan-500 animate-spin" />
+                            <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
                           </div>
                         ) : !messages || messages.length === 0 ? (
                           <div className="text-center py-8 text-gray-400">

@@ -62,11 +62,11 @@ export default function Login() {
   const phonePlaceholder = "05XXXXXXXX";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
-            <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5 text-white" />
             </div>
             <span className="text-2xl font-bold text-gray-900">LIM</span>
@@ -93,7 +93,7 @@ export default function Login() {
                 <form onSubmit={handleLogin} className="space-y-4 pt-3">
                   <PhoneField id="login-phone" label={phoneLabel} placeholder={phonePlaceholder} value={loginPhone} onChange={setLoginPhone} />
                   <PasswordField id="login-password" label={isAr ? "كلمة المرور" : "Password"} value={loginPassword} onChange={setLoginPassword} />
-                  <Button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white" disabled={loginMutation.isPending}>
+                  <Button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" disabled={loginMutation.isPending}>
                     {loginMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     {isAr ? "تسجيل الدخول" : "Sign In"}
                   </Button>
@@ -112,7 +112,7 @@ export default function Login() {
                   <PhoneField id="reg-phone" label={phoneLabel} placeholder={phonePlaceholder} value={regPhone} onChange={setRegPhone} />
                   <PasswordField id="reg-password" label={isAr ? "كلمة المرور" : "Password"} value={regPassword} onChange={setRegPassword} minLength={6} />
                   <PasswordField id="reg-confirm" label={isAr ? "تأكيد كلمة المرور" : "Confirm Password"} value={regConfirm} onChange={setRegConfirm} minLength={6} />
-                  <Button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white" disabled={registerMutation.isPending}>
+                  <Button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" disabled={registerMutation.isPending}>
                     {registerMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     {isAr ? "إنشاء الحساب" : "Create Account"}
                   </Button>

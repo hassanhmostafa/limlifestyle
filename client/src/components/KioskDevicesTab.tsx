@@ -139,12 +139,12 @@ export function KioskDevicesTab() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-cyan-600" />
+            <Cpu className="w-5 h-5 text-emerald-600" />
             Kiosk Devices
           </h2>
           <div className="flex flex-wrap justify-end gap-2">
             <Button
-              className="bg-cyan-500 hover:bg-cyan-600 text-white"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
               onClick={openAdd}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -163,8 +163,8 @@ export function KioskDevicesTab() {
         </div>
 
         {/* Info card */}
-        <Card className="mb-6 border-cyan-100 bg-cyan-50">
-          <CardContent className="py-4 text-sm text-cyan-800">
+        <Card className="mb-6 border-emerald-100 bg-emerald-50">
+          <CardContent className="py-4 text-sm text-emerald-800">
             <p className="font-medium mb-1">How kiosk integration works</p>
             <p>
               Register each TRIPLEBIGHT kiosk machine here using its hardware Device ID (found in the kiosk Settings menu).
@@ -184,7 +184,7 @@ export function KioskDevicesTab() {
         {/* Devices list */}
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="w-6 h-6 text-cyan-500 animate-spin" />
+            <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
           </div>
         ) : !devices || devices.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
@@ -224,7 +224,7 @@ export function KioskDevicesTab() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-gray-500 hover:text-cyan-600"
+                      className="text-gray-500 hover:text-emerald-600"
                       onClick={() => toggleActive(device)}
                       title={device.isActive === "true" ? "Deactivate" : "Activate"}
                     >
@@ -235,7 +235,7 @@ export function KioskDevicesTab() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-gray-500 hover:text-cyan-600"
+                      className="text-gray-500 hover:text-emerald-600"
                       onClick={() => openEdit(device)}
                     >
                       <Pencil className="w-4 h-4" />
@@ -303,7 +303,7 @@ export function KioskDevicesTab() {
               Cancel
             </Button>
             <Button
-              className="bg-cyan-500 hover:bg-cyan-600"
+              className="bg-emerald-500 hover:bg-emerald-600"
               onClick={handleSubmit}
               disabled={isBusy || (!editingId && !form.deviceId.trim())}
             >
@@ -324,7 +324,7 @@ export function KioskDevicesTab() {
             <p className="text-sm text-gray-600">
               Use this one key for every registered active LIM device. LIM stores it only as a hash and cannot show it again.
             </p>
-            <code className="block w-full break-all rounded-lg bg-slate-950 p-3 text-xs text-cyan-300 font-mono">
+            <code className="block w-full break-all rounded-lg bg-slate-950 p-3 text-xs text-emerald-300 font-mono">
               {issuedCredential?.apiKey}
             </code>
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
@@ -333,7 +333,7 @@ export function KioskDevicesTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIssuedCredential(null)}>I copied it</Button>
-            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={copyCredential}>
+            <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={copyCredential}>
               <Copy className="w-4 h-4 mr-2" /> Copy Key
             </Button>
           </DialogFooter>

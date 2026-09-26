@@ -24,7 +24,7 @@ import { Link } from "wouter";
 type Tab = "upcoming" | "past";
 
 const STATUS_COLORS: Record<string, string> = {
-  confirmed: "bg-blue-100 text-blue-700",
+  confirmed: "bg-emerald-100 text-emerald-700",
   completed: "bg-green-100 text-green-700",
   cancelled: "bg-red-100 text-red-700",
 };
@@ -73,7 +73,7 @@ export default function MyBookings() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
         </main>
         <Footer />
       </div>
@@ -96,7 +96,7 @@ export default function MyBookings() {
                 : "You need to be signed in to view your bookings."}
             </p>
             <a href="/login">
-              <Button className="bg-cyan-500 hover:bg-cyan-600 text-white">
+              <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
                 {isAr ? "تسجيل الدخول" : "Sign In"}
               </Button>
             </a>
@@ -115,7 +115,7 @@ export default function MyBookings() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-1">
-            <CalendarDays className="w-7 h-7 text-cyan-500" />
+            <CalendarDays className="w-7 h-7 text-emerald-500" />
             <h1 className="text-3xl font-bold text-gray-900">
               {isAr ? "حجوزاتي" : "My Bookings"}
             </h1>
@@ -135,7 +135,7 @@ export default function MyBookings() {
               onClick={() => setActiveTab(tab)}
               className={`px-5 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === tab
-                  ? "bg-white text-cyan-600 shadow-sm"
+                  ? "bg-white text-emerald-600 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -153,7 +153,7 @@ export default function MyBookings() {
         {/* Content */}
         {isLoading ? (
           <div className="flex justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
           </div>
         ) : displayed.length === 0 ? (
           <div className="text-center py-20">
@@ -171,7 +171,7 @@ export default function MyBookings() {
               <Link href="/find-station">
                 <Button
                   variant="outline"
-                  className="mt-4 border-cyan-300 text-cyan-600 hover:bg-cyan-50"
+                  className="mt-4 border-emerald-300 text-emerald-600 hover:bg-emerald-50"
                 >
                   {isAr ? "ابحث عن محطة" : "Find a Station"}
                 </Button>
@@ -205,11 +205,11 @@ export default function MyBookings() {
                       {/* Date & time */}
                       <div className="flex flex-wrap items-center gap-3 text-sm text-gray-700">
                         <span className="flex items-center gap-1.5">
-                          <CalendarDays className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                          <CalendarDays className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                           {formatDate(booking.visitDate, isAr)}
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                          <Clock className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                           {booking.timeSlot}
                         </span>
                       </div>

@@ -92,7 +92,7 @@ export default function StationDetail() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <main className="flex-1 pt-20 flex items-center justify-center">
-          <Loader2 className="w-10 h-10 text-cyan-500 animate-spin" />
+          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
         </main>
         <Footer />
       </div>
@@ -108,7 +108,7 @@ export default function StationDetail() {
             <h1 className="text-2xl font-bold mb-2">{isAr ? "المحطة غير موجودة" : "Station Not Found"}</h1>
             <p className="text-gray-600 mb-4">{isAr ? "المحطة التي تبحث عنها غير موجودة." : "The station you are looking for does not exist."}</p>
             <Link href="/find-station">
-              <Button className="bg-cyan-500 hover:bg-cyan-600">{isAr ? "العودة إلى المحطات" : "Back to Stations"}</Button>
+              <Button className="bg-emerald-500 hover:bg-emerald-600">{isAr ? "العودة إلى المحطات" : "Back to Stations"}</Button>
             </Link>
           </div>
         </main>
@@ -138,7 +138,7 @@ export default function StationDetail() {
 
       <main className="flex-1 pt-20">
         {/* Header */}
-        <section className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-8">
+        <section className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-8">
           <div className="container">
             <Link href="/find-station">
               <Button variant="ghost" className="text-white hover:bg-white/20 mb-4">
@@ -147,7 +147,7 @@ export default function StationDetail() {
               </Button>
             </Link>
             <h1 className="text-4xl font-bold mb-2">{kiosk.name}</h1>
-            <p className="text-cyan-50">{kiosk.location}</p>
+            <p className="text-emerald-50">{kiosk.location}</p>
           </div>
         </section>
 
@@ -173,12 +173,12 @@ export default function StationDetail() {
                       : "This health screening station is equipped with state-of-the-art medical devices to provide comprehensive health assessments. Our trained staff is available to assist you with all your screening needs."}
                   </p>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-cyan-50 rounded-lg">
-                      <div className="text-3xl font-bold text-cyan-600 mb-1">{services.length}</div>
+                    <div className="p-4 bg-emerald-50 rounded-lg">
+                      <div className="text-3xl font-bold text-emerald-600 mb-1">{services.length}</div>
                       <div className="text-sm text-gray-600">{isAr ? "خدمة متاحة" : "Services Available"}</div>
                     </div>
-                    <div className="p-4 bg-cyan-50 rounded-lg">
-                      <div className="text-3xl font-bold text-cyan-600 mb-1">{kiosk.rating ?? "N/A"}</div>
+                    <div className="p-4 bg-emerald-50 rounded-lg">
+                      <div className="text-3xl font-bold text-emerald-600 mb-1">{kiosk.rating ?? "N/A"}</div>
                       <div className="text-sm text-gray-600">{isAr ? "تقييم العملاء" : "Customer Rating"}</div>
                     </div>
                   </div>
@@ -193,8 +193,8 @@ export default function StationDetail() {
                         const Icon = serviceIcons[idx % serviceIcons.length];
                         return (
                           <div key={idx} className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
-                            <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Icon className="w-5 h-5 text-cyan-600" />
+                            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Icon className="w-5 h-5 text-emerald-600" />
                             </div>
                             <div>
                               <h3 className="font-semibold text-gray-900">{service}</h3>
@@ -232,7 +232,7 @@ export default function StationDetail() {
                   <h3 className="text-xl font-bold mb-6">{isAr ? "معلومات التواصل" : "Contact Information"}</h3>
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
-                      <MapPin className="w-5 h-5 text-cyan-600 mt-1 flex-shrink-0" />
+                      <MapPin className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
                       <div>
                         <p className="text-sm text-gray-600">{isAr ? "العنوان" : "Address"}</p>
                         <p className="font-medium text-gray-900">{kiosk.address}</p>
@@ -241,10 +241,10 @@ export default function StationDetail() {
 
                     {kiosk.phone && (
                       <div className="flex items-start gap-3">
-                        <Phone className="w-5 h-5 text-cyan-600 mt-1 flex-shrink-0" />
+                        <Phone className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
                         <div>
                           <p className="text-sm text-gray-600">{isAr ? "الهاتف" : "Phone"}</p>
-                          <a href={`tel:${kiosk.phone}`} className="font-medium text-cyan-600 hover:text-cyan-700">
+                          <a href={`tel:${kiosk.phone}`} className="font-medium text-emerald-600 hover:text-emerald-700">
                             {kiosk.phone}
                           </a>
                         </div>
@@ -253,12 +253,12 @@ export default function StationDetail() {
 
                     {kiosk.email && (
                       <div className="flex items-start gap-3">
-                        <Heart className="w-5 h-5 text-cyan-600 mt-1 flex-shrink-0" />
+                        <Heart className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
                         <div>
                           <p className="text-sm text-gray-600">{isAr ? "البريد الإلكتروني" : "Email"}</p>
                           <a
                             href={`mailto:${kiosk.email}`}
-                            className="font-medium text-cyan-600 hover:text-cyan-700 break-all"
+                            className="font-medium text-emerald-600 hover:text-emerald-700 break-all"
                           >
                             {kiosk.email}
                           </a>
@@ -269,7 +269,7 @@ export default function StationDetail() {
 
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <Button
-                      className="w-full bg-cyan-500 hover:bg-cyan-600 text-white mb-3"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white mb-3"
                       onClick={handleOpenBooking}
                     >
                       <CalendarDays className="w-4 h-4 mr-2" />
@@ -309,7 +309,7 @@ export default function StationDetail() {
                 )}
 
                 {/* Tips */}
-                <Card className="p-6 border-0 shadow-lg bg-cyan-50">
+                <Card className="p-6 border-0 shadow-lg bg-emerald-50">
                   <h3 className="font-bold text-gray-900 mb-3">{isAr ? "نصائح سريعة" : "Quick Tips"}</h3>
                   <ul className="text-sm text-gray-700 space-y-2">
                     <li>✓ {isAr ? "الفحوصات مجانية تماماً" : "Screenings are completely free"}</li>
@@ -324,10 +324,10 @@ export default function StationDetail() {
         </section>
 
         {/* CTA */}
-        <section className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-12 mt-12">
+        <section className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-12 mt-12">
           <div className="container text-center">
             <h2 className="text-3xl font-bold mb-4">{isAr ? "هل أنت مستعد لفحصك الصحي؟" : "Ready for Your Health Screening?"}</h2>
-            <p className="text-cyan-50 mb-6 max-w-2xl mx-auto">
+            <p className="text-emerald-50 mb-6 max-w-2xl mx-auto">
               {isAr
                 ? `زُر ${kiosk.name} اليوم مع LIM وابدأ خطوتك الأولى نحو صحة أفضل`
                 : `Visit ${kiosk.name} today with LIM and take the first step towards better health`}
@@ -335,7 +335,7 @@ export default function StationDetail() {
             <div className="flex gap-4 justify-center">
               <Button
                 size="lg"
-                className="bg-white text-cyan-600 hover:bg-gray-100"
+                className="bg-white text-emerald-600 hover:bg-gray-100"
                 onClick={handleOpenBooking}
               >
                 <CalendarDays className="w-4 h-4 mr-2" />
@@ -363,7 +363,7 @@ export default function StationDetail() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-cyan-500" />
+              <CalendarDays className="w-5 h-5 text-emerald-500" />
               {isAr ? "احجز موعد فحص" : "Book a Screening Slot"}
             </DialogTitle>
           </DialogHeader>
@@ -378,7 +378,7 @@ export default function StationDetail() {
                   : <>Your screening slot at <span className="font-semibold">{kiosk.name}</span> has been booked for{" "}<span className="font-semibold">{selectedDate}</span> at{" "}<span className="font-semibold">{selectedSlot}</span>.</>}
               </p>
               <p className="text-sm text-gray-500">{isAr ? "يمكنك عرض حجوزاتك في ملفك الشخصي." : "You can view your bookings in your profile."}</p>
-              <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={handleCloseBooking}>
+              <Button className="bg-emerald-500 hover:bg-emerald-600" onClick={handleCloseBooking}>
                 {isAr ? "تم" : "Done"}
               </Button>
             </div>
@@ -397,7 +397,7 @@ export default function StationDetail() {
                       setSelectedDate(e.target.value);
                       setSelectedSlot("");
                     }}
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                 </div>
 
@@ -429,8 +429,8 @@ export default function StationDetail() {
                             onClick={() => setSelectedSlot(slot)}
                             className={`px-2 py-2 text-xs font-medium rounded-md border transition-colors ${
                               selectedSlot === slot
-                                ? "bg-cyan-500 text-white border-cyan-500"
-                                : "bg-white text-gray-700 border-gray-200 hover:border-cyan-400 hover:text-cyan-600"
+                                ? "bg-emerald-500 text-white border-emerald-500"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-emerald-400 hover:text-emerald-600"
                             }`}
                           >
                             {slot}
@@ -450,16 +450,16 @@ export default function StationDetail() {
                       onChange={(e) => setBookingNotes(e.target.value)}
                       placeholder={isAr ? "أي متطلبات أو ملاحظات خاصة..." : "Any special requirements or notes…"}
                       rows={2}
-                      className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none"
+                      className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none"
                     />
                   </div>
                 )}
 
                 {/* Summary */}
                 {selectedDate && selectedSlot && (
-                  <div className="bg-cyan-50 border border-cyan-200 rounded-md p-3 text-sm">
-                    <p className="font-medium text-cyan-800">{isAr ? "ملخص الحجز" : "Booking Summary"}</p>
-                    <p className="text-cyan-700 mt-1">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-sm">
+                    <p className="font-medium text-emerald-800">{isAr ? "ملخص الحجز" : "Booking Summary"}</p>
+                    <p className="text-emerald-700 mt-1">
                       {kiosk.name} · {selectedDate} · {selectedSlot}
                     </p>
                   </div>
@@ -469,7 +469,7 @@ export default function StationDetail() {
               <DialogFooter>
                 <Button variant="outline" onClick={handleCloseBooking}>{isAr ? "إلغاء" : "Cancel"}</Button>
                 <Button
-                  className="bg-cyan-500 hover:bg-cyan-600"
+                  className="bg-emerald-500 hover:bg-emerald-600"
                   onClick={handleBook}
                   disabled={!selectedDate || !selectedSlot || bookMutation.isPending}
                 >

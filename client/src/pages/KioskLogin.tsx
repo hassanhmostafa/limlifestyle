@@ -194,8 +194,8 @@ export default function KioskLogin() {
 
   if (pageState === "loading") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
       </div>
     );
   }
@@ -204,13 +204,13 @@ export default function KioskLogin() {
 
   if (pageState === "connect") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-4">
 
           {/* Header */}
           <div className="text-center mb-2">
             <div className="inline-flex items-center gap-2 mb-2">
-              <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
                 <Heart className="w-5 h-5 text-white" />
               </div>
               <span className="text-2xl font-bold text-gray-900">LIM</span>
@@ -234,7 +234,7 @@ export default function KioskLogin() {
               <button
                 className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors border-b-2 ${
                   connectTab === "qr"
-                    ? "border-cyan-500 text-cyan-600"
+                    ? "border-emerald-500 text-emerald-600"
                     : "border-transparent text-gray-400 hover:text-gray-600"
                 }`}
                 onClick={() => setConnectTab("qr")}
@@ -245,7 +245,7 @@ export default function KioskLogin() {
               <button
                 className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors border-b-2 ${
                   connectTab === "manual"
-                    ? "border-cyan-500 text-cyan-600"
+                    ? "border-emerald-500 text-emerald-600"
                     : "border-transparent text-gray-400 hover:text-gray-600"
                 }`}
                 onClick={() => setConnectTab("manual")}
@@ -280,7 +280,7 @@ export default function KioskLogin() {
                   )}
 
                   {createSessionMutation.isPending ? (
-                    <div className="flex items-center justify-center gap-2 py-3 text-cyan-600">
+                    <div className="flex items-center justify-center gap-2 py-3 text-emerald-600">
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span className="text-sm font-medium">
                         {isAr ? "جارٍ إنشاء الجلسة..." : "Creating session..."}
@@ -296,7 +296,7 @@ export default function KioskLogin() {
                     </Button>
                   ) : (
                     <Button
-                      className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-11 text-base font-medium"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-11 text-base font-medium"
                       onClick={startScanner}
                     >
                       <Camera className="w-4 h-4 mr-2" />
@@ -337,7 +337,7 @@ export default function KioskLogin() {
 
                   <Button
                     type="submit"
-                    className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-11 text-base font-medium"
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-11 text-base font-medium"
                     disabled={!manualDeviceId || createSessionMutation.isPending}
                   >
                     {createSessionMutation.isPending ? (
@@ -360,7 +360,7 @@ export default function KioskLogin() {
                   isAr ? "أجرِ القياسات — ستظهر النتائج تلقائياً في التطبيق" : "Complete measurements — results appear automatically in the app",
                 ].map((step, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-cyan-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
                       {i + 1}
                     </div>
                     <p className="text-sm text-gray-600">{step}</p>
@@ -386,7 +386,7 @@ export default function KioskLogin() {
 
   if (pageState === "success") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-4">
           <Card className="shadow-lg border-0">
             <CardContent className="pt-8 pb-6 text-center space-y-4">
@@ -401,8 +401,8 @@ export default function KioskLogin() {
                   ? "تم ربط حسابك بالجهاز. يمكنك الآن وضع هاتفك جانباً وإجراء القياسات على الجهاز. ستظهر النتائج تلقائياً في تطبيقك بعد الانتهاء."
                   : "Your account has been linked to the machine. You can now put your phone aside and proceed with the health measurements. Your results will appear automatically in the app once finished."}
               </p>
-              <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4 text-left space-y-2">
-                <div className="flex items-center gap-2 text-cyan-700 font-medium text-sm">
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-left space-y-2">
+                <div className="flex items-center gap-2 text-emerald-700 font-medium text-sm">
                   <Activity className="w-4 h-4" />
                   {isAr ? "الخطوات التالية:" : "Next steps:"}
                 </div>
@@ -413,7 +413,7 @@ export default function KioskLogin() {
                 </ol>
               </div>
               <Button
-                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
                 onClick={() => navigate("/health")}
               >
                 {isAr ? "الذهاب إلى لوحة الصحة" : "Go to Health Dashboard"}
@@ -431,7 +431,7 @@ export default function KioskLogin() {
 
   if (pageState === "error") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-lg border-0">
           <CardContent className="pt-8 pb-8 text-center space-y-4">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
@@ -459,13 +459,13 @@ export default function KioskLogin() {
   // ── Confirm (token present) ───────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-4">
 
         {/* Header */}
         <div className="text-center mb-2">
           <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 bg-cyan-500 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5 text-white" />
             </div>
             <span className="text-2xl font-bold text-gray-900">LIM</span>
@@ -474,8 +474,8 @@ export default function KioskLogin() {
 
         <Card className="shadow-lg border-0">
           <CardHeader className="pb-3 text-center">
-            <div className="w-14 h-14 bg-cyan-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <QrCode className="w-7 h-7 text-cyan-600" />
+            <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <QrCode className="w-7 h-7 text-emerald-600" />
             </div>
             <CardTitle className="text-lg">
               {isAr ? "ربط الجهاز بحسابك" : "Link Machine to Your Account"}
@@ -491,7 +491,7 @@ export default function KioskLogin() {
             {/* User info card */}
             {user && (
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
-                <div className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div className="min-w-0">
@@ -506,8 +506,8 @@ export default function KioskLogin() {
             )}
 
             {/* What happens next */}
-            <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-3 space-y-1">
-              <p className="text-xs font-medium text-cyan-700">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-1">
+              <p className="text-xs font-medium text-emerald-700">
                 {isAr ? "ماذا سيحدث؟" : "What will happen?"}
               </p>
               <p className="text-xs text-gray-600 leading-relaxed">
@@ -519,7 +519,7 @@ export default function KioskLogin() {
 
             {/* Confirm button */}
             <Button
-              className="w-full bg-cyan-500 hover:bg-cyan-600 text-white h-11 text-base font-medium"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-11 text-base font-medium"
               onClick={handleConfirm}
               disabled={confirmMutation.isPending}
             >

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Bone, CalendarDays, Droplets, Dumbbell, Flame, Gauge, Percent, Scale, Sparkles, UserRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { LIMAnatomyDistribution } from "@/components/LIMAnatomyDistribution";
 
 export type DashboardReading = {
   id: number;
@@ -29,7 +30,7 @@ type MetricDefinition = {
 
 const metrics: MetricDefinition[] = [
   { key: "$height", en: "Height", ar: "الطول", unit: "cm", color: "#0ea5a4" },
-  { key: "$weight", en: "Weight", ar: "الوزن", unit: "kg", color: "#3b82f6" },
+  { key: "$weight", en: "Weight", ar: "الوزن", unit: "kg", color: "#87bd37" },
   { key: "$bmi", en: "BMI", ar: "مؤشر كتلة الجسم", unit: "", color: "#8b5cf6" },
   { key: "fatRate", en: "Body fat percentage", ar: "نسبة الدهون", unit: "%", color: "#ef6d5a" },
   { key: "bodyScore", en: "Body score", ar: "مؤشر كتلة الجسم", unit: "", color: "#d2a11a" },
@@ -47,7 +48,7 @@ const metrics: MetricDefinition[] = [
   { key: "vfal", en: "Visceral fat level", ar: "الدهون الحشوية", unit: "level", color: "#ef6d5a" },
   { key: "whr", en: "Waist-to-hip ratio", ar: "نسبة الخصر إلى الورك", unit: "", color: "#d27d3a" },
   { key: "fatSubCutRate", en: "Subcutaneous fat", ar: "الدهون تحت الجلد", unit: "%", color: "#ef6d5a" },
-  { key: "idealWeight", en: "Ideal weight", ar: "الوزن المثالي", unit: "kg", color: "#3b82f6" },
+  { key: "idealWeight", en: "Ideal weight", ar: "الوزن المثالي", unit: "kg", color: "#87bd37" },
   { key: "dci", en: "Daily calorie intake", ar: "الاحتياج اليومي للطاقة", unit: "kcal", color: "#e8902d" },
   { key: "bodyAge", en: "Body age", ar: "عمر الجسم", unit: "years", color: "#7a6ad8" },
   { key: "obesity", en: "Obesity index", ar: "مؤشر السمنة", unit: "%", color: "#d27d3a" },
@@ -185,24 +186,6 @@ function X18MetricTrend({ metric, readings, language }: { metric: MetricDefiniti
   );
 }
 
-function BodySilhouette({ mode }: { mode: "muscle" | "fat" }) {
-  const color = mode === "muscle" ? "#25855e" : "#ef836f";
-  const pale = mode === "muscle" ? "#ccebd9" : "#fbd1c8";
-  return (
-    <svg viewBox="0 0 170 250" className="mx-auto h-56 w-36" role="img" aria-label={mode === "muscle" ? "Muscle distribution" : "Fat distribution"}>
-      <circle cx="85" cy="24" r="18" fill="#f0d9c6" />
-      <rect x="70" y="41" width="30" height="17" rx="7" fill="#ead2bd" />
-      <path d="M54 60 Q85 48 116 60 L127 129 Q115 145 85 145 Q55 145 43 129 Z" fill={pale} stroke={color} strokeWidth="2"/>
-      <path d="M51 66 L20 115 L30 128 L59 94" fill={pale} stroke={color} strokeWidth="2"/>
-      <path d="M119 66 L150 115 L140 128 L111 94" fill={pale} stroke={color} strokeWidth="2"/>
-      <path d="M63 139 L52 218 L73 223 L84 155" fill={pale} stroke={color} strokeWidth="2"/>
-      <path d="M107 139 L118 218 L97 223 L86 155" fill={pale} stroke={color} strokeWidth="2"/>
-      <path d="M68 63 Q85 81 102 63 M60 100 Q85 113 110 100 M85 58 L85 140" stroke={color} strokeWidth="2" opacity=".7" fill="none"/>
-      <circle cx="29" cy="117" r="4" fill={color}/><circle cx="141" cy="117" r="4" fill={color}/><circle cx="85" cy="103" r="4" fill={color}/><circle cx="63" cy="189" r="4" fill={color}/><circle cx="107" cy="189" r="4" fill={color}/>
-    </svg>
-  );
-}
-
 export function BodyCompositionReport({ readings, language }: { readings: DashboardReading[]; language: Language }) {
   const reports = readings.filter((reading) => Object.keys(recordMetrics(reading)).length > 0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -216,9 +199,7 @@ export function BodyCompositionReport({ readings, language }: { readings: Dashbo
   ];
   const compositionKeys = ["fat", "waterRate", "skeletalMuscle", "muscle"];
   const additionKeys = ["bmr", "vfal", "fatFree", "bone", "protein", "waterICW", "waterECW", "mineral", "whr", "fatSubCutRate", "idealWeight", "dci", "bodyAge", "obesity"];
-  const segments = segmentDefinitions[mode];
   const genderLabel = formatX18Sex(report.patientSex, language);
-  const segmentColor = mode === "muscle" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950";
   const allSegments = [...segmentDefinitions.muscle, ...segmentDefinitions.fat];
   const trendMetrics = [...metrics, ...allSegments.map((segment) => ({ key: segment.key, en: segment.en, ar: segment.ar, unit: "kg", color: segment.key.startsWith("muscle") ? "#25855e" : "#ef836f" }))]
     .filter((metric, index, list) => list.findIndex((candidate) => candidate.key === metric.key) === index)
@@ -266,21 +247,14 @@ export function BodyCompositionReport({ readings, language }: { readings: Dashbo
       <Card className="overflow-hidden border-0 p-4 shadow-sm sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div><h3 className="text-lg font-extrabold text-slate-800">{language === "ar" ? "توزيع الدهون والعضلات" : "Fat & Muscle Distribution"}</h3><p className="text-sm text-slate-500">{language === "ar" ? "اختر نوع القياس لعرض القيم القطاعية من الجهاز" : "Choose a measurement type to view the device's segmental values."}</p></div>
-          <div className="flex rounded-xl bg-slate-100 p-1">
-            {(["muscle", "fat"] as const).map((item) => <button key={item} onClick={() => setMode(item)} className={`rounded-lg px-5 py-2 text-sm font-bold transition ${mode === item ? (item === "muscle" ? "bg-emerald-700 text-white shadow" : "bg-rose-500 text-white shadow") : "text-slate-500"}`}>{item === "muscle" ? (language === "ar" ? "العضلات" : "Muscle") : (language === "ar" ? "الدهون" : "Fat")}</button>)}
+          <div className="flex rounded-xl bg-[#eef4ec] p-1">
+            {(["muscle", "fat"] as const).map((item) => <button key={item} onClick={() => setMode(item)} className={`rounded-lg px-5 py-2 text-sm font-bold transition ${mode === item ? (item === "muscle" ? "bg-[#073f35] text-white shadow" : "bg-[#ef806d] text-white shadow") : "text-[#49665c] hover:text-[#073f35]"}`}>{item === "muscle" ? (language === "ar" ? "العضلات" : "Muscle") : (language === "ar" ? "الدهون" : "Fat")}</button>)}
           </div>
         </div>
-        <div className="grid items-center gap-4 md:grid-cols-[1fr_180px_1fr]">
-          <div className="grid gap-3">
-            {segments.slice(0, 2).map((segment) => <div key={segment.key} className={`rounded-xl border p-3 ${segmentColor}`}><div className="text-xs font-medium opacity-70">{language === "ar" ? segment.ar : segment.en}</div><div className="text-xl font-extrabold">{formattedValue(report, segment.key, "kg")}</div></div>)}
-            <div className={`rounded-xl border p-3 ${segmentColor}`}><div className="text-xs font-medium opacity-70">{language === "ar" ? segments[2].ar : segments[2].en}</div><div className="text-xl font-extrabold">{formattedValue(report, segments[2].key, "kg")}</div></div>
-          </div>
-          <div className="rounded-3xl bg-slate-50 py-2"><BodySilhouette mode={mode}/></div>
-          <div className="grid gap-3">
-            {segments.slice(3).map((segment) => <div key={segment.key} className={`rounded-xl border p-3 ${segmentColor}`}><div className="text-xs font-medium opacity-70">{language === "ar" ? segment.ar : segment.en}</div><div className="text-xl font-extrabold">{formattedValue(report, segment.key, "kg")}</div></div>)}
-            <div className="rounded-xl border border-slate-200 bg-white p-3 text-slate-700"><div className="text-xs font-medium text-slate-400">{language === "ar" ? "مصدر القياس" : "Report source"}</div><div className="mt-1 break-all text-xs font-semibold">{report.deviceNo ?? "X18"} · {report.recordNo ?? "—"}</div></div>
-          </div>
+        <div className="rounded-[1.4rem] border border-[#dfe9e1] bg-[#f8faf4] p-2 sm:p-4">
+          <LIMAnatomyDistribution mode={mode} values={recordMetrics(report)} language={language} />
         </div>
+        <div className="mt-3 rounded-xl border border-[#e3ebe5] bg-[#fbfdf9] p-3 text-center text-xs text-[#557069]">{language === "ar" ? "اليمين واليسار من منظور صاحب القياس." : "Right and left are from the measured person's perspective."} <span className="mx-1 text-[#adc3ba]">·</span><bdi>{report.deviceNo ?? "X18"} · {report.recordNo ?? "—"}</bdi></div>
       </Card>
 
       <Card className="border-0 p-4 shadow-sm sm:p-6">

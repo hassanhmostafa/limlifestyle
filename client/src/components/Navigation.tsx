@@ -30,15 +30,15 @@ export default function Navigation() {
 
   return (
     <>
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#dfe9e1] bg-white/95 shadow-[0_4px_18px_rgba(7,63,53,0.06)] backdrop-blur-md">
       <div className="container flex items-center justify-between h-16">
         {/* Logo */}
         <Link href="/">
           <div className="flex items-center gap-2 cursor-pointer">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <Heart className="w-6 h-6 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#dff45a] shadow-[0_8px_18px_rgba(130,166,40,0.25)]">
+              <Heart className="h-6 w-6 text-[#073f35]" />
             </div>
-            <span className="font-bold text-xl text-gray-900">LIM</span>
+            <span className="text-xl font-black tracking-tight text-[#073f35]">LIM</span>
           </div>
         </Link>
 
@@ -48,7 +48,7 @@ export default function Navigation() {
             <Link key={href} href={href}>
               <span
                 className={`transition-colors cursor-pointer font-medium ${
-                  location === href ? "text-cyan-600" : "text-gray-700 hover:text-cyan-600"
+                  location === href ? "text-[#075847]" : "text-[#49665c] hover:text-[#075847]"
                 }`}
               >
                 {label}
@@ -60,7 +60,7 @@ export default function Navigation() {
             <Link href="/my-bookings">
               <span
                 className={`transition-colors cursor-pointer font-medium flex items-center gap-1 ${
-                  location === "/my-bookings" ? "text-cyan-600" : "text-gray-700 hover:text-cyan-600"
+                  location === "/my-bookings" ? "text-[#075847]" : "text-[#49665c] hover:text-[#075847]"
                 }`}
               >
                 <CalendarDays className="w-4 h-4" />
@@ -73,7 +73,7 @@ export default function Navigation() {
             <Link href="/kiosk-qr">
               <span
                 className={`transition-colors cursor-pointer font-medium flex items-center gap-1 ${
-                  location === "/kiosk-qr" ? "text-cyan-600" : "text-gray-700 hover:text-cyan-600"
+                  location === "/kiosk-qr" ? "text-[#075847]" : "text-[#49665c] hover:text-[#075847]"
                 }`}
               >
                 <QrCode className="w-4 h-4" />
@@ -85,7 +85,7 @@ export default function Navigation() {
             <Link href="/experts">
               <span
                 className={`transition-colors cursor-pointer font-medium flex items-center gap-1 ${
-                  location === "/experts" ? "text-teal-600" : "text-gray-700 hover:text-teal-600"
+                  location === "/experts" ? "text-[#075847]" : "text-[#49665c] hover:text-[#075847]"
                 }`}
               >
                 <Stethoscope className="w-4 h-4" />
@@ -97,7 +97,7 @@ export default function Navigation() {
             <Link href="/expert-inbox">
               <span
                 className={`transition-colors cursor-pointer font-medium flex items-center gap-1 ${
-                  location === "/expert-inbox" ? "text-teal-600" : "text-gray-700 hover:text-teal-600"
+                  location === "/expert-inbox" ? "text-[#075847]" : "text-[#49665c] hover:text-[#075847]"
                 }`}
               >
                 <MessageCircle className="w-4 h-4" />
@@ -109,7 +109,7 @@ export default function Navigation() {
             <Link href="/admin">
               <span
                 className={`transition-colors cursor-pointer font-medium flex items-center gap-1 ${
-                  location === "/admin" ? "text-cyan-600" : "text-gray-700 hover:text-cyan-600"
+                  location === "/admin" ? "text-[#075847]" : "text-[#49665c] hover:text-[#075847]"
                 }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -125,7 +125,7 @@ export default function Navigation() {
           {canInstall && (
             <button
               onClick={handleNavInstall}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 transition-colors text-sm font-medium text-cyan-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition-colors text-sm font-medium text-emerald-700"
               title={language === "ar" ? "تثبيت التطبيق" : "Install App"}
             >
               {isIOS ? <Share className="w-4 h-4" /> : <Download className="w-4 h-4" />}
@@ -136,7 +136,7 @@ export default function Navigation() {
           {/* Language Toggle */}
           <button
             onClick={toggleLanguage}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-cyan-400 hover:bg-cyan-50 transition-colors text-sm font-medium text-gray-600 hover:text-cyan-600"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors text-sm font-medium text-gray-600 hover:text-emerald-600"
             title={language === "en" ? "Switch to Arabic" : "التبديل إلى الإنجليزية"}
           >
             <Globe className="w-4 h-4" />
@@ -147,7 +147,7 @@ export default function Navigation() {
             <>
               <Link href="/profile">
                 <span className={`text-sm font-medium flex items-center gap-1 cursor-pointer transition-colors ${
-                  location === "/profile" ? "text-cyan-600" : "text-gray-600 hover:text-cyan-600"
+                  location === "/profile" ? "text-emerald-600" : "text-gray-600 hover:text-emerald-600"
                 }`}>
                   <UserCircle2 className="w-4 h-4" />
                   {user?.name?.split(" ")[0]}
@@ -165,13 +165,13 @@ export default function Navigation() {
           ) : (
             <>
               <Link href="/login">
-                <Button variant="ghost" className="text-gray-700 hover:text-cyan-600">
+                <Button variant="ghost" className="text-gray-700 hover:text-emerald-600">
                   <LogIn className="w-4 h-4 mr-1" />
                   {t.nav_signIn}
                 </Button>
               </Link>
               <Link href="/login">
-                <Button className="bg-cyan-500 hover:bg-cyan-600 text-white">{t.nav_getStarted}</Button>
+                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">{t.nav_getStarted}</Button>
               </Link>
             </>
           )}
@@ -202,7 +202,7 @@ export default function Navigation() {
             {navLinks.map(({ href, label }) => (
               <Link key={href} href={href}>
                 <div
-                  className="text-gray-700 hover:text-cyan-600 py-2 cursor-pointer font-medium"
+                  className="text-gray-700 hover:text-emerald-600 py-2 cursor-pointer font-medium"
                   onClick={() => setIsOpen(false)}
                 >
                   {label}
@@ -213,7 +213,7 @@ export default function Navigation() {
             {isAuthenticated && (
               <Link href="/kiosk-qr">
                 <div
-                  className="text-gray-700 hover:text-cyan-600 py-2 cursor-pointer font-medium flex items-center gap-1"
+                  className="text-gray-700 hover:text-emerald-600 py-2 cursor-pointer font-medium flex items-center gap-1"
                   onClick={() => setIsOpen(false)}
                 >
                   <QrCode className="w-4 h-4" />
@@ -224,7 +224,7 @@ export default function Navigation() {
             {isAuthenticated && (
               <Link href="/my-bookings">
                 <div
-                  className="text-gray-700 hover:text-cyan-600 py-2 cursor-pointer font-medium flex items-center gap-1"
+                  className="text-gray-700 hover:text-emerald-600 py-2 cursor-pointer font-medium flex items-center gap-1"
                   onClick={() => setIsOpen(false)}
                 >
                   <CalendarDays className="w-4 h-4" />
@@ -258,7 +258,7 @@ export default function Navigation() {
             {user?.role === "admin" && (
               <Link href="/admin">
                 <div
-                  className="text-gray-700 hover:text-cyan-600 py-2 cursor-pointer font-medium flex items-center gap-1"
+                  className="text-gray-700 hover:text-emerald-600 py-2 cursor-pointer font-medium flex items-center gap-1"
                   onClick={() => setIsOpen(false)}
                 >
                   <LayoutDashboard className="w-4 h-4" />
@@ -270,7 +270,7 @@ export default function Navigation() {
             {canInstall && (
               <button
                 onClick={() => { handleNavInstall(); setIsOpen(false); }}
-                className="flex items-center gap-2 py-2 text-cyan-700 font-medium w-full"
+                className="flex items-center gap-2 py-2 text-emerald-700 font-medium w-full"
               >
                 {isIOS ? <Share className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                 {language === "ar" ? "تثبيت التطبيق" : "Install App"}
@@ -293,7 +293,7 @@ export default function Navigation() {
                     <Button variant="ghost" className="w-full">{t.nav_signIn}</Button>
                   </Link>
                   <Link href="/login" className="flex-1">
-                    <Button className="w-full bg-cyan-500 hover:bg-cyan-600">{t.nav_getStarted}</Button>
+                    <Button className="w-full bg-emerald-500 hover:bg-emerald-600">{t.nav_getStarted}</Button>
                   </Link>
                 </>
               )}

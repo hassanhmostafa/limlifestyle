@@ -26,7 +26,7 @@ export interface HealthScoreSnapshot {
 
 function addHeader(doc: jsPDF, title: string, subtitle: string) {
   // Teal header bar
-  doc.setFillColor(8, 145, 178); // cyan-600
+  doc.setFillColor(8, 145, 178); // emerald-600
   doc.rect(0, 0, 210, 28, "F");
 
   doc.setTextColor(255, 255, 255);

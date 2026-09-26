@@ -46,7 +46,7 @@ export default function FindExperts() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
         </div>
       </div>
     );
@@ -59,7 +59,7 @@ export default function FindExperts() {
         <div className="flex-1 flex items-center justify-center">
           <Card className="max-w-md w-full mx-4">
             <CardContent className="pt-8 pb-8 text-center">
-              <Stethoscope className="w-12 h-12 text-cyan-500 mx-auto mb-4" />
+              <Stethoscope className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
               <h2 className="text-xl font-semibold mb-2">
                 {isAr ? "سجّل الدخول للتحدث مع الخبراء" : "Sign in to Talk to Experts"}
               </h2>
@@ -69,7 +69,7 @@ export default function FindExperts() {
                   : "You need to be signed in to browse and message health experts."}
               </p>
               <a href="/login">
-                <Button className="bg-cyan-500 hover:bg-cyan-600">
+                <Button className="bg-emerald-500 hover:bg-emerald-600">
                   {isAr ? "تسجيل الدخول" : "Sign In"}
                 </Button>
               </a>
@@ -117,7 +117,7 @@ export default function FindExperts() {
           <div className="container max-w-4xl">
             {isLoading ? (
               <div className="flex justify-center py-20">
-                <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
               </div>
             ) : !filtered || filtered.length === 0 ? (
               <div className="text-center py-20">

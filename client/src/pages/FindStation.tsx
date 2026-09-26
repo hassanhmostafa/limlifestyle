@@ -57,11 +57,11 @@ export default function FindStation() {
 
       <main className="flex-1 pt-20">
         {/* Header */}
-        <section className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-12">
+        <section className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-12">
           <div className="container flex items-end justify-between">
             <div>
               <h1 className="text-4xl font-bold mb-2">{t.findStation_title}</h1>
-              <p className="text-cyan-50">{t.findStation_subtitle}</p>
+              <p className="text-emerald-50">{t.findStation_subtitle}</p>
             </div>
 
           </div>
@@ -80,7 +80,7 @@ export default function FindStation() {
                   className="pl-10"
                 />
               </div>
-              <Button className="bg-cyan-500 hover:bg-cyan-600">{t.home_searchBtn}</Button>
+              <Button className="bg-emerald-500 hover:bg-emerald-600">{t.home_searchBtn}</Button>
             </div>
           </div>
         </section>
@@ -100,7 +100,7 @@ export default function FindStation() {
               <div className="space-y-4 max-h-[600px] overflow-y-auto">
                 {isLoading && (
                   <div className="flex items-center justify-center py-16">
-                    <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+                    <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
                   </div>
                 )}
 
@@ -123,7 +123,7 @@ export default function FindStation() {
                       key={kiosk.id}
                       className={`p-4 cursor-pointer transition-all border-2 ${
                         selectedKiosk?.id === kiosk.id
-                          ? "border-cyan-500 bg-cyan-50 shadow-lg"
+                          ? "border-emerald-500 bg-emerald-50 shadow-lg"
                           : "border-transparent hover:shadow-md"
                       }`}
                       onClick={() => setSelectedKiosk(kiosk)}
@@ -135,7 +135,7 @@ export default function FindStation() {
                         </div>
 
                         <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-1 text-cyan-600">
+                          <div className="flex items-center gap-1 text-emerald-600">
                             <MapPin className="w-4 h-4" />
                             <span>{kiosk.distance?.toFixed(1)} km away</span>
                           </div>
@@ -157,7 +157,7 @@ export default function FindStation() {
                         )}
 
                         <Link href={`/station/${kiosk.id}`}>
-                          <Button size="sm" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white">
+                          <Button size="sm" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
                             {t.findStation_viewDetails}
                           </Button>
                         </Link>
@@ -174,24 +174,24 @@ export default function FindStation() {
           <div className="container">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="text-center">
-                <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <MapPin className="w-6 h-6 text-cyan-600" />
+                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <MapPin className="w-6 h-6 text-emerald-600" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">Easy to Find</h3>
                 <p className="text-gray-600">Located in convenient shopping centers and pharmacies</p>
               </div>
 
               <div className="text-center">
-                <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Clock className="w-6 h-6 text-cyan-600" />
+                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-6 h-6 text-emerald-600" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">Extended Hours</h3>
                 <p className="text-gray-600">Open from early morning to late evening, 7 days a week</p>
               </div>
 
               <div className="text-center">
-                <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Phone className="w-6 h-6 text-cyan-600" />
+                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Phone className="w-6 h-6 text-emerald-600" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">Get Support</h3>
                 <p className="text-gray-600">Contact us for more information about any station</p>

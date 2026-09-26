@@ -43,7 +43,7 @@ export default function ExpertRegistration() {
       <div className="min-h-screen flex flex-col">
         <Navigation />
         <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
         </div>
       </div>
     );
@@ -56,7 +56,7 @@ export default function ExpertRegistration() {
         <div className="flex-1 flex items-center justify-center">
           <Card className="max-w-md w-full mx-4">
             <CardContent className="pt-8 pb-8 text-center">
-              <Stethoscope className="w-12 h-12 text-cyan-500 mx-auto mb-4" />
+              <Stethoscope className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
               <h2 className="text-xl font-semibold mb-2">
                 {isAr ? "سجّل الدخول للتقديم" : "Sign in to Apply"}
               </h2>
@@ -66,7 +66,7 @@ export default function ExpertRegistration() {
                   : "You need to be signed in to apply as a health expert."}
               </p>
               <a href="/login">
-                <Button className="bg-cyan-500 hover:bg-cyan-600">
+                <Button className="bg-emerald-500 hover:bg-emerald-600">
                   {isAr ? "تسجيل الدخول" : "Sign In"}
                 </Button>
               </a>
@@ -95,7 +95,7 @@ export default function ExpertRegistration() {
                   : "Your expert profile is active. Go to your inbox to chat with users."}
               </p>
               <Link href="/expert-inbox">
-                <Button className="bg-cyan-500 hover:bg-cyan-600">
+                <Button className="bg-emerald-500 hover:bg-emerald-600">
                   {isAr ? "الذهاب إلى صندوق الوارد" : "Go to Expert Inbox"}
                 </Button>
               </Link>
@@ -144,8 +144,8 @@ export default function ExpertRegistration() {
         </Link>
 
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-lg bg-cyan-100 flex items-center justify-center">
-            <Stethoscope className="w-5 h-5 text-cyan-600" />
+          <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <Stethoscope className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -161,7 +161,7 @@ export default function ExpertRegistration() {
 
         {/* Existing request status */}
         {myRequest && (
-          <Card className="mb-6 border-l-4 border-l-cyan-400">
+          <Card className="mb-6 border-l-4 border-l-emerald-400">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -252,7 +252,7 @@ export default function ExpertRegistration() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-cyan-500 hover:bg-cyan-600"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600"
                   disabled={submitMutation.isPending}
                 >
                   {submitMutation.isPending
