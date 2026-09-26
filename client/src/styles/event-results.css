@@ -67,9 +67,11 @@
   --arm-target: 15.3cqw;
   --leg-leader: 18cqw;
   --leg-target: 19.7cqw;
-  --trunk-leader-diagonal: 14cqw;
-  --trunk-target: 22.5cqw;
-  --trunk-target-rise: 11.4cqw;
+  /* The trunk leader and dot describe the same 50° vector. Its extended
+     endpoint is centered over the upper abdomen, just above the navel. */
+  --trunk-leader-diagonal: 22cqw;
+  --trunk-target: 27.9cqw;
+  --trunk-target-rise: 18.6cqw;
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1.4;
