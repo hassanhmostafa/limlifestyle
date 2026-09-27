@@ -123,6 +123,14 @@ function sendDatabase() {
 }
 describe("persistent send limits", () => {
   afterEach(() => vi.useRealTimers());
+  it("redacts database driver errors before they reach a participant", async () => {
+    vi.mocked(getDb).mockResolvedValue({
+      transaction: async () => { throw new Error("Failed query: insert into event_otp_limits"); },
+    } as never);
+
+    await expect(sendEventOtp("0501234567", "test-ip"))
+      .rejects.toThrow("تعذر بدء التحقق بالجوال");
+  });
   it("enforces the resend cooldown across an hourly bucket boundary", async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-26T10:59:50Z'));
     const state = sendDatabase();

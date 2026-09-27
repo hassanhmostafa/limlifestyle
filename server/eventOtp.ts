@@ -43,6 +43,20 @@ async function database() {
   return db;
 }
 
+/** Database-driver details must never be returned to an Events participant. */
+async function runOtpPersistence<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    console.error("[Events OTP] Challenge persistence failed", error);
+    throw new TRPCError({
+      code: "SERVICE_UNAVAILABLE",
+      message: "تعذر بدء التحقق بالجوال حاليًا. حاول مرة أخرى بعد قليل.",
+    });
+  }
+}
+
 // Persisted, locked counters apply across restarts and multiple server instances.
 // Trust req.ip only after the hosting proxy has been configured in Express.
 export async function sendEventOtp(rawPhone: string, ip: string) {
@@ -50,7 +64,7 @@ export async function sendEventOtp(rawPhone: string, ip: string) {
   const phone = otpPhone(rawPhone), phoneHash = hash(phone);
   const token = crypto.randomBytes(32).toString("base64url"), tokenHash = hash(token);
   const db = await database(), now = new Date();
-  await db.transaction(async tx => {
+  await runOtpPersistence(() => db.transaction(async tx => {
     const hour = Math.floor(now.getTime() / 3_600_000), day = Math.floor(now.getTime() / 86_400_000);
     const limits: Array<[string, number, number]> = [
       [`global:${day}`, 5000, 0], [`ip:${hash(ip)}:${hour}`, 1000, 0], [`phone:${phoneHash}:${hour}`, 5, 60_000],
@@ -72,12 +86,12 @@ export async function sendEventOtp(rawPhone: string, ip: string) {
       throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "انتظر دقيقة قبل طلب رمز آخر." });
     }
     await tx.update(eventOtpChallenges).set(value).where(eq(eventOtpChallenges.phoneHash, phoneHash));
-  });
+  }));
   let sent = false;
   try { sent = await authenticaRequest("send-otp", { method: "sms", phone }); }
   finally {
-    await db.update(eventOtpChallenges).set({ state: sent ? "pending" : "failed" })
-      .where(and(eq(eventOtpChallenges.phoneHash, phoneHash), eq(eventOtpChallenges.tokenHash, tokenHash)));
+    await runOtpPersistence(() => db.update(eventOtpChallenges).set({ state: sent ? "pending" : "failed" })
+      .where(and(eq(eventOtpChallenges.phoneHash, phoneHash), eq(eventOtpChallenges.tokenHash, tokenHash))));
   }
   if (!sent) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "لم يتم إرسال الرمز. حاول لاحقًا." });
   return { challengeToken: token, retryAfterSeconds: 60, expiresInSeconds: TTL / 1000 };
@@ -87,16 +101,16 @@ export async function verifyEventOtp(rawPhone: string, token: string, code: stri
   configuredKey();
   const phone = otpPhone(rawPhone), phoneHash = hash(phone), tokenHash = hash(token);
   const db = await database();
-  await db.transaction(async tx => {
+  await runOtpPersistence(() => db.transaction(async tx => {
     const [row] = await tx.select().from(eventOtpChallenges).where(eq(eventOtpChallenges.phoneHash, phoneHash)).for("update");
     if (!row || row.tokenHash !== tokenHash || row.expiresAt.getTime() <= Date.now() || row.attempts >= 5 || row.state !== "pending") throw invalid();
     await tx.update(eventOtpChallenges).set({ attempts: row.attempts + 1, state: "verifying" }).where(eq(eventOtpChallenges.phoneHash, phoneHash));
-  });
+  }));
   let verified = false;
   try { verified = await authenticaRequest("verify-otp", { phone, otp: code }); }
   finally {
-    await db.update(eventOtpChallenges).set({ state: verified ? "verified" : "pending" })
-      .where(and(eq(eventOtpChallenges.phoneHash, phoneHash), eq(eventOtpChallenges.tokenHash, tokenHash)));
+    await runOtpPersistence(() => db.update(eventOtpChallenges).set({ state: verified ? "verified" : "pending" })
+      .where(and(eq(eventOtpChallenges.phoneHash, phoneHash), eq(eventOtpChallenges.tokenHash, tokenHash))));
   }
   if (!verified) throw invalid();
   return { verified: true as const };
@@ -106,9 +120,9 @@ export async function consumeEventOtp(rawPhone: string, token?: string) {
   configuredKey();
   if (!token) throw invalid();
   const db = await database(), phoneHash = hash(otpPhone(rawPhone)), tokenHash = hash(token);
-  await db.transaction(async tx => {
+  await runOtpPersistence(() => db.transaction(async tx => {
     const [row] = await tx.select().from(eventOtpChallenges).where(eq(eventOtpChallenges.phoneHash, phoneHash)).for("update");
     if (!row || row.tokenHash !== tokenHash || row.state !== "verified" || row.expiresAt.getTime() <= Date.now()) throw invalid();
     await tx.update(eventOtpChallenges).set({ state: "consumed" }).where(eq(eventOtpChallenges.phoneHash, phoneHash));
-  });
+  }));
 }

@@ -1,6 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
+function otpMessage(error: unknown, fallback: string) {
+  const candidate = error as { message?: unknown; data?: { code?: unknown } };
+  const code = candidate?.data?.code;
+  const publicCodes = new Set([
+    "BAD_REQUEST",
+    "TOO_MANY_REQUESTS",
+    "UNAUTHORIZED",
+    "PRECONDITION_FAILED",
+    "SERVICE_UNAVAILABLE",
+  ]);
+  return typeof candidate?.message === "string" && typeof code === "string" && publicCodes.has(code)
+    ? candidate.message
+    : fallback;
+}
+
 /** Embedded in the registration form. All controls are non-submit buttons. */
 export function EventOtpVerification({ phone, enabled, saving, onVerified }: {
   phone: string; enabled: boolean; saving: boolean;
@@ -38,7 +53,7 @@ export function EventOtpVerification({ phone, enabled, saving, onVerified }: {
           const result = await send.mutateAsync({ phone });
           setToken(result.challengeToken); setRetryAt(Date.now() + result.retryAfterSeconds * 1000);
           setExpiresAt(Date.now() + result.expiresInSeconds * 1000); setNow(Date.now());
-        } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر إرسال الرمز."); }
+        } catch (e) { setMessage(otpMessage(e, "تعذر إرسال رمز التحقق حاليًا. حاول مرة أخرى بعد قليل.")); }
       }}>{send.isPending ? "جارٍ إرسال الرمز…" : seconds > 0 ? `إعادة الإرسال بعد ${seconds} ثانية` : token ? "إعادة إرسال الرمز" : "إرسال رمز التحقق"}</button>
       {token && <>
         <p role="status" className="text-sm">تم إرسال الرمز إلى <b dir="ltr">{phone}</b></p>
@@ -52,7 +67,7 @@ export function EventOtpVerification({ phone, enabled, saving, onVerified }: {
           try {
             await verify.mutateAsync({ phone, challengeToken: token, code });
             setVerified(true); onVerified(token);
-          } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر تأكيد الرمز."); }
+          } catch (e) { setMessage(otpMessage(e, "تعذر تأكيد رمز التحقق حاليًا. حاول مرة أخرى بعد قليل.")); }
         }}>{verify.isPending ? "جارٍ التحقق…" : "تأكيد الرمز"}</button>
       </>}
     </>}
