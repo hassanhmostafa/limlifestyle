@@ -19,23 +19,54 @@ function configuredKey() {
   if (!otpEnabled() || !key) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "التحقق بالجوال غير متاح حاليًا. تواصل مع منظم الفعالية." });
   return key;
 }
-// Provider bodies and headers must never be returned to the browser or logged.
+// Never log provider bodies, request headers, phone numbers or OTP codes.
+function providerFailure(action: string, category: string, httpStatus?: number): never {
+  console.warn("[Events OTP] Provider failure", { action, category, ...(httpStatus ? { httpStatus } : {}) });
+  const messages: Record<string, string> = {
+    AUTH: "خدمة الرسائل تحتاج مراجعة إعداداتها. تواصل مع منظم الفعالية.",
+    LIMIT: "خدمة الرسائل مشغولة أو وصلت لحد الإرسال. حاول بعد قليل.",
+    REQUEST: "تعذر إرسال الرمز. يلزم مراجعة إعدادات الرسائل لدى منظم الفعالية.",
+    CREDIT: "خدمة الرسائل غير متاحة حاليًا. تواصل مع منظم الفعالية.",
+    TIMEOUT: "تأخر رد خدمة الرسائل. حاول مرة أخرى بعد قليل.",
+    NETWORK: "تعذر الاتصال بخدمة الرسائل. حاول مرة أخرى بعد قليل.",
+    PROVIDER: "خدمة الرسائل غير متاحة حاليًا. حاول مرة أخرى بعد قليل.",
+    RESPONSE: "تعذر تأكيد رد خدمة الرسائل. تواصل مع منظم الفعالية.",
+  };
+  throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: `${messages[category]} (OTP-${category})` });
+}
 export async function authenticaRequest(action: "send-otp" | "verify-otp", body: Record<string, string>) {
   const key = configuredKey();
+  let response: Response;
   try {
-    const response = await fetch(`https://api.authentica.sa/api/v2/${action}`, {
+    response = await fetch(`https://api.authentica.sa/api/v2/${action}`, {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
       headers: { Accept: "application/json", "Content-Type": "application/json", "X-Authorization": key },
       body: JSON.stringify(body),
     });
-    if (action === "verify-otp" && [400, 422].includes(response.status)) return false;
-    if (!response.ok) throw new Error("provider unavailable");
-    const data = await response.json();
-    // Fail closed: an HTTP 200 alone is never proof of ownership.
-    return action === "verify-otp" ? data?.verified === true : data?.success === true;
-  } catch {
-    throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "تعذر الاتصال بخدمة التحقق. حاول مرة أخرى بعد قليل." });
+  } catch (error) {
+    providerFailure(action, error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "TIMEOUT" : "NETWORK");
   }
+  if (action === "verify-otp" && [400, 422].includes(response.status)) return false;
+  if (!response.ok) {
+    const category = [401, 403].includes(response.status) ? "AUTH" : response.status === 429 ? "LIMIT"
+      : response.status === 402 ? "CREDIT" : [400, 422].includes(response.status) ? "REQUEST" : "PROVIDER";
+    providerFailure(action, category, response.status);
+  }
+  let data: unknown;
+  try { data = await response.json(); }
+  catch { providerFailure(action, "RESPONSE", response.status); }
+  if (!data || typeof data !== "object" || Array.isArray(data)) providerFailure(action, "RESPONSE", response.status);
+  const result = data as Record<string, unknown>;
+  if (action === "send-otp") {
+    if (result.success === true) return true;
+    providerFailure(action, "RESPONSE", response.status);
+  }
+  // Current official docs return {status:true}; old official examples used
+  // {verified:true}. An explicit status always takes precedence, including false.
+  if (typeof result.status === "boolean") return result.status;
+  if ("status" in result) providerFailure(action, "RESPONSE", response.status);
+  if (typeof result.verified === "boolean") return result.verified;
+  providerFailure(action, "RESPONSE", response.status);
 }
 async function database() {
   const db = await getDb();
