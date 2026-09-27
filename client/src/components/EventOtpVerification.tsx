@@ -1,48 +1,61 @@
 import React, { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
-export function EventOtpVerification({ phone, initialToken, saving, error, onVerified, onBack }: {
-  phone: string; initialToken: string; saving: boolean; error: string;
-  onVerified: (token: string) => void; onBack: () => void;
+/** Embedded in the registration form. All controls are non-submit buttons. */
+export function EventOtpVerification({ phone, enabled, saving, onVerified }: {
+  phone: string; enabled: boolean; saving: boolean;
+  onVerified: (token: string | null) => void;
 }) {
-  const [token, setToken] = useState(initialToken);
+  const [token, setToken] = useState("");
   const [code, setCode] = useState("");
-  const [retryAt, setRetryAt] = useState(() => Date.now() + 60_000);
-  const [seconds, setSeconds] = useState(60);
+  const [retryAt, setRetryAt] = useState(0);
+  const [expiresAt, setExpiresAt] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [verified, setVerified] = useState(false);
   const [message, setMessage] = useState("");
   const send = trpc.events.sendOtp.useMutation();
   const verify = trpc.events.verifyOtp.useMutation();
   const busy = saving || send.isPending || verify.isPending;
+  const validPhone = /^((\+966)|(00966)|(966)|(0))5\d{8}$/.test(phone.replace(/\s/g, ""));
+  const seconds = Math.max(0, Math.ceil((retryAt - now) / 1000));
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
-    const timer = window.setInterval(() => setSeconds(Math.max(0, Math.ceil((retryAt - Date.now()) / 1000))), 500);
+    const timer = window.setInterval(() => setNow(Date.now()), 500);
     return () => window.clearInterval(timer);
-  }, [retryAt]);
-  return <section className="m-5 rounded-3xl border border-[#dce9e5] bg-white p-6">
-    <h1 className="text-2xl font-bold">تأكيد رقم الجوال</h1>
-    <p className="my-4 leading-7">أرسلنا رمز تحقق برسالة SMS إلى <b dir="ltr">{phone}</b>. أدخله لإكمال التسجيل.</p>
-    <form onSubmit={async event => {
-      event.preventDefault();
-      if (busy || !/^\d{4,8}$/.test(code)) return;
-      setMessage("");
-      try { await verify.mutateAsync({ phone, challengeToken: token, code }); onVerified(token); }
-      catch (e) { setMessage(e instanceof Error ? e.message : "تعذر تأكيد الرمز."); }
-    }}>
-      <label htmlFor="event-otp" className="block font-bold">رمز التحقق</label>
-      <input id="event-otp" autoFocus dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code}
-        onChange={event => setCode(event.target.value.replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632)).replace(/\D/g, ""))}
-        className="my-3 h-14 w-full rounded-2xl border text-center text-2xl tracking-widest" />
-      {(message || error) && <p role="alert" className="my-3 rounded-xl bg-red-50 p-3 text-red-800">{message || error}</p>}
-      <button type="submit" disabled={busy || !/^\d{4,8}$/.test(code)} className="w-full rounded-2xl bg-[#dff33d] p-4 font-bold text-[#123a34] disabled:opacity-50">{busy ? "جارٍ التحقق…" : "تأكيد وإنشاء جلستي الصحية"}</button>
-    </form>
-    <button type="button" disabled={busy || seconds > 0} className="mt-4 w-full rounded-xl border p-3 disabled:opacity-50" onClick={async () => {
-      setMessage("");
-      try {
-        const result = await send.mutateAsync({ phone });
-        setToken(result.challengeToken); setCode(""); setRetryAt(Date.now() + result.retryAfterSeconds * 1000); setSeconds(result.retryAfterSeconds);
-        document.getElementById("event-otp")?.focus();
-      } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر إرسال الرمز."); }
-    }}>{seconds > 0 ? `إعادة الإرسال بعد ${seconds} ثانية` : "إعادة إرسال الرمز"}</button>
-    <button type="button" disabled={busy} onClick={onBack} className="mt-3 w-full p-3 underline">تعديل رقم الجوال أو البيانات</button>
-  </section>;
+  }, []);
+  useEffect(() => {
+    if (expiresAt && now >= expiresAt) {
+      setVerified(false); setToken(""); setExpiresAt(0); onVerified(null);
+      setMessage("انتهت صلاحية الرمز. اطلب رمزًا جديدًا.");
+    }
+  }, [now, expiresAt, onVerified]);
+  return <div className="space-y-3 rounded-2xl border border-[#dce9e5] bg-[#f3f8f6] p-4" aria-label="التحقق من رقم الجوال">
+    <p className="font-bold">تأكيد الجوال برمز OTP</p>
+    {verified ? <p role="status" className="font-bold text-[#197f6f]">✓ تم التحقق من رقم الجوال</p> : <>
+      <p className="text-sm leading-6">نرسل رمزًا برسالة SMS للتأكد من رقمك. لا تحتاج كتابة رقم الجوال مرة ثانية.</p>
+      <button type="button" disabled={!enabled || !validPhone || busy || seconds > 0} className="w-full rounded-xl border border-[#123a34] bg-white p-3 font-bold disabled:opacity-50" onClick={async () => {
+        onVerified(null); setMessage(""); setToken(""); setCode("");
+        try {
+          const result = await send.mutateAsync({ phone });
+          setToken(result.challengeToken); setRetryAt(Date.now() + result.retryAfterSeconds * 1000);
+          setExpiresAt(Date.now() + result.expiresInSeconds * 1000); setNow(Date.now());
+        } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر إرسال الرمز."); }
+      }}>{send.isPending ? "جارٍ إرسال الرمز…" : seconds > 0 ? `إعادة الإرسال بعد ${seconds} ثانية` : token ? "إعادة إرسال الرمز" : "إرسال رمز التحقق"}</button>
+      {token && <>
+        <p role="status" className="text-sm">تم إرسال الرمز إلى <b dir="ltr">{phone}</b></p>
+        <label htmlFor="event-otp" className="block font-bold">رمز التحقق</label>
+        <input id="event-otp" autoFocus dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code}
+          onChange={event => setCode(event.target.value.replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632)).replace(/\D/g, ""))}
+          onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }}
+          className="h-14 w-full rounded-2xl border bg-white text-center text-2xl tracking-widest" />
+        <button type="button" disabled={!enabled || busy || !/^\d{4,8}$/.test(code)} className="w-full rounded-xl bg-[#dff33d] p-3 font-bold disabled:opacity-50" onClick={async () => {
+          setMessage("");
+          try {
+            await verify.mutateAsync({ phone, challengeToken: token, code });
+            setVerified(true); onVerified(token);
+          } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر تأكيد الرمز."); }
+        }}>{verify.isPending ? "جارٍ التحقق…" : "تأكيد الرمز"}</button>
+      </>}
+    </>}
+    {message && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{message}</p>}
+  </div>;
 }

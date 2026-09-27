@@ -1,3 +1,5 @@
+import * as otp from "./eventOtp";
+vi.mock("./eventOtp", async importOriginal => ({ ...await importOriginal<typeof import("./eventOtp")>(), consumeEventOtp: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
@@ -54,6 +56,7 @@ const eventSession = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(otp.consumeEventOtp).mockResolvedValue(undefined);
   vi.mocked(requireOpenEvent).mockResolvedValue({questionnaireIds:["lifestyle"],closed:0} as never);
   vi.mocked(tracks.selectRegistrationTrack).mockResolvedValue({ id: 1, name: "المسار 1", eventCode: "lim-events", active: 1 });
   vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, approvedAt: null } as never);
@@ -74,6 +77,8 @@ describe("standalone events.createSession", () => {
     vi.stubEnv("EVENTS_OTP_ENABLED", "true");
     vi.stubEnv("AUTHENTICA_API_KEY", "test-only-key");
     try {
+      const actual = await vi.importActual<typeof import("./eventOtp")>("./eventOtp");
+      vi.mocked(otp.consumeEventOtp).mockImplementation(actual.consumeEventOtp);
       await expect(appRouter.createCaller(anonymousContext).events.createSession({ age: 40, sex: "male", phone: "0501234567", consent: true })).rejects.toThrow("رمز التحقق");
       expect(mockedDb.getUserByPhone).not.toHaveBeenCalled();
       expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();

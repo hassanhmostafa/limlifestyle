@@ -5,7 +5,7 @@ const superjson = require('superjson');
 (async () => {
   const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE, args: ['--no-sandbox'] } : {}) });
   try {
-    for (const scenario of ['verified', 'send-failure', 'change-phone', 'config-failure']) {
+    for (const scenario of ['verified', 'send-failure', 'change-phone', 'config-failure', 'service-disabled']) {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
       await context.route('https://fonts.googleapis.com/**', r => r.abort());
       await context.route('https://fonts.gstatic.com/**', r => r.abort());
@@ -24,7 +24,7 @@ const superjson = require('superjson');
           let data = null;
           if (name === 'events.otpStatus') {
             if (scenario === 'config-failure') return failure(name, 'Unavailable');
-            data = { enabled: true };
+            data = { enabled: scenario !== 'service-disabled' };
           } else if (name === 'events.sendOtp') {
             sends++;
             if (scenario === 'send-failure') return failure(name, 'تعذر إرسال رمز التحقق.');
@@ -49,44 +49,49 @@ const superjson = require('superjson');
       await page.getByPlaceholder('18+').fill('40');
       await page.getByRole('button', { name: 'ذكر', exact: true }).click();
       await page.getByPlaceholder('05XXXXXXXX', { exact: true }).fill('0500000000');
-      await page.getByPlaceholder('أعد كتابة الرقم').fill('0500000000');
+      assert.equal(await page.getByPlaceholder('أعد كتابة الرقم').count(), 0);
       await page.getByRole('checkbox').check();
       const submit = page.getByRole('button', { name: 'إنشاء جلستي الصحية', exact: true });
-      if (scenario === 'config-failure') {
-        await page.getByRole('alert').filter({ hasText: 'تعذر تحميل إعدادات التسجيل' }).waitFor();
-        assert.equal(await submit.isDisabled(), true);
-        assert.equal(creates, 0);
+      assert.equal(await submit.isDisabled(), true);
+      if (scenario === 'config-failure' || scenario === 'service-disabled') {
+        await page.getByRole('alert').filter({ hasText: scenario === 'config-failure' ? 'تعذر تحميل إعدادات التسجيل' : 'التحقق بالجوال غير متاح' }).waitFor();
+        assert.equal(await page.getByRole('button', {name:'إرسال رمز التحقق',exact:true}).isDisabled(),true);
       } else {
-        await submit.click();
+        await page.getByRole('button', { name: 'إرسال رمز التحقق', exact: true }).click();
         if (scenario === 'send-failure') {
-          await page.getByRole('alert').filter({ hasText: 'تعذر إرسال' }).waitFor();
-          assert.equal(await page.getByPlaceholder('05XXXXXXXX', { exact: true }).inputValue(), '0500000000');
-          assert.equal(creates, 0);
+          await page.getByRole('alert').filter({hasText:'تعذر إرسال'}).waitFor();
+          assert.equal(await submit.isDisabled(), true);
         } else {
-          await page.getByRole('heading', { name: 'تأكيد رقم الجوال' }).waitFor();
-          assert.equal(creates, 0);
-          assert.equal(await page.getByRole('button', { name: /إعادة الإرسال بعد/ }).isDisabled(), true);
-          if (scenario === 'change-phone') {
-            await page.getByRole('button', { name: 'تعديل رقم الجوال أو البيانات' }).click();
-            assert.equal(await page.getByPlaceholder('مثال: عبداللطيف').inputValue(), 'تجربة');
-            assert.equal(creates, 0);
+          const code = page.getByLabel('رمز التحقق', { exact: true });
+          await code.waitFor();
+          assert.equal(await page.getByRole('button',{name:/إعادة الإرسال بعد/}).isDisabled(),true);
+          await code.fill('000000');
+          await page.getByRole('button',{name:'تأكيد الرمز',exact:true}).click();
+          await page.getByRole('alert').filter({hasText:'غير صحيح'}).waitFor();
+          assert.equal(await submit.isDisabled(),true);
+          assert.equal(creates,0);
+          await page.clock.fastForward(61000);
+          await page.getByRole('button',{name:'إعادة إرسال الرمز',exact:true}).click();
+          await page.waitForFunction(() => document.getElementById('event-otp')?.value === '');
+          assert.equal(sends,2);
+          await code.fill('١٢٣٤٥٦');
+          await page.getByRole('button',{name:'تأكيد الرمز',exact:true}).click();
+          await page.getByRole('status').filter({hasText:'تم التحقق من رقم الجوال'}).waitFor();
+          assert.equal(await submit.isEnabled(),true);
+          assert.equal(creates,0);
+          if(scenario === 'change-phone') {
+            await page.getByPlaceholder('05XXXXXXXX',{exact:true}).fill('0500000001');
+            assert.equal(await submit.isDisabled(),true);
+            assert.equal(await page.getByRole('status').filter({hasText:'تم التحقق من رقم الجوال'}).count(),0);
+            await page.getByPlaceholder('05XXXXXXXX',{exact:true}).fill('0500000000');
+            assert.equal(await submit.isDisabled(),true);
           } else {
-            await page.getByLabel('رمز التحقق', { exact: true }).fill('000000');
-            await page.getByRole('button', { name: 'تأكيد وإنشاء جلستي الصحية' }).click();
-            await page.getByRole('alert').filter({ hasText: 'غير صحيح' }).waitFor();
-            assert.equal(creates, 0);
-            await page.screenshot({ path: '/tmp/lim-otp-ui.png', fullPage: true });
-            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
-            await page.clock.fastForward(61000);
-            await page.getByRole('button', { name: 'إعادة إرسال الرمز', exact: true }).click();
-            await page.waitForFunction(() => document.getElementById('event-otp').value === '');
-            assert.equal(sends, 2);
-            await page.getByLabel('رمز التحقق', { exact: true }).fill('١٢٣٤٥٦');
-            await page.getByRole('button', { name: 'تأكيد وإنشاء جلستي الصحية' }).click();
-            await page.getByRole('button').filter({ hasText: 'تقييم نمط الحياة' }).waitFor();
-            assert.equal(creates, 1);
-            assert.equal(sentInput.otpChallengeToken, token + sends);
-            assert.equal(sentInput.phone, '0500000000');
+            await page.screenshot({path:'/tmp/lim-inline-otp.png',fullPage:true});
+            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),true);
+            await submit.click();
+            await page.getByRole('button').filter({hasText:'تقييم نمط الحياة'}).waitFor();
+            assert.equal(creates,1);
+            assert.equal(sentInput.otpChallengeToken,token+sends);
           }
         }
       }
