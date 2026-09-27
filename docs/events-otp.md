@@ -1,15 +1,15 @@
 # LIM Events: Authentica SMS OTP
 
-This change adds server-enforced phone verification to NEW event registration. Existing opaque event sessions continue normally; staff login and X18 phone QR/ingestion are unchanged. It does not implement main-app OTP login or recovery of historic records.
+This change requires server-enforced phone verification for NEW event registration. The code field replaces the repeated phone input in the same form; verification unlocks the create-session button. Editing the phone clears the proof. Existing opaque event sessions continue normally; staff login and X18 phone QR/ingestion are unchanged. It does not implement main-app OTP login or recovery of historic records.
 
 ## Deployment (Hassan / Manus)
 
-1. Review and deploy this branch. Keep `EVENTS_OTP_ENABLED=false` during preparation so the existing registration journey remains usable.
+1. Review and deploy this branch. Prepare the provider key and database before publishing: NEW registrations are now always gated by OTP. Existing sessions continue normally.
 2. Back up the database and apply pending migrations using `pnpm exec drizzle-kit migrate`. New migration: `0014_event_otp.sql`. Do not run generate/push blindly or mark the migration applied without creating both tables.
 3. In the SERVER secret/environment settings, set `AUTHENTICA_API_KEY` to the owner's current Authentica application key. Paste the value literally; its dollar signs must not be expanded by a shell. Never add it to GitHub, client code, a VITE_ variable, or logs.
 4. Set `EVENTS_OTP_ENABLED=true`, run `pnpm db:check-events`, then restart/redeploy the server. Missing key/database fails closed when enabled.
 5. Test on a designated real Saudi mobile: SMS arrives, wrong code rejected, valid code creates the session, QR still has the national phone number, existing session continues without another OTP. Also test resending, expired code, changing phone, and replaying a consumed challenge. Verify live provider JSON matches the documented `success:true` send and `verified:true` verify fields. HTTP 200 alone is not accepted as proof.
-6. If SMS integration is not ready, deliberately set the feature flag back to false and redeploy; this restores the pre-existing unverified registration flow. No automatic fallback occurs after verification failure.
+6. Disabling EVENTS_OTP_ENABLED pauses NEW registration; it does not bypass phone verification. Publish only after configuring the provider and migration.
 
 Provider contract: https://github.com/AuthenticaSA/Authentica (`/api/v2/send-otp`, `/api/v2/verify-otp`, X-Authorization). No custom-SMS endpoint is used. Key validity/delivery and native iOS Safari require live testing; automated tests use synthetic provider responses.
 

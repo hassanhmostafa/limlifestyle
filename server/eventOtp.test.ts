@@ -44,9 +44,9 @@ describe("Authentica boundary", () => {
   it("does not accept missing proof when enabled", async () => {
     await expect(consumeEventOtp("0501234567")).rejects.toThrow("رمز التحقق");
   });
-  it("keeps the existing journey when explicitly not enabled", async () => {
+  it("blocks new registration when OTP is disabled", async () => {
     vi.stubEnv("EVENTS_OTP_ENABLED", "false");
-    await expect(consumeEventOtp("0501234567")).resolves.toBeUndefined();
+    await expect(consumeEventOtp("0501234567")).rejects.toThrow("غير متاح");
     expect(getDb).not.toHaveBeenCalled();
   });
 });

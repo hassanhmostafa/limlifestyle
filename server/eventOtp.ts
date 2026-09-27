@@ -103,7 +103,6 @@ export async function verifyEventOtp(rawPhone: string, token: string, code: stri
 }
 
 export async function consumeEventOtp(rawPhone: string, token?: string) {
-  if (!otpEnabled()) return;
   configuredKey();
   if (!token) throw invalid();
   const db = await database(), phoneHash = hash(otpPhone(rawPhone)), tokenHash = hash(token);
