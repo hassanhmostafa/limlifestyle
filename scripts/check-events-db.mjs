@@ -2,7 +2,30 @@
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
-const connection = await mysql.createConnection(process.env.DATABASE_URL);
+
+// Manus supplies the managed TiDB URL with an SSL JSON value. mysql2 interprets
+// query-string `ssl` values as named profiles, so pass the parsed TLS option
+// separately while preserving every other URL connection option.
+function connectionOptions(databaseUrl) {
+  const url = new URL(databaseUrl);
+  const rawSsl = url.searchParams.get('ssl');
+  if (!rawSsl) return url.toString();
+  url.searchParams.delete('ssl');
+  try {
+    const parsed = JSON.parse(rawSsl);
+    if (parsed && typeof parsed === 'object') return { uri: url.toString(), ssl: parsed };
+  } catch {
+    // The managed URL currently serializes the one TLS option as a JavaScript
+    // object literal rather than JSON: {rejectUnauthorized:true}.
+    const managedSsl = rawSsl.match(/^\{\s*rejectUnauthorized\s*:\s*(true|false)\s*\}$/);
+    if (managedSsl) return { uri: url.toString(), ssl: { rejectUnauthorized: managedSsl[1] === 'true' } };
+    // Leave ordinary mysql2 SSL profiles untouched when a non-JSON URL is used.
+    url.searchParams.set('ssl', rawSsl);
+  }
+  return url.toString();
+}
+
+const connection = await mysql.createConnection(connectionOptions(process.env.DATABASE_URL));
 try {
   for (const query of [
     'SELECT id, username, codeHash, allEvents, includeIdentity, credentialVersion FROM event_researchers LIMIT 0',
