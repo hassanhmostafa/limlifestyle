@@ -2,7 +2,7 @@ import EventPdfButton from "@/components/EventPdfButton";
 import { eventReportCsv } from "@shared/eventReport";
 import { useEffect, useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc';
-import { CalendarDays, ImagePlus, ClipboardList, FileDown, LockKeyhole } from 'lucide-react';
+import { CalendarDays, ImagePlus, ClipboardList, FileDown, LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react';
 const card='space-y-4 rounded-3xl border border-emerald-100 bg-white p-6';
 const button='rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white disabled:opacity-40';
 const input='mt-2 w-full rounded-xl border border-emerald-100 bg-[#f8fbfa] p-3';
@@ -13,6 +13,7 @@ function download(name:string,content:string,type:string){
 export default function EventAdminPanel(){
   const profile=trpc.eventAdmin.profile.useQuery(undefined,{retry:false,refetchOnWindowFocus:false});
   const summary=trpc.eventAdmin.summary.useQuery(undefined,{retry:false});
+  const otpDiagnostics=trpc.eventAdmin.otpDiagnostics.useQuery(undefined,{enabled:false,retry:false});
   const utils=trpc.useUtils();
   const [form,setForm]=useState({name:'',startsOn:'',endsOn:'',location:'',organizer:'',questionnaireIds:['lifestyle'] as 'lifestyle'[]});
   const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);const [exporting,setExporting]=useState(false);
@@ -69,6 +70,20 @@ export default function EventAdminPanel(){
       <p className="font-bold">الحالة: {profile.data?.closed?'التسجيل مغلق':'التسجيل مفتوح'}</p>
       <p>الإغلاق يوقف التسجيل الجديد. يستكمل المشاركون المسجلون زياراتهم وتبقى التقارير متاحة، دون حذف أي بيانات.</p>
       {confirmClose?<div className="space-y-3 rounded-2xl bg-amber-50 p-4"><p>هل تريد إغلاق التسجيل الجديد الآن؟</p><button type="button" className={button} disabled={close.isPending} onClick={()=>close.mutate({closed:true})}>تأكيد الإغلاق</button><button type="button" className="mx-4 underline" onClick={()=>setConfirmClose(false)}>إلغاء</button></div>:<button type="button" className={button} disabled={close.isPending} onClick={()=>profile.data?.closed?close.mutate({closed:false}):setConfirmClose(true)}>{profile.data?.closed?'إعادة فتح التسجيل':'إغلاق الفعالية'}</button>}
+    </section>
+    <section className={card}>
+      <h2 className="flex items-center gap-2 text-xl font-bold"><ShieldCheck/>فحص اتصال OTP بالخادم المنشور</h2>
+      <p className="text-sm text-slate-600">يفحص هذا الزر الخادم الذي يستقبل هذه الصفحة الآن عبر نقطة الرصيد غير المُرسِلة لدى Authentica. لا يعرض المفتاح أو الرصيد أو رقم جوال أو أي رسالة من مزود الخدمة.</p>
+      <button type="button" className={button} disabled={otpDiagnostics.isFetching} onClick={()=>void otpDiagnostics.refetch()}>
+        <RefreshCw className="inline-block size-4"/> {otpDiagnostics.isFetching?'جارٍ الفحص…':'فحص إعداد OTP'}
+      </button>
+      {otpDiagnostics.error&&<p role="alert" className="rounded-2xl bg-red-50 p-4 text-red-800">تعذر تنفيذ فحص OTP. تأكد من الدخول كمدير عام ثم أعد المحاولة.</p>}
+      {otpDiagnostics.data&&<div role="status" className="space-y-2 rounded-2xl bg-[#f3f8f6] p-4 text-sm">
+        <p><strong>المفتاح موجود:</strong> {otpDiagnostics.data.keyPresent?'نعم':'لا'} · <strong>الطول:</strong> {otpDiagnostics.data.keyLength} · <strong>الصيغة:</strong> {otpDiagnostics.data.keyFormat==='bcrypt'?'صيغة Authentica':'صيغة غير متوقعة'}</p>
+        <p><strong>بصمة آمنة للمقارنة:</strong> <code dir="ltr">{otpDiagnostics.data.keyFingerprint??'—'}</code></p>
+        <p><strong>نتيجة Authentica:</strong> {otpDiagnostics.data.transport==='network_error'?'تعذر الوصول للشبكة':otpDiagnostics.data.balanceHttpStatus===null?'لا يوجد مفتاح':'HTTP '+otpDiagnostics.data.balanceHttpStatus} {otpDiagnostics.data.balanceReachable?'— تم قبول المفتاح':'— لم يتم قبول المفتاح'}</p>
+        <p className="text-slate-600">قارن البصمة وحالة HTTP بين المعاينة والموقع المنشور: تطابق البصمة مع 401 يعني أن Authentica أو شبكة الخادم المنشور ترفض نفس المفتاح؛ اختلاف البصمة يعني أن إعداد secret المنشور مختلف.</p>
+      </div>}
     </section>
     <section data-pdf-report id="event-print-report" className={card}>
       <style>{`@media print { body * { visibility: hidden; } #event-print-report, #event-print-report * { visibility: visible; } #event-print-report { position:absolute; inset:0; margin:0; } #event-print-report button { display:none; } }`}</style>

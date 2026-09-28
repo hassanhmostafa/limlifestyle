@@ -6,6 +6,8 @@ vi.mock('./eventTracksDb',()=>({listTracks:vi.fn()}));
 import type { TrpcContext } from './_core/context';
 import { eventReportCsv } from '../shared/eventReport';
 vi.mock('./eventAdminDb',()=>({readEventProfile:vi.fn(),updateEventProfile:vi.fn(),eventReportSummary:vi.fn(),eventReportPage:vi.fn()}));
+vi.mock('./lib/authenticaDiagnostics',()=>({getAuthenticaDiagnostics:vi.fn()}));
+import { getAuthenticaDiagnostics } from './lib/authenticaDiagnostics';
 const ctx=(user:unknown)=>({user,req:{headers:{}},res:{}} as TrpcContext);
 const admin=eventAdminRouter.createCaller(ctx({id:1,role:'admin',adminType:'super'}));
 const profile={name:'اليوم الصحي',startsOn:'2026-09-26',endsOn:'2026-09-27',location:'جدة',organizer:'ليم',questionnaireIds:['lifestyle'] as 'lifestyle'[]};
@@ -21,6 +23,7 @@ describe('event administration',()=>{
       await expect(caller.report({after:0,limit:50})).rejects.toThrow();
       await expect(caller.summary()).rejects.toThrow();
       await expect(caller.start()).rejects.toThrow();
+      await expect(caller.otpDiagnostics()).rejects.toThrow();
     }
     expect(store.updateEventProfile).not.toHaveBeenCalled();
     expect(store.eventReportPage).not.toHaveBeenCalled();
@@ -64,6 +67,16 @@ describe('event administration',()=>{
     await admin.report({after:50,limit:20});
     expect(store.eventReportPage).toHaveBeenCalledWith(50,20);
     await expect(admin.report({after:0,limit:1000})).rejects.toThrow();
+  });
+  it('returns Authentica diagnostics only to a super admin',async()=>{
+    vi.mocked(getAuthenticaDiagnostics).mockResolvedValue({
+      keyPresent:true,keyLength:60,keyFormat:'bcrypt',keyFingerprint:'sha256:abc123def456',
+      balanceHttpStatus:200,balanceReachable:true,transport:'ok',
+    });
+    await expect(admin.otpDiagnostics()).resolves.toMatchObject({
+      keyLength:60,balanceHttpStatus:200,keyFingerprint:'sha256:abc123def456',
+    });
+    expect(getAuthenticaDiagnostics).toHaveBeenCalledOnce();
   });
   it('quotes CSV data and neutralizes spreadsheet formulas',()=>{
     const csv=eventReportCsv([{name:'=HYPERLINK("test")',phone:'+966500000000',advice:'line1\nline2'}]);

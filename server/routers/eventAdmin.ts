@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, superAdminProcedure } from '../_core/trpc';
 import * as store from '../eventAdminDb';
+import { getAuthenticaDiagnostics } from '../lib/authenticaDiagnostics';
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=> {
   const d = new Date(v+'T00:00:00Z'); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10)===v;
 }, 'تاريخ غير صحيح');
@@ -37,6 +38,12 @@ export const eventAdminRouter = router({
     await store.updateEventProfile({closed:0});return {success:true};
   }),
   summary: superAdminProcedure.query(()=>store.eventReportSummary()),
-  report: superAdminProcedure.input(z.object({after:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(50).default(50)}))
+  report: superAdminProcedure.input(z.object({after:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(50)}))
     .query(({input})=>store.eventReportPage(input.after,input.limit)),
+  /**
+   * A safe, super-admin-only check of the runtime that serves this request.
+   * It returns a short one-way fingerprint and HTTP status only—never the key,
+   * account balance, phone number, or provider response body.
+   */
+  otpDiagnostics: superAdminProcedure.query(() => getAuthenticaDiagnostics()),
 });
