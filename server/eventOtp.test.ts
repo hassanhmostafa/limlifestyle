@@ -176,7 +176,7 @@ describe("documented Authentica response contract and safe diagnostics", () => {
   it.each([[401, "AUTH"], [403, "AUTH"], [429, "LIMIT"], [402, "CREDIT"], [422, "REQUEST"], [500, "PROVIDER"]] as const)("maps HTTP %s without revealing response contents", async (status, category) => {
     const logger = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(fetch).mockResolvedValue(new Response("test-only-key phone otp provider details", { status }));
-    await expect(authenticaRequest("send-otp", {})).rejects.toThrow(`OTP-${category}`);
+    await expect(authenticaRequest("send-otp", {})).rejects.toThrow(`OTP-${category}-${status}`);
     expect(logger).toHaveBeenCalledWith("[Events OTP] Provider failure", { action: "send-otp", category, httpStatus: status });
     expect(JSON.stringify(logger.mock.calls)).not.toContain("test-only-key");
     logger.mockRestore();

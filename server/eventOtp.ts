@@ -23,7 +23,9 @@ function configuredKey() {
 function providerFailure(action: string, category: string, httpStatus?: number): never {
   console.warn("[Events OTP] Provider failure", { action, category, ...(httpStatus ? { httpStatus } : {}) });
   const messages: Record<string, string> = {
-    AUTH: "خدمة الرسائل تحتاج مراجعة إعداداتها. تواصل مع منظم الفعالية.",
+    AUTH: httpStatus === 401
+      ? "خدمة الرسائل رفضت مفتاح الربط في الخادم المنشور."
+      : "خدمة الرسائل رفضت صلاحية الإرسال لهذا التطبيق.",
     LIMIT: "خدمة الرسائل مشغولة أو وصلت لحد الإرسال. حاول بعد قليل.",
     REQUEST: "تعذر إرسال الرمز. يلزم مراجعة إعدادات الرسائل لدى منظم الفعالية.",
     CREDIT: "خدمة الرسائل غير متاحة حاليًا. تواصل مع منظم الفعالية.",
@@ -32,7 +34,8 @@ function providerFailure(action: string, category: string, httpStatus?: number):
     PROVIDER: "خدمة الرسائل غير متاحة حاليًا. حاول مرة أخرى بعد قليل.",
     RESPONSE: "تعذر تأكيد رد خدمة الرسائل. تواصل مع منظم الفعالية.",
   };
-  throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: `${messages[category]} (OTP-${category})` });
+  const diagnostic = `OTP-${category}${httpStatus ? `-${httpStatus}` : ""}`;
+  throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: `${messages[category]} (${diagnostic})` });
 }
 export async function authenticaRequest(action: "send-otp" | "verify-otp", body: Record<string, string>) {
   const key = configuredKey();

@@ -37,6 +37,7 @@
 - [x] Standardize primary controls and hero gradients across the main LIM app on the Events palette: lime primary calls to action with forest text, and deep forest supporting actions/panels. Remove the saturated turquoise green used by the previous light-blue-to-emerald conversion.
 - [x] Extend the shared trunk callout as one connected 50° leader-and-dot vector so its endpoint is horizontally centered on the upper abdomen, just above the navel, in both Events and My Health anatomy boards.
 - [x] Shorten the shared trunk vector by approximately 1 mm while retaining its connected dot, and add a coral fallback color to the shared fat leaders so both the line segments and dots render in My Health as well as Events.
+- [x] Distinguish Authentica provider failures precisely in Events OTP messages: the public code now includes the received HTTP status (for example `OTP-AUTH-401` versus `OTP-AUTH-403`) without exposing the API key, phone number, OTP, or provider response body. Verified the active server key accepts both Authentica balance and a non-delivery invalid-recipient OTP request.
 
 ## Required field verification after deployment
 - [ ] Publish the checkpoint, then rotate the registered X18 device key in **Admin → Kiosk Devices** and configure the generated URL/key in the physical machine.
