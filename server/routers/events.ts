@@ -1,3 +1,4 @@
+import { EVENT_LIFESTYLE_VERSION, revisedLifestyleComplete } from "../../shared/eventLifestyle";
 import { otpEnabled, sendEventOtp, verifyEventOtp, consumeEventOtp } from "../eventOtp";
 import { requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
@@ -165,6 +166,8 @@ export const eventsRouter = router({
     .mutation(async ({ input }) => {
       const session = await requireEventSession(input.accessToken);
       if (!(session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle")) throw new TRPCError({code:"BAD_REQUEST", message:"الاستبيان غير مفعّل لهذه الزيارة"});
+      if (input.answers._questionnaireVersion !== undefined && (input.answers._questionnaireVersion !== EVENT_LIFESTYLE_VERSION || !revisedLifestyleComplete(input.answers)))
+        throw new TRPCError({code:"BAD_REQUEST",message:"أكمل أسئلة الاستبيان بقيم صحيحة وأولويات مختلفة قبل الحفظ"});
       const updated = await updateEventParticipantSession(tokenHash(input.accessToken), { answers: input.answers });
       if (!updated || updated.id !== session.id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save lifestyle answers." });
       return { success: true, answers: updated.answers ?? {} };

@@ -1,54 +1,45 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { authenticaRequest, consumeEventOtp, otpPhone, sendEventOtp, verifyEventOtp } from "./eventOtp";
+import { sendOurSms, otpDigest, consumeEventOtp, otpPhone, sendEventOtp, verifyEventOtp } from "./eventOtp";
 import { getDb } from "./db";
 vi.mock("./db", () => ({ getDb: vi.fn() }));
 
 beforeEach(() => {
   vi.stubEnv("EVENTS_OTP_ENABLED", "true");
-  vi.stubEnv("AUTHENTICA_API_KEY", "test-only-key");
+  vi.stubEnv("OURSMS_API_KEY", "test-only-key");
+  vi.stubEnv("OURSMS_SENDER_ID", "LIM");
+  vi.stubEnv("EVENTS_OTP_SECRET", "test-only-secret-at-least-32-characters");
   vi.stubGlobal("fetch", vi.fn());
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetAllMocks(); });
 
-describe("Authentica boundary", () => {
-  it("normalizes Saudi numbers and rejects other destinations", () => {
-    expect(otpPhone("0501234567")).toBe("+966501234567");
-    expect(otpPhone("00966501234567")).toBe("+966501234567");
-    expect(() => otpPhone("+12025550101")).toThrow();
-  });
-  it("sends SMS with a server-only key and no redirects", async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ success: true })));
-    expect(await authenticaRequest("send-otp", { phone: "+966501234567", method: "sms" })).toBe(true);
-    expect(fetch).toHaveBeenCalledWith("https://api.authentica.sa/api/v2/send-otp", expect.objectContaining({
-      redirect: "error", headers: expect.objectContaining({ "X-Authorization": "test-only-key" }),
-      body: JSON.stringify({ phone: "+966501234567", method: "sms" }),
-    }));
-  });
-  it.each([{ verified: true }, { verified: false }])("only accepts explicit verified:true (%j)", async response => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(response)));
-    expect(await authenticaRequest("verify-otp", { phone: "+966501234567", otp: "123456" })).toBe(response.verified === true);
-  });
-  it("treats provider rejection as an invalid code", async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 422 }));
-    expect(await authenticaRequest("verify-otp", {})).toBe(false);
-  });
-  it.each([401, 429, 500])("redacts provider failure %s", async status => {
-    vi.mocked(fetch).mockResolvedValue(new Response("test-only-key internal detail", { status }));
-    await expect(authenticaRequest("send-otp", {})).rejects.toThrow("OTP-");
-  });
-  it("fails closed if enabled without a key", async () => {
-    vi.stubEnv("AUTHENTICA_API_KEY", "");
-    await expect(authenticaRequest("send-otp", {})).rejects.toThrow("غير متاح");
-    expect(fetch).not.toHaveBeenCalled();
-  });
-  it("does not accept missing proof when enabled", async () => {
-    await expect(consumeEventOtp("0501234567")).rejects.toThrow("رمز التحقق");
-  });
-  it("blocks new registration when OTP is disabled", async () => {
-    vi.stubEnv("EVENTS_OTP_ENABLED", "false");
-    await expect(consumeEventOtp("0501234567")).rejects.toThrow("غير متاح");
-    expect(getDb).not.toHaveBeenCalled();
-  });
+describe("OurSMS boundary", () => {
+ it("normalizes Saudi numbers and rejects other destinations",()=>{
+  expect(otpPhone("0501234567")).toBe("+966501234567");expect(()=>otpPhone("+12025550101")).toThrow();
+ });
+ it("uses Bearer and the configured sender with no redirects",async()=>{
+  vi.mocked(fetch).mockResolvedValue(new Response('{}'));
+  await sendOurSms('+966501234567','012345');
+  expect(fetch).toHaveBeenCalledWith('https://api.oursms.com/msgs/sms',expect.objectContaining({redirect:'error',headers:expect.objectContaining({Authorization:'Bearer test-only-key'})}));
+  const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+  expect(body).toMatchObject({src:'LIM',dests:['966501234567'],secure:true,msgClass:'transactional',validity:10});
+  expect(body.body).toContain('012345');
+ });
+ it.each(['OURSMS_API_KEY','OURSMS_SENDER_ID','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
+  vi.stubEnv(key,'');await expect(sendEventOtp('0501234567','ip')).rejects.toThrow('OTP-CONFIG');expect(fetch).not.toHaveBeenCalled();
+ });
+ it('blocks missing proof and disabled OTP',async()=>{
+  await expect(consumeEventOtp('0501234567')).rejects.toThrow('رمز التحقق');
+  vi.stubEnv('EVENTS_OTP_ENABLED','false');await expect(consumeEventOtp('0501234567')).rejects.toThrow('غير متاح');
+ });
+ it.each([[401,'AUTH'],[403,'AUTH'],[429,'LIMIT'],[402,'CREDIT'],[422,'REQUEST'],[500,'PROVIDER']] as const)('redacts HTTP %s',async(status,category)=>{
+  const log=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  vi.mocked(fetch).mockResolvedValue(new Response('secret code phone key',{status}));
+  await expect(sendOurSms('+966501234567','123456')).rejects.toThrow(`OTP-${category}-${status}`);
+  expect(JSON.stringify(log.mock.calls)).not.toContain('secret');log.mockRestore();
+ });
+ it.each(['not json','{"success":false}','{"error":"secret"}'])('rejects malformed or explicitly failed body %s',async body=>{
+  vi.mocked(fetch).mockResolvedValue(new Response(body));await expect(sendOurSms('+966501234567','123456')).rejects.toThrow('OTP-RESPONSE');
+ });
 });
 
 // Single-row DB adapter exercises challenge transitions; MySQL lock/rollback
@@ -66,7 +57,7 @@ function challengeDatabase(row: Record<string, unknown> | undefined) {
 import { createHash } from "node:crypto";
 const token = "a".repeat(43);
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
-const pending = () => ({ tokenHash: digest(token), expiresAt: new Date(Date.now() + 600000), state: "pending", attempts: 0 });
+const pending = () => ({ tokenHash: digest(token), expiresAt: new Date(Date.now() + 600000), state: "pending", attempts: 0, codeHash: otpDigest(digest("+966501234567"),digest(token),"123456") });
 describe("challenge ownership and lifecycle", () => {
   it("verifies then consumes exactly once", async () => {
     const row = challengeDatabase(pending())!;
@@ -94,15 +85,18 @@ describe("challenge ownership and lifecycle", () => {
     const row = challengeDatabase(pending())!;
     vi.mocked(fetch).mockImplementation(async () => new Response('{"verified":false}'));
     for (let i = 0; i < 6; i++) await expect(verifyEventOtp("0501234567", token, "000000")).rejects.toThrow();
-    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(fetch).not.toHaveBeenCalled();
     expect(row.attempts).toBe(5);
     expect(row.state).toBe("pending");
   });
-  it("a network failure never verifies a challenge and permits retry", async () => {
-    const row = challengeDatabase(pending())!;
-    vi.mocked(fetch).mockRejectedValue(new Error("network secret"));
-    await expect(verifyEventOtp("0501234567", token, "123456")).rejects.toThrow("OTP-NETWORK");
-    expect(row.state).toBe("pending");
+  it("binds the code to the phone and current browser challenge",async()=>{
+    challengeDatabase(pending());
+    await expect(verifyEventOtp('0509999999',token,'123456')).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("rejects pre-migration Authentica challenges",async()=>{
+    challengeDatabase({...pending(),codeHash:null});
+    await expect(verifyEventOtp('0501234567',token,'123456')).rejects.toThrow();
   });
 });
 
@@ -138,6 +132,9 @@ describe("persistent send limits", () => {
     const result = await sendEventOtp('0501234567', 'test-ip');
     expect(result.challengeToken.length).toBeGreaterThanOrEqual(32);
     expect(state.challenge().tokenHash).not.toBe(result.challengeToken);
+    const sentCode = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).body.match(/\d{6}/)[0];
+    expect(state.challenge().codeHash).toBe(otpDigest(digest("+966501234567"), digest(result.challengeToken), sentCode));
+    expect(JSON.stringify(result)).not.toContain(sentCode);
     vi.setSystemTime(new Date('2026-09-26T11:00:05Z'));
     await expect(sendEventOtp('0501234567', 'test-ip')).rejects.toThrow('دقيقة');
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -160,29 +157,5 @@ describe("persistent send limits", () => {
     vi.mocked(fetch).mockRejectedValue(new Error('unavailable'));
     await expect(sendEventOtp('0501234567', 'test-ip')).rejects.toThrow('OTP-NETWORK');
     expect(state.challenge().state).toBe('failed');
-  });
-});
-
-
-describe("documented Authentica response contract and safe diagnostics", () => {
-  it.each([{ status: true }, { status: false }, { status: false, verified: true }])("honors status boolean %j", async response => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(response)));
-    expect(await authenticaRequest("verify-otp", {})).toBe(response.status);
-  });
-  it.each([{ success: true }, { status: "true", verified: true }, { verified: "true" }, {}, null])("rejects ambiguous verification %j", async response => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(response)));
-    await expect(authenticaRequest("verify-otp", {})).rejects.toThrow("OTP-RESPONSE");
-  });
-  it.each([[401, "AUTH"], [403, "AUTH"], [429, "LIMIT"], [402, "CREDIT"], [422, "REQUEST"], [500, "PROVIDER"]] as const)("maps HTTP %s without revealing response contents", async (status, category) => {
-    const logger = vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.mocked(fetch).mockResolvedValue(new Response("test-only-key phone otp provider details", { status }));
-    await expect(authenticaRequest("send-otp", {})).rejects.toThrow(`OTP-${category}-${status}`);
-    expect(logger).toHaveBeenCalledWith("[Events OTP] Provider failure", { action: "send-otp", category, httpStatus: status });
-    expect(JSON.stringify(logger.mock.calls)).not.toContain("test-only-key");
-    logger.mockRestore();
-  });
-  it("labels connection timeout separately", async () => {
-    vi.mocked(fetch).mockRejectedValue(new DOMException("sensitive provider details", "TimeoutError"));
-    await expect(authenticaRequest("send-otp", {})).rejects.toThrow("OTP-TIMEOUT");
   });
 });

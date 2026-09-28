@@ -3,6 +3,7 @@ import { int, mysqlEnum, mysqlTable, mediumtext, text, timestamp, varchar, decim
 export const eventOtpChallenges = mysqlTable("event_otp_challenges", {
   phoneHash: varchar("phoneHash", { length: 64 }).primaryKey(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+  codeHash: varchar("codeHash", { length: 64 }),
   expiresAt: timestamp("expiresAt").notNull(),
   attempts: int("attempts").notNull().default(0),
   state: varchar("state", { length: 16 }).notNull(),
@@ -427,3 +428,35 @@ export const kioskSessions = mysqlTable("kiosk_sessions", {
 
 export type KioskSession = typeof kioskSessions.$inferSelect;
 export type InsertKioskSession = typeof kioskSessions.$inferInsert;
+
+// Research access is independent of clinical tracks and core-user accounts.
+export const eventResearchers = mysqlTable('event_researchers', {
+  id: int('id').autoincrement().primaryKey(),
+  username: varchar('username',{length:80}).notNull().unique(),
+  name: varchar('name',{length:255}).notNull(),
+  codeHash: varchar('codeHash',{length:64}).notNull(),
+  allEvents: int('allEvents').notNull().default(0),
+  includeIdentity: int('includeIdentity').notNull().default(0),
+  active: int('active').notNull().default(1),
+  credentialVersion: int('credentialVersion').notNull().default(1),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+});
+export const eventResearchGrants = mysqlTable('event_research_grants', {
+  id: int('id').autoincrement().primaryKey(),
+  researcherId: int('researcherId').notNull(),
+  eventCode: varchar('eventCode',{length:64}).notNull(),
+},t=>[uniqueIndex('research_event_unique').on(t.researcherId,t.eventCode)]);
+export const eventResearchSessions = mysqlTable('event_research_sessions', {
+  tokenHash: varchar('tokenHash',{length:64}).primaryKey(),
+  researcherId: int('researcherId').notNull(),
+  credentialVersion: int('credentialVersion').notNull(),
+  expiresAt: timestamp('expiresAt').notNull(),
+});
+export const eventResearchAudit = mysqlTable('event_research_audit', {
+  id: int('id').autoincrement().primaryKey(),
+  actorId: int('actorId').notNull(),
+  action: varchar('action',{length:40}).notNull(),
+  eventCode: varchar('eventCode',{length:64}),
+  rowCount: int('rowCount').notNull().default(0),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+});

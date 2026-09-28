@@ -87,6 +87,7 @@ const assert = require("node:assert/strict");
       machineMetrics: { fatRate: "25.3", muscle: "42.8", bmr: "1426" },
     };
     let partial = false;
+    let revisedSaved;
     await context.route("**/api/events/anatomy/**", r =>
       r.fulfill({
         contentType: "image/png",
@@ -101,7 +102,8 @@ const assert = require("node:assert/strict");
       const names = decodeURIComponent(
         url.pathname.split("/api/trpc/")[1]
       ).split(",");
-      const result = names.map(name => {
+      const req=route.request();const payload=req.method()==='POST'?JSON.parse(req.postData()):{};
+      const result = names.map((name,index) => {
         let value = null;
         if (name === "eventTeam.me")
           value = {
@@ -126,6 +128,7 @@ const assert = require("node:assert/strict");
             answers: partial ? {} : answers,
             readings: [reading],
           };
+        else if (name === "events.saveLifestyle") {revisedSaved=superjson.deserialize(payload[index]).answers;session.answers=revisedSaved;value={success:true,answers:revisedSaved};}
         else if (name === "events.getSession") value = session;
         else if (name === "events.care") value = care;
         else if (name === "events.results") value = { readings: [reading] };
@@ -229,6 +232,14 @@ const assert = require("node:assert/strict");
     console.log(
       "PASS questionnaire next/back reset to top, including long nutrition page"
     );
+    await page.getByRole('button',{name:'لحوم الصيد',exact:true}).click();
+    for(let i=0;i<5;i++)await page.getByRole('button',{name:'التالي',exact:true}).click();
+    const save=page.getByRole('button',{name:'حفظ التقييم',exact:true});
+    assert.equal(await save.isDisabled(),true);
+    await page.locator('p').filter({hasText:'كم مرة تناولت مشروبات كحولية؟'}).locator('..').getByRole('button',{name:'أبدًا',exact:true}).click();
+    await save.click();await page.waitForTimeout(200);
+    assert.equal(revisedSaved._questionnaireVersion,'2026-09-28');assert.equal(revisedSaved.alcoholUse,'3');assert.ok(revisedSaved.proteins.includes('gameMeat'));
+    console.log('PASS full revised questionnaire saves new version, separate alcohol key and game meat');
   } finally {
     await browser.close();
   }

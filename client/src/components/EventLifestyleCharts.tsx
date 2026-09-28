@@ -1,5 +1,5 @@
 import {
-  eventLifestyleSections,
+  lifestyleSectionsForAnswers,
   scoreEventLifestyle,
   type EventAnswers,
 } from "@/lib/eventLifestyle";
@@ -24,7 +24,7 @@ export default function EventLifestyleCharts({
 }: {
   answers: EventAnswers;
 }) {
-  const complete = eventLifestyleSections.every(s =>
+  const complete = lifestyleSectionsForAnswers(answers).every(s =>
     s.questions.every(q =>
       q.type === "multi"
         ? Array.isArray(answers[q.id])

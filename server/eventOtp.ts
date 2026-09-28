@@ -14,10 +14,17 @@ export function otpPhone(value: string) {
   if (!phone.ok) throw new TRPCError({ code: "BAD_REQUEST", message: "أدخل رقم جوال سعودي صحيحًا." });
   return phone.e164;
 }
-function configuredKey() {
-  const key = process.env.AUTHENTICA_API_KEY?.trim();
-  if (!otpEnabled() || !key) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "التحقق بالجوال غير متاح حاليًا. تواصل مع منظم الفعالية." });
-  return key;
+export function otpConfiguration() {
+  const key = process.env.OURSMS_API_KEY?.trim();
+  const sender = process.env.OURSMS_SENDER_ID?.trim();
+  const secret = process.env.EVENTS_OTP_SECRET;
+  if (!otpEnabled() || !key || !sender || !secret || secret.length < 32)
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "التحقق بالجوال غير متاح حاليًا. تواصل مع منظم الفعالية. (OTP-CONFIG)" });
+  return { key, sender, secret };
+}
+export function otpDigest(phoneHash: string, tokenHash: string, code: string) {
+  return crypto.createHmac("sha256", otpConfiguration().secret)
+    .update(JSON.stringify([phoneHash, tokenHash, code])).digest("hex");
 }
 // Never log provider bodies, request headers, phone numbers or OTP codes.
 function providerFailure(action: string, category: string, httpStatus?: number): never {
@@ -37,39 +44,35 @@ function providerFailure(action: string, category: string, httpStatus?: number):
   const diagnostic = `OTP-${category}${httpStatus ? `-${httpStatus}` : ""}`;
   throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: `${messages[category]} (${diagnostic})` });
 }
-export async function authenticaRequest(action: "send-otp" | "verify-otp", body: Record<string, string>) {
-  const key = configuredKey();
+export async function sendOurSms(phone: string, code: string) {
+  const { key, sender } = otpConfiguration();
   let response: Response;
   try {
-    response = await fetch(`https://api.authentica.sa/api/v2/${action}`, {
+    response = await fetch("https://api.oursms.com/msgs/sms", {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
-      headers: { Accept: "application/json", "Content-Type": "application/json", "X-Authorization": key },
-      body: JSON.stringify(body),
+      headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ src: sender, dests: [phone.replace(/^\+/, "")],
+        body: `رمز التحقق في ليم: ${code}. صالح لمدة 10 دقائق. لا تشارك الرمز مع أحد.`,
+        msgClass: "transactional", secure: true, validity: 10 }),
     });
   } catch (error) {
-    providerFailure(action, error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "TIMEOUT" : "NETWORK");
+    providerFailure("send", error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "TIMEOUT" : "NETWORK");
   }
-  if (action === "verify-otp" && [400, 422].includes(response.status)) return false;
-  if (!response.ok) {
+  if (response.status !== 200) {
     const category = [401, 403].includes(response.status) ? "AUTH" : response.status === 429 ? "LIMIT"
       : response.status === 402 ? "CREDIT" : [400, 422].includes(response.status) ? "REQUEST" : "PROVIDER";
-    providerFailure(action, category, response.status);
+    providerFailure("send", category, response.status);
   }
-  let data: unknown;
-  try { data = await response.json(); }
-  catch { providerFailure(action, "RESPONSE", response.status); }
-  if (!data || typeof data !== "object" || Array.isArray(data)) providerFailure(action, "RESPONSE", response.status);
-  const result = data as Record<string, unknown>;
-  if (action === "send-otp") {
-    if (result.success === true) return true;
-    providerFailure(action, "RESPONSE", response.status);
+  // OurSMS documents HTTP 200 with no required response schema. This means
+  // accepted for sending, never proof of delivery. Reject explicit error bodies.
+  const body = await response.text();
+  if (body.trim()) {
+    let data: any;
+    try { data = JSON.parse(body); } catch { providerFailure("send", "RESPONSE", response.status); }
+    if (!data || typeof data !== "object" || data.error || data.errors || data.success === false || data.status === false)
+      providerFailure("send", "RESPONSE", response.status);
   }
-  // Current official docs return {status:true}; old official examples used
-  // {verified:true}. An explicit status always takes precedence, including false.
-  if (typeof result.status === "boolean") return result.status;
-  if ("status" in result) providerFailure(action, "RESPONSE", response.status);
-  if (typeof result.verified === "boolean") return result.verified;
-  providerFailure(action, "RESPONSE", response.status);
+  return true;
 }
 async function database() {
   const db = await getDb();
@@ -83,7 +86,7 @@ async function runOtpPersistence<T>(operation: () => Promise<T>): Promise<T> {
     return await operation();
   } catch (error) {
     if (error instanceof TRPCError) throw error;
-    console.error("[Events OTP] Challenge persistence failed", error);
+    console.error("[Events OTP] Challenge persistence failed");
     throw new TRPCError({
       code: "SERVICE_UNAVAILABLE",
       message: "تعذر بدء التحقق بالجوال حاليًا. حاول مرة أخرى بعد قليل.",
@@ -94,10 +97,12 @@ async function runOtpPersistence<T>(operation: () => Promise<T>): Promise<T> {
 // Persisted, locked counters apply across restarts and multiple server instances.
 // Trust req.ip only after the hosting proxy has been configured in Express.
 export async function sendEventOtp(rawPhone: string, ip: string) {
-  configuredKey();
+  otpConfiguration();
   const phone = otpPhone(rawPhone), phoneHash = hash(phone);
   const token = crypto.randomBytes(32).toString("base64url"), tokenHash = hash(token);
   const db = await database(), now = new Date();
+  const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const codeHash = otpDigest(phoneHash, tokenHash, code);
   await runOtpPersistence(() => db.transaction(async tx => {
     const hour = Math.floor(now.getTime() / 3_600_000), day = Math.floor(now.getTime() / 86_400_000);
     const limits: Array<[string, number, number]> = [
@@ -113,7 +118,7 @@ export async function sendEventOtp(rawPhone: string, ip: string) {
       await tx.update(eventOtpLimits).set({ count: row.count + 1, lastAt: now }).where(eq(eventOtpLimits.bucket, bucket));
     }
     // One active challenge per phone; resending invalidates older browser challenges.
-    const value = { tokenHash, expiresAt: new Date(now.getTime() + TTL), attempts: 0, state: "sending" };
+    const value = { tokenHash, codeHash, expiresAt: new Date(now.getTime() + TTL), attempts: 0, state: "sending" };
     await tx.insert(eventOtpChallenges).values({ phoneHash, ...value, expiresAt: new Date("2000-01-01T00:00:00Z") }).onDuplicateKeyUpdate({ set: { phoneHash } });
     const [previous] = await tx.select().from(eventOtpChallenges).where(eq(eventOtpChallenges.phoneHash, phoneHash)).for("update");
     if (previous.expiresAt.getTime() - TTL + 60_000 > now.getTime()) {
@@ -122,7 +127,7 @@ export async function sendEventOtp(rawPhone: string, ip: string) {
     await tx.update(eventOtpChallenges).set(value).where(eq(eventOtpChallenges.phoneHash, phoneHash));
   }));
   let sent = false;
-  try { sent = await authenticaRequest("send-otp", { method: "sms", phone }); }
+  try { sent = await sendOurSms(phone, code); }
   finally {
     await runOtpPersistence(() => db.update(eventOtpChallenges).set({ state: sent ? "pending" : "failed" })
       .where(and(eq(eventOtpChallenges.phoneHash, phoneHash), eq(eventOtpChallenges.tokenHash, tokenHash))));
@@ -132,31 +137,32 @@ export async function sendEventOtp(rawPhone: string, ip: string) {
 }
 
 export async function verifyEventOtp(rawPhone: string, token: string, code: string) {
-  configuredKey();
+  otpConfiguration();
   const phone = otpPhone(rawPhone), phoneHash = hash(phone), tokenHash = hash(token);
   const db = await database();
-  await runOtpPersistence(() => db.transaction(async tx => {
+  const verified = await runOtpPersistence(() => db.transaction(async tx => {
     const [row] = await tx.select().from(eventOtpChallenges).where(eq(eventOtpChallenges.phoneHash, phoneHash)).for("update");
-    if (!row || row.tokenHash !== tokenHash || row.expiresAt.getTime() <= Date.now() || row.attempts >= 5 || row.state !== "pending") throw invalid();
-    await tx.update(eventOtpChallenges).set({ attempts: row.attempts + 1, state: "verifying" }).where(eq(eventOtpChallenges.phoneHash, phoneHash));
+    if (!row || row.tokenHash !== tokenHash || row.expiresAt.getTime() <= Date.now() || row.attempts >= 5 || row.state !== "pending" || !row.codeHash) throw invalid();
+    const candidate = otpDigest(phoneHash, tokenHash, code);
+    const matches = /^\d{6}$/.test(code) && /^[a-f0-9]{64}$/.test(row.codeHash) &&
+      crypto.timingSafeEqual(Buffer.from(row.codeHash, "hex"), Buffer.from(candidate, "hex"));
+    // Wrong attempts commit before throwing; otherwise a transaction rollback
+    // would permit unlimited guesses. Verification and consumption are atomic.
+    await tx.update(eventOtpChallenges).set({ attempts: row.attempts + 1, state: matches ? "verified" : "pending" })
+      .where(eq(eventOtpChallenges.phoneHash, phoneHash));
+    return matches;
   }));
-  let verified = false;
-  try { verified = await authenticaRequest("verify-otp", { phone, otp: code }); }
-  finally {
-    await runOtpPersistence(() => db.update(eventOtpChallenges).set({ state: verified ? "verified" : "pending" })
-      .where(and(eq(eventOtpChallenges.phoneHash, phoneHash), eq(eventOtpChallenges.tokenHash, tokenHash))));
-  }
   if (!verified) throw invalid();
   return { verified: true as const };
 }
 
 export async function consumeEventOtp(rawPhone: string, token?: string) {
-  configuredKey();
+  otpConfiguration();
   if (!token) throw invalid();
   const db = await database(), phoneHash = hash(otpPhone(rawPhone)), tokenHash = hash(token);
   await runOtpPersistence(() => db.transaction(async tx => {
     const [row] = await tx.select().from(eventOtpChallenges).where(eq(eventOtpChallenges.phoneHash, phoneHash)).for("update");
-    if (!row || row.tokenHash !== tokenHash || row.state !== "verified" || row.expiresAt.getTime() <= Date.now()) throw invalid();
+    if (!row || row.tokenHash !== tokenHash || row.state !== "verified" || !row.codeHash || row.expiresAt.getTime() <= Date.now()) throw invalid();
     await tx.update(eventOtpChallenges).set({ state: "consumed" }).where(eq(eventOtpChallenges.phoneHash, phoneHash));
   }));
 }
