@@ -1,3 +1,4 @@
+import EventResearchAdmin from "@/components/EventResearchAdmin";
 import EventAdminLaunch from "@/components/EventAdminLaunch";
 import EventAdminPanel from "@/components/EventAdminPanel";
 import { useEffect, useState } from "react";
@@ -69,6 +70,7 @@ export default function EventCareAdmin() {
         ) : (
           <>
             <EventAdminPanel />
+            <EventResearchAdmin />
             <section className="space-y-4 rounded-3xl bg-white p-6">
               <label className="flex gap-3 text-lg font-bold">
                 <input

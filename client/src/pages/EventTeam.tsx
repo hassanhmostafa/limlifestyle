@@ -493,7 +493,7 @@ export default function EventTeam() {
   );
 }
 
-import { eventLifestyleSections } from "@/lib/eventLifestyle";
+import { lifestyleSectionsForAnswers } from "@/lib/eventLifestyle";
 function LifestyleAnswers({
   answers,
 }: {
@@ -501,7 +501,7 @@ function LifestyleAnswers({
 }) {
   return (
     <dl className="mt-3 space-y-3">
-      {eventLifestyleSections
+      {lifestyleSectionsForAnswers(answers)
         .flatMap(s => s.questions)
         .filter(q => answers[q.id] !== undefined)
         .map(q => (

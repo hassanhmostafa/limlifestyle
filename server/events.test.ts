@@ -75,7 +75,9 @@ beforeEach(() => {
 describe("standalone events.createSession", () => {
   it("enforces OTP on the server before looking up or creating a participant", async () => {
     vi.stubEnv("EVENTS_OTP_ENABLED", "true");
-    vi.stubEnv("AUTHENTICA_API_KEY", "test-only-key");
+    vi.stubEnv("OURSMS_API_KEY", "test-only-key");
+    vi.stubEnv("OURSMS_SENDER_ID", "LIM");
+    vi.stubEnv("EVENTS_OTP_SECRET", "test-only-secret-at-least-32-characters");
     try {
       const actual = await vi.importActual<typeof import("./eventOtp")>("./eventOtp");
       vi.mocked(otp.consumeEventOtp).mockImplementation(actual.consumeEventOtp);

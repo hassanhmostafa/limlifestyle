@@ -73,16 +73,16 @@ export default function EventAdminPanel(){
     </section>
     <section className={card}>
       <h2 className="flex items-center gap-2 text-xl font-bold"><ShieldCheck/>فحص اتصال OTP بالخادم المنشور</h2>
-      <p className="text-sm text-slate-600">يفحص هذا الزر الخادم الذي يستقبل هذه الصفحة الآن عبر نقطة الرصيد غير المُرسِلة لدى Authentica. لا يعرض المفتاح أو الرصيد أو رقم جوال أو أي رسالة من مزود الخدمة.</p>
+      <p className="text-sm text-slate-600">يفحص هذا الزر الخادم الذي يستقبل هذه الصفحة الآن عبر نقطة فحص الرصيد لدى OurSMS. لا يعرض المفتاح أو الرصيد أو رقم جوال أو أي رسالة من مزود الخدمة.</p>
       <button type="button" className={button} disabled={otpDiagnostics.isFetching} onClick={()=>void otpDiagnostics.refetch()}>
         <RefreshCw className="inline-block size-4"/> {otpDiagnostics.isFetching?'جارٍ الفحص…':'فحص إعداد OTP'}
       </button>
       {otpDiagnostics.error&&<p role="alert" className="rounded-2xl bg-red-50 p-4 text-red-800">تعذر تنفيذ فحص OTP. تأكد من الدخول كمدير عام ثم أعد المحاولة.</p>}
       {otpDiagnostics.data&&<div role="status" className="space-y-2 rounded-2xl bg-[#f3f8f6] p-4 text-sm">
-        <p><strong>المفتاح موجود:</strong> {otpDiagnostics.data.keyPresent?'نعم':'لا'} · <strong>الطول:</strong> {otpDiagnostics.data.keyLength} · <strong>الصيغة:</strong> {otpDiagnostics.data.keyFormat==='bcrypt'?'صيغة Authentica':'صيغة غير متوقعة'}</p>
-        <p><strong>بصمة آمنة للمقارنة:</strong> <code dir="ltr">{otpDiagnostics.data.keyFingerprint??'—'}</code></p>
-        <p><strong>نتيجة Authentica:</strong> {otpDiagnostics.data.transport==='network_error'?'تعذر الوصول للشبكة':otpDiagnostics.data.balanceHttpStatus===null?'لا يوجد مفتاح':'HTTP '+otpDiagnostics.data.balanceHttpStatus} {otpDiagnostics.data.balanceReachable?'— تم قبول المفتاح':'— لم يتم قبول المفتاح'}</p>
-        <p className="text-slate-600">قارن البصمة وحالة HTTP بين المعاينة والموقع المنشور: تطابق البصمة مع 401 يعني أن Authentica أو شبكة الخادم المنشور ترفض نفس المفتاح؛ اختلاف البصمة يعني أن إعداد secret المنشور مختلف.</p>
+        <p><strong>المفتاح موجود:</strong> {otpDiagnostics.data.keyPresent?'نعم':'لا'} · <strong>الطول:</strong> {otpDiagnostics.data.keyLength}</p>
+        <p>تفعيل OTP: {otpDiagnostics.data.enabled?'نعم':'لا'} · اسم المرسل: {otpDiagnostics.data.senderConfigured?'مضبوط':'ناقص'} · سر التحقق: {otpDiagnostics.data.secretConfigured?'مضبوط':'ناقص'}</p><p><strong>بصمة آمنة للمقارنة:</strong> <code dir="ltr">{otpDiagnostics.data.keyFingerprint??'—'}</code></p>
+        <p><strong>نتيجة OurSMS:</strong> {otpDiagnostics.data.transport==='network_error'?'تعذر الوصول للشبكة':otpDiagnostics.data.balanceHttpStatus===null?'لا يوجد مفتاح':'HTTP '+otpDiagnostics.data.balanceHttpStatus} {otpDiagnostics.data.balanceReachable?'— تم قبول المفتاح':'— لم يتم قبول المفتاح'}</p>
+        <p className="text-slate-600">قارن البصمة وحالة HTTP بين المعاينة والموقع المنشور: تطابق البصمة مع 401 يعني أن OurSMS أو شبكة الخادم المنشور ترفض نفس المفتاح؛ اختلاف البصمة يعني أن إعداد secret المنشور مختلف.</p>
       </div>}
     </section>
     <section data-pdf-report id="event-print-report" className={card}>

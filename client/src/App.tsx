@@ -1,3 +1,4 @@
+import EventResearch from "./pages/EventResearch";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -45,6 +46,7 @@ function Router() {
       <Route path={"/kiosk-login"} component={KioskLogin} />
       <Route path={"/machine-simulator"} component={MachineSimulator} />
       <Route path={"/kiosk-qr"} component={KioskQR} />
+      <Route path={"/events/research"} component={EventResearch} />
       <Route path={"/events/team"} component={EventTeam} />
       <Route path={"/events/care-admin"} component={EventCareAdmin} />
       <Route path={"/events"} component={Events} />
