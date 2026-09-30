@@ -42,7 +42,7 @@ try {
     'SELECT nurseStaffId, doctorStaffId, approvedAt FROM event_care LIMIT 0',
   ]) await connection.query(query);
   if (process.env.EVENTS_OTP_ENABLED === 'true') {
-    if (!process.env.OURSMS_API_KEY?.trim() || !process.env.OURSMS_SENDER_ID?.trim() || !process.env.OURSMS_TEMPLATE_ID?.trim() || (process.env.EVENTS_OTP_SECRET?.length ?? 0) < 32) throw new Error('OURSMS_API_KEY, OURSMS_SENDER_ID, OURSMS_TEMPLATE_ID and EVENTS_OTP_SECRET (32+ characters) are required');
+    if (!process.env.OURSMS_API_KEY?.trim() || !process.env.OURSMS_SENDER_ID?.trim() || (process.env.EVENTS_OTP_SECRET?.length ?? 0) < 32) throw new Error('OURSMS_API_KEY, OURSMS_SENDER_ID and EVENTS_OTP_SECRET (32+ characters) are required');
     await connection.query('SELECT phoneHash, tokenHash, codeHash, expiresAt, attempts, state FROM event_otp_challenges LIMIT 0');
     await connection.query('SELECT bucket, count, lastAt FROM event_otp_limits LIMIT 0');
   }

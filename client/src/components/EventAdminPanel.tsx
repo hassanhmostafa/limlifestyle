@@ -80,7 +80,7 @@ export default function EventAdminPanel(){
       {otpDiagnostics.error&&<p role="alert" className="rounded-2xl bg-red-50 p-4 text-red-800">تعذر تنفيذ فحص OTP. تأكد من الدخول كمدير عام ثم أعد المحاولة.</p>}
       {otpDiagnostics.data&&<div role="status" className="space-y-2 rounded-2xl bg-[#f3f8f6] p-4 text-sm">
         <p><strong>المفتاح موجود:</strong> {otpDiagnostics.data.keyPresent?'نعم':'لا'} · <strong>الطول:</strong> {otpDiagnostics.data.keyLength}</p>
-        <p>تفعيل OTP: {otpDiagnostics.data.enabled?'نعم':'لا'} · اسم المرسل: {otpDiagnostics.data.senderConfigured?'مضبوط':'ناقص'} · قالب الرسالة: {otpDiagnostics.data.templateConfigured?'مضبوط':'ناقص'} · سر التحقق: {otpDiagnostics.data.secretConfigured?'مضبوط':'ناقص'}</p><p><strong>بصمة آمنة للمقارنة:</strong> <code dir="ltr">{otpDiagnostics.data.keyFingerprint??'—'}</code></p>
+        <p>تفعيل OTP: {otpDiagnostics.data.enabled?'نعم':'لا'} · اسم المرسل: {otpDiagnostics.data.senderConfigured?'مضبوط':'ناقص'} · صيغة الإرسال: {otpDiagnostics.data.messageFormat} · سر التحقق: {otpDiagnostics.data.secretConfigured?'مضبوط':'ناقص'}</p><p><strong>بصمة آمنة للمقارنة:</strong> <code dir="ltr">{otpDiagnostics.data.keyFingerprint??'—'}</code></p>
         <p><strong>نتيجة OurSMS:</strong> {otpDiagnostics.data.transport==='network_error'?'تعذر الوصول للشبكة':otpDiagnostics.data.balanceHttpStatus===null?'لا يوجد مفتاح':'HTTP '+otpDiagnostics.data.balanceHttpStatus} {otpDiagnostics.data.balanceReachable?'— تم قبول المفتاح':'— لم يتم قبول المفتاح'}</p>
         <p className="text-slate-600">قارن البصمة وحالة HTTP بين المعاينة والموقع المنشور: تطابق البصمة مع 401 يعني أن OurSMS أو شبكة الخادم المنشور ترفض نفس المفتاح؛ اختلاف البصمة يعني أن إعداد secret المنشور مختلف.</p>
       </div>}
