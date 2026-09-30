@@ -14,12 +14,12 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetAllMocks(); });
 
 describe("OurSMS boundary", () => {
- it("sends the approved text without requiring the obsolete template ID",async()=>{
+ it("sends the original LIM text without requiring the obsolete template ID",async()=>{
   vi.stubEnv('OURSMS_TEMPLATE_ID','');
   vi.mocked(fetch).mockResolvedValue(new Response('{}'));
   await sendOurSms('+966501234567','0007');
   const request=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
-  expect(request).toEqual({src:'RAWZ OTP',dests:['966501234567'],body:'رمز التحقق الخاص بك ( 0007 )'});
+  expect(request).toEqual({src:'RAWZ OTP',dests:['966501234567'],body:'رمز التحقق في ليم: 0007. صالح لمدة 10 دقائق. لا تشارك الرمز مع أحد.'});
  });
 
  it("normalizes Saudi numbers and rejects other destinations",()=>{
@@ -30,7 +30,7 @@ describe("OurSMS boundary", () => {
   await sendOurSms('+966501234567','0123');
   expect(fetch).toHaveBeenCalledWith('https://api.oursms.com/msgs/sms',expect.objectContaining({redirect:'error',headers:expect.objectContaining({Authorization:'Bearer test-only-key'})}));
   const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
-  expect(body).toEqual({src:'RAWZ OTP',dests:['966501234567'],body:'رمز التحقق الخاص بك ( 0123 )'});
+  expect(body).toEqual({src:'RAWZ OTP',dests:['966501234567'],body:'رمز التحقق في ليم: 0123. صالح لمدة 10 دقائق. لا تشارك الرمز مع أحد.'});
  });
 
  it("decodes percent-encoded spaces in a sender ID only for the provider request",async()=>{

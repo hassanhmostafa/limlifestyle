@@ -72,7 +72,7 @@ export async function sendOurSms(phone: string, code: string) {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
       headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({ src: sender, dests: [phone.replace(/^\+/, "")],
-        body: `رمز التحقق الخاص بك ( ${code} )` }),
+        body: `رمز التحقق في ليم: ${code}. صالح لمدة 10 دقائق. لا تشارك الرمز مع أحد.` }),
     });
   } catch (error) {
     providerFailure("send", error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "TIMEOUT" : "NETWORK");
