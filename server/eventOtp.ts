@@ -36,12 +36,11 @@ function otpSender(value: string) {
 export function otpConfiguration() {
   const key = process.env.OURSMS_API_KEY?.trim();
   const configuredSender = process.env.OURSMS_SENDER_ID?.trim();
-  const templateId = process.env.OURSMS_TEMPLATE_ID?.trim();
   const secret = process.env.EVENTS_OTP_SECRET;
-  if (!otpEnabled() || !key || !configuredSender || !templateId || !secret || secret.length < 32)
+  if (!otpEnabled() || !key || !configuredSender || !secret || secret.length < 32)
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "التحقق بالجوال غير متاح حاليًا. تواصل مع منظم الفعالية. (OTP-CONFIG)" });
   const sender = otpSender(configuredSender);
-  return { key, sender, templateId, secret };
+  return { key, sender, secret };
 }
 export function otpDigest(phoneHash: string, tokenHash: string, code: string) {
   return crypto.createHmac("sha256", otpConfiguration().secret)
@@ -66,14 +65,14 @@ function providerFailure(action: string, category: string, httpStatus?: number):
   throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: `${messages[category]} (${diagnostic})` });
 }
 export async function sendOurSms(phone: string, code: string) {
-  const { key, sender, templateId } = otpConfiguration();
+  const { key, sender } = otpConfiguration();
   let response: Response;
   try {
     response = await fetch("https://api.oursms.com/msgs/sms", {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
       headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({ src: sender, dests: [phone.replace(/^\+/, "")],
-        templateId, vars: { CODE: code } }),
+        body: `رمز التحقق الخاص بك ( ${code} )` }),
     });
   } catch (error) {
     providerFailure("send", error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "TIMEOUT" : "NETWORK");

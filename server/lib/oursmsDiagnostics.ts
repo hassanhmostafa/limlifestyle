@@ -11,7 +11,7 @@ export async function getOurSmsDiagnostics(fetcher: typeof fetch = fetch) {
       ? "sha256:" +
         crypto.createHash("sha256").update(key).digest("hex").slice(0, 12)
       : null,
-    templateConfigured: Boolean(process.env.OURSMS_TEMPLATE_ID?.trim()),
+    messageFormat: "approved-text-v1" as const,
     senderConfigured: Boolean(process.env.OURSMS_SENDER_ID?.trim()),
     secretConfigured: (process.env.EVENTS_OTP_SECRET?.length ?? 0) >= 32,
   };

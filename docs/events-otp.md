@@ -3,9 +3,13 @@
 The Events registration flow uses OurSMS. Authentica is no longer called by Events.
 Provider contract: https://docs.oursms.com/api/v1/ (and the supplied docs.json).
 POST https://api.oursms.com/msgs/sms with Authorization: Bearer <server key>,
-src, dests (9665… without +), templateId and vars: { CODE: "<generated code>" }.
-Uses the approved template payload supplied by OurSMS support on 2026-09-30.
-Do not send body or the previous free-text options alongside the template.
+src, dests (9665… without +), and body only.
+The exact approved message, per support's 2026-09-30 follow-up, is:
+`رمز التحقق الخاص بك ( 0123 )` (0123 is replaced with the generated four-digit code).
+Do not append LIM branding, expiry wording, punctuation or other text.
+The public /msgs/sms schema requires body and does not document templateId.
+We therefore render the approved text directly, rather than sending templateId/vars.
+This needs one real delivery acceptance test after deployment; local tests are mocks.
 HTTP 200 means accepted for sending, not delivered; the supplied OpenAPI does not
 specify a response schema. Malformed/non-JSON nonempty or explicit error responses
 are rejected. Confirm the actual send/delivery response in staging before launch.
@@ -15,7 +19,7 @@ are rejected. Confirm the actual send/delivery response in staging before launch
 - EVENTS_OTP_ENABLED=true
 - OURSMS_API_KEY: paste the new provider key into the hosting secret manager.
 - OURSMS_SENDER_ID=RAWZ OTP (exact sender supplied by support, including space).
-- OURSMS_TEMPLATE_ID=MGtF_xgC (case-sensitive template supplied by support).
+- OURSMS_TEMPLATE_ID is no longer required or sent; an existing value can remain unused.
 - EVENTS_OTP_SECRET: an independent cryptographically random secret of at least 32
   characters; generate with `openssl rand -hex 32`. All server replicas need the
   same value. Do not expose any of these through VITE_* or client-side code.
@@ -57,9 +61,9 @@ After configuring the approved sender, test on an authorized test phone: send, w
 code, correct code, register, then verify replay is rejected. Also test resend and
 expiry. Automated tests use simulated provider responses; they do not send SMS.
 
-## Template update deployment (2026-09-30)
+## Approved-text deployment (2026-09-30)
 
-Keep the current API key and EVENTS_OTP_SECRET unchanged. Set sender and template
+Keep the current API key and EVENTS_OTP_SECRET unchanged. Set the approved sender
 above in production and preview; publish server and frontend together. No new DB
 migration is needed for this template update. Existing verified sessions remain valid.
 Ask participants with pending six-digit codes to request a new four-digit code.
@@ -67,5 +71,5 @@ The example 1235 from support is not a fixed code; new codes are generated secur
 including leading zeros. Confirm actual delivery and verification on staging.
 
 When the hosting secret editor rejects spaces, set OURSMS_SENDER_ID=RAWZ%20OTP.
-The server decodes it to RAWZ OTP before sending. This does not replace the
-required OURSMS_TEMPLATE_ID=MGtF_xgC. Changing only the sender is insufficient.
+The server decodes it to RAWZ OTP before sending. The admin diagnostic shows messageFormat=approved-text-v1 for this server version.
+A successful balance check still does not prove SMS delivery.

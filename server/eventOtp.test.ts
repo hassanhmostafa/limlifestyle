@@ -14,6 +14,14 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetAllMocks(); });
 
 describe("OurSMS boundary", () => {
+ it("sends the approved text without requiring the obsolete template ID",async()=>{
+  vi.stubEnv('OURSMS_TEMPLATE_ID','');
+  vi.mocked(fetch).mockResolvedValue(new Response('{}'));
+  await sendOurSms('+966501234567','0007');
+  const request=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+  expect(request).toEqual({src:'RAWZ OTP',dests:['966501234567'],body:'رمز التحقق الخاص بك ( 0007 )'});
+ });
+
  it("normalizes Saudi numbers and rejects other destinations",()=>{
   expect(otpPhone("0501234567")).toBe("+966501234567");expect(()=>otpPhone("+12025550101")).toThrow();
  });
@@ -22,7 +30,7 @@ describe("OurSMS boundary", () => {
   await sendOurSms('+966501234567','0123');
   expect(fetch).toHaveBeenCalledWith('https://api.oursms.com/msgs/sms',expect.objectContaining({redirect:'error',headers:expect.objectContaining({Authorization:'Bearer test-only-key'})}));
   const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
-  expect(body).toEqual({src:'RAWZ OTP',dests:['966501234567'],templateId:'MGtF_xgC',vars:{CODE:'0123'}});
+  expect(body).toEqual({src:'RAWZ OTP',dests:['966501234567'],body:'رمز التحقق الخاص بك ( 0123 )'});
  });
 
  it("decodes percent-encoded spaces in a sender ID only for the provider request",async()=>{
@@ -38,7 +46,7 @@ describe("OurSMS boundary", () => {
   await expect(sendOurSms('+966501234567','0123')).rejects.toThrow('OTP-SENDER');
   expect(fetch).not.toHaveBeenCalled();
  });
- it.each(['OURSMS_API_KEY','OURSMS_SENDER_ID','OURSMS_TEMPLATE_ID','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
+ it.each(['OURSMS_API_KEY','OURSMS_SENDER_ID','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
 
   vi.stubEnv(key,'');await expect(sendEventOtp('0501234567','ip')).rejects.toThrow('OTP-CONFIG');expect(fetch).not.toHaveBeenCalled();
  });
@@ -157,7 +165,7 @@ describe("persistent send limits", () => {
     const result = await sendEventOtp('0501234567', 'test-ip');
     expect(result.challengeToken.length).toBeGreaterThanOrEqual(32);
     expect(state.challenge().tokenHash).not.toBe(result.challengeToken);
-    const sentCode = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).vars.CODE;
+    const sentCode = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).body.match(/\d{4}/)[0];
     expect(sentCode).toMatch(/^\d{4}$/);
     expect(state.challenge().codeHash).toBe(otpDigest(digest("+966501234567"), digest(result.challengeToken), sentCode));
     expect(JSON.stringify(result)).not.toContain(sentCode);
