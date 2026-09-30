@@ -14,12 +14,32 @@ export function otpPhone(value: string) {
   if (!phone.ok) throw new TRPCError({ code: "BAD_REQUEST", message: "أدخل رقم جوال سعودي صحيحًا." });
   return phone.e164;
 }
+
+/**
+ * Some secret managers reject literal spaces. Allow the sender ID to be stored
+ * with standard percent encoding (for example, LIM%20Lifestyle), then decode it
+ * only in server memory immediately before the authenticated provider request.
+ */
+function otpSender(value: string) {
+  try {
+    const sender = decodeURIComponent(value).trim();
+    if (sender) return sender;
+  } catch {
+    // Fall through to the safe configuration error below.
+  }
+  throw new TRPCError({
+    code: "PRECONDITION_FAILED",
+    message: "اسم مرسل الرسائل غير صالح. استخدم %20 بدل المسافة. (OTP-SENDER)",
+  });
+}
+
 export function otpConfiguration() {
   const key = process.env.OURSMS_API_KEY?.trim();
-  const sender = process.env.OURSMS_SENDER_ID?.trim();
+  const configuredSender = process.env.OURSMS_SENDER_ID?.trim();
   const secret = process.env.EVENTS_OTP_SECRET;
-  if (!otpEnabled() || !key || !sender || !secret || secret.length < 32)
+  if (!otpEnabled() || !key || !configuredSender || !secret || secret.length < 32)
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "التحقق بالجوال غير متاح حاليًا. تواصل مع منظم الفعالية. (OTP-CONFIG)" });
+  const sender = otpSender(configuredSender);
   return { key, sender, secret };
 }
 export function otpDigest(phoneHash: string, tokenHash: string, code: string) {
