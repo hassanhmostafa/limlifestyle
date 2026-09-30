@@ -31,7 +31,7 @@ const superjson = require('superjson');
             data = { challengeToken: token + sends, retryAfterSeconds: 60, expiresInSeconds: 600 };
           } else if (name === 'events.verifyOtp') {
             assert.equal(input.challengeToken, token + sends);
-            if (input.code !== '123456') return failure(name, 'رمز التحقق غير صحيح');
+            if (input.code !== '1234') return failure(name, 'رمز التحقق غير صحيح');
             verified = true; data = { verified: true };
           } else if (name === 'events.createSession') {
             assert.equal(verified, true, 'must verify before registering');
@@ -62,10 +62,10 @@ const superjson = require('superjson');
           await page.getByRole('alert').filter({hasText:'تعذر إرسال'}).waitFor();
           assert.equal(await submit.isDisabled(), true);
         } else {
-          const code = page.getByLabel('رمز التحقق', { exact: true });
+          const code = page.getByLabel('رمز التحقق (٤ أرقام)', { exact: true });
           await code.waitFor();
           assert.equal(await page.getByRole('button',{name:/إعادة الإرسال بعد/}).isDisabled(),true);
-          await code.fill('000000');
+          await code.fill('0000');
           await page.getByRole('button',{name:'تأكيد الرمز',exact:true}).click();
           await page.getByRole('alert').filter({hasText:'غير صحيح'}).waitFor();
           assert.equal(await submit.isDisabled(),true);
@@ -74,7 +74,7 @@ const superjson = require('superjson');
           await page.getByRole('button',{name:'إعادة إرسال الرمز',exact:true}).click();
           await page.waitForFunction(() => document.getElementById('event-otp')?.value === '');
           assert.equal(sends,2);
-          await code.fill('١٢٣٤٥٦');
+          await code.fill('١٢٣٤');
           await page.getByRole('button',{name:'تأكيد الرمز',exact:true}).click();
           await page.getByRole('status').filter({hasText:'تم التحقق من رقم الجوال'}).waitFor();
           assert.equal(await submit.isEnabled(),true);

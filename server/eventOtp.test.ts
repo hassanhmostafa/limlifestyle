@@ -6,7 +6,8 @@ vi.mock("./db", () => ({ getDb: vi.fn() }));
 beforeEach(() => {
   vi.stubEnv("EVENTS_OTP_ENABLED", "true");
   vi.stubEnv("OURSMS_API_KEY", "test-only-key");
-  vi.stubEnv("OURSMS_SENDER_ID", "LIM");
+  vi.stubEnv("OURSMS_SENDER_ID", "RAWZ OTP");
+  vi.stubEnv("OURSMS_TEMPLATE_ID", "MGtF_xgC");
   vi.stubEnv("EVENTS_OTP_SECRET", "test-only-secret-at-least-32-characters");
   vi.stubGlobal("fetch", vi.fn());
 });
@@ -18,13 +19,12 @@ describe("OurSMS boundary", () => {
  });
  it("uses Bearer and the configured sender with no redirects",async()=>{
   vi.mocked(fetch).mockResolvedValue(new Response('{}'));
-  await sendOurSms('+966501234567','012345');
+  await sendOurSms('+966501234567','0123');
   expect(fetch).toHaveBeenCalledWith('https://api.oursms.com/msgs/sms',expect.objectContaining({redirect:'error',headers:expect.objectContaining({Authorization:'Bearer test-only-key'})}));
   const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
-  expect(body).toMatchObject({src:'LIM',dests:['966501234567'],secure:true,msgClass:'transactional',validity:10});
-  expect(body.body).toContain('012345');
+  expect(body).toEqual({src:'RAWZ OTP',dests:['966501234567'],templateId:'MGtF_xgC',vars:{CODE:'0123'}});
  });
- it.each(['OURSMS_API_KEY','OURSMS_SENDER_ID','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
+ it.each(['OURSMS_API_KEY','OURSMS_SENDER_ID','OURSMS_TEMPLATE_ID','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
   vi.stubEnv(key,'');await expect(sendEventOtp('0501234567','ip')).rejects.toThrow('OTP-CONFIG');expect(fetch).not.toHaveBeenCalled();
  });
  it('blocks missing proof and disabled OTP',async()=>{
@@ -34,11 +34,11 @@ describe("OurSMS boundary", () => {
  it.each([[401,'AUTH'],[403,'AUTH'],[429,'LIMIT'],[402,'CREDIT'],[422,'REQUEST'],[500,'PROVIDER']] as const)('redacts HTTP %s',async(status,category)=>{
   const log=vi.spyOn(console,'warn').mockImplementation(()=>{});
   vi.mocked(fetch).mockResolvedValue(new Response('secret code phone key',{status}));
-  await expect(sendOurSms('+966501234567','123456')).rejects.toThrow(`OTP-${category}-${status}`);
+  await expect(sendOurSms('+966501234567','1234')).rejects.toThrow(`OTP-${category}-${status}`);
   expect(JSON.stringify(log.mock.calls)).not.toContain('secret');log.mockRestore();
  });
  it.each(['not json','{"success":false}','{"error":"secret"}'])('rejects malformed or explicitly failed body %s',async body=>{
-  vi.mocked(fetch).mockResolvedValue(new Response(body));await expect(sendOurSms('+966501234567','123456')).rejects.toThrow('OTP-RESPONSE');
+  vi.mocked(fetch).mockResolvedValue(new Response(body));await expect(sendOurSms('+966501234567','1234')).rejects.toThrow('OTP-RESPONSE');
  });
 });
 
@@ -57,12 +57,22 @@ function challengeDatabase(row: Record<string, unknown> | undefined) {
 import { createHash } from "node:crypto";
 const token = "a".repeat(43);
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
-const pending = () => ({ tokenHash: digest(token), expiresAt: new Date(Date.now() + 600000), state: "pending", attempts: 0, codeHash: otpDigest(digest("+966501234567"),digest(token),"123456") });
+const pending = () => ({ tokenHash: digest(token), expiresAt: new Date(Date.now() + 600000), state: "pending", attempts: 0, codeHash: otpDigest(digest("+966501234567"),digest(token),"1234") });
 describe("challenge ownership and lifecycle", () => {
+  it("accepts a leading-zero four-digit code", async () => {
+    const row = challengeDatabase({...pending(), codeHash: otpDigest(digest("+966501234567"), digest(token), "0123")})!;
+    await verifyEventOtp("0501234567", token, "0123");
+    expect(row.state).toBe("verified");
+  });
+  it("rejects an old six-digit challenge even with a matching digest", async () => {
+    const row = challengeDatabase({...pending(), codeHash: otpDigest(digest("+966501234567"), digest(token), "123456")})!;
+    await expect(verifyEventOtp("0501234567", token, "123456")).rejects.toThrow();
+    expect(row.state).toBe("pending");
+  });
   it("verifies then consumes exactly once", async () => {
     const row = challengeDatabase(pending())!;
     vi.mocked(fetch).mockResolvedValue(new Response('{"verified":true}'));
-    await verifyEventOtp("0501234567", token, "123456");
+    await verifyEventOtp("0501234567", token, "1234");
     expect(row.state).toBe("verified");
     expect(row.attempts).toBe(1);
     await consumeEventOtp("0501234567", token);
@@ -78,25 +88,25 @@ describe("challenge ownership and lifecycle", () => {
   });
   it.each([{ attempts: 5 }, { state: "verifying" }, { expiresAt: new Date(0) }, { tokenHash: digest("other") }])("blocks invalid verification before contacting provider %j", async override => {
     challengeDatabase({ ...pending(), ...override });
-    await expect(verifyEventOtp("0501234567", token, "123456")).rejects.toThrow();
+    await expect(verifyEventOtp("0501234567", token, "1234")).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
   });
   it("counts wrong attempts and stops the sixth attempt", async () => {
     const row = challengeDatabase(pending())!;
     vi.mocked(fetch).mockImplementation(async () => new Response('{"verified":false}'));
-    for (let i = 0; i < 6; i++) await expect(verifyEventOtp("0501234567", token, "000000")).rejects.toThrow();
+    for (let i = 0; i < 6; i++) await expect(verifyEventOtp("0501234567", token, "0000")).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
     expect(row.attempts).toBe(5);
     expect(row.state).toBe("pending");
   });
   it("binds the code to the phone and current browser challenge",async()=>{
     challengeDatabase(pending());
-    await expect(verifyEventOtp('0509999999',token,'123456')).rejects.toThrow();
+    await expect(verifyEventOtp('0509999999',token,'1234')).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
   });
   it("rejects pre-migration Authentica challenges",async()=>{
     challengeDatabase({...pending(),codeHash:null});
-    await expect(verifyEventOtp('0501234567',token,'123456')).rejects.toThrow();
+    await expect(verifyEventOtp('0501234567',token,'1234')).rejects.toThrow();
   });
 });
 
@@ -132,7 +142,8 @@ describe("persistent send limits", () => {
     const result = await sendEventOtp('0501234567', 'test-ip');
     expect(result.challengeToken.length).toBeGreaterThanOrEqual(32);
     expect(state.challenge().tokenHash).not.toBe(result.challengeToken);
-    const sentCode = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).body.match(/\d{6}/)[0];
+    const sentCode = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).vars.CODE;
+    expect(sentCode).toMatch(/^\d{4}$/);
     expect(state.challenge().codeHash).toBe(otpDigest(digest("+966501234567"), digest(result.challengeToken), sentCode));
     expect(JSON.stringify(result)).not.toContain(sentCode);
     vi.setSystemTime(new Date('2026-09-26T11:00:05Z'));

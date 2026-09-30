@@ -57,12 +57,12 @@ export function EventOtpVerification({ phone, enabled, saving, onVerified }: {
       }}>{send.isPending ? "جارٍ إرسال الرمز…" : seconds > 0 ? `إعادة الإرسال بعد ${seconds} ثانية` : token ? "إعادة إرسال الرمز" : "إرسال رمز التحقق"}</button>
       {token && <>
         <p role="status" className="text-sm">تم إرسال الرمز إلى <b dir="ltr">{phone}</b></p>
-        <label htmlFor="event-otp" className="block font-bold">رمز التحقق</label>
-        <input id="event-otp" autoFocus dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code}
+        <label htmlFor="event-otp" className="block font-bold">رمز التحقق (٤ أرقام)</label>
+        <input id="event-otp" autoFocus dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={4} value={code}
           onChange={event => setCode(event.target.value.replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632)).replace(/\D/g, ""))}
           onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }}
           className="h-14 w-full rounded-2xl border bg-white text-center text-2xl tracking-widest" />
-        <button type="button" disabled={!enabled || busy || !/^\d{4,8}$/.test(code)} className="w-full rounded-xl bg-[#dff33d] p-3 font-bold disabled:opacity-50" onClick={async () => {
+        <button type="button" disabled={!enabled || busy || !/^\d{4}$/.test(code)} className="w-full rounded-xl bg-[#dff33d] p-3 font-bold disabled:opacity-50" onClick={async () => {
           setMessage("");
           try {
             await verify.mutateAsync({ phone, challengeToken: token, code });
