@@ -20,6 +20,13 @@ are rejected. Confirm the actual send/delivery response in staging before launch
   characters; generate with `openssl rand -hex 32`. All server replicas need the
   same value. Do not expose any of these through VITE_* or client-side code.
 
+### Sender IDs containing spaces
+
+If the Manus secret editor rejects literal spaces, write each space as `%20` in
+`OURSMS_SENDER_ID`. For example, store `LIM%20Lifestyle` for the approved sender
+`LIM Lifestyle`. The server decodes this value in memory only when it submits the
+authenticated request to OurSMS. Do not add quotation marks or use `+` for spaces.
+
 Apply migration 0015_oursms_research.sql, restart/publish the server, then run
 `pnpm db:check-events` against the intended database. Use the existing migration
 runner (`pnpm exec drizzle-kit migrate`) rather than generating duplicate migrations.
@@ -58,3 +65,7 @@ migration is needed for this template update. Existing verified sessions remain 
 Ask participants with pending six-digit codes to request a new four-digit code.
 The example 1235 from support is not a fixed code; new codes are generated securely,
 including leading zeros. Confirm actual delivery and verification on staging.
+
+When the hosting secret editor rejects spaces, set OURSMS_SENDER_ID=RAWZ%20OTP.
+The server decodes it to RAWZ OTP before sending. This does not replace the
+required OURSMS_TEMPLATE_ID=MGtF_xgC. Changing only the sender is insufficient.

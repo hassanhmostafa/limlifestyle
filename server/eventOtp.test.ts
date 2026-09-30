@@ -24,7 +24,22 @@ describe("OurSMS boundary", () => {
   const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
   expect(body).toEqual({src:'RAWZ OTP',dests:['966501234567'],templateId:'MGtF_xgC',vars:{CODE:'0123'}});
  });
+
+ it("decodes percent-encoded spaces in a sender ID only for the provider request",async()=>{
+  vi.stubEnv('OURSMS_SENDER_ID','RAWZ%20OTP');
+  vi.mocked(fetch).mockResolvedValue(new Response('{}'));
+  await sendOurSms('+966501234567','0123');
+  const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+  expect(body.src).toBe('RAWZ OTP');
+  expect(JSON.stringify(vi.mocked(fetch).mock.calls)).not.toContain('RAWZ%20OTP');
+ });
+ it("fails closed for an invalid percent-encoded sender ID",async()=>{
+  vi.stubEnv('OURSMS_SENDER_ID','LIM%bad');
+  await expect(sendOurSms('+966501234567','0123')).rejects.toThrow('OTP-SENDER');
+  expect(fetch).not.toHaveBeenCalled();
+ });
  it.each(['OURSMS_API_KEY','OURSMS_SENDER_ID','OURSMS_TEMPLATE_ID','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
+
   vi.stubEnv(key,'');await expect(sendEventOtp('0501234567','ip')).rejects.toThrow('OTP-CONFIG');expect(fetch).not.toHaveBeenCalled();
  });
  it('blocks missing proof and disabled OTP',async()=>{
