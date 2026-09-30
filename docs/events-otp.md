@@ -3,7 +3,9 @@
 The Events registration flow uses OurSMS. Authentica is no longer called by Events.
 Provider contract: https://docs.oursms.com/api/v1/ (and the supplied docs.json).
 POST https://api.oursms.com/msgs/sms with Authorization: Bearer <server key>,
-src, dests (9665… without +), body, msgClass=transactional, secure=true, validity=10.
+src, dests (9665… without +), templateId and vars: { CODE: "<generated code>" }.
+Uses the approved template payload supplied by OurSMS support on 2026-09-30.
+Do not send body or the previous free-text options alongside the template.
 HTTP 200 means accepted for sending, not delivered; the supplied OpenAPI does not
 specify a response schema. Malformed/non-JSON nonempty or explicit error responses
 are rejected. Confirm the actual send/delivery response in staging before launch.
@@ -12,7 +14,8 @@ are rejected. Confirm the actual send/delivery response in staging before launch
 
 - EVENTS_OTP_ENABLED=true
 - OURSMS_API_KEY: paste the new provider key into the hosting secret manager.
-- OURSMS_SENDER_ID: exact approved sender belonging to that account; no invented default.
+- OURSMS_SENDER_ID=RAWZ OTP (exact sender supplied by support, including space).
+- OURSMS_TEMPLATE_ID=MGtF_xgC (case-sensitive template supplied by support).
 - EVENTS_OTP_SECRET: an independent cryptographically random secret of at least 32
   characters; generate with `openssl rand -hex 32`. All server replicas need the
   same value. Do not expose any of these through VITE_* or client-side code.
@@ -31,12 +34,12 @@ Do not put credentials into SQL, source code, screenshots or GitHub.
 
 ## Challenge lifecycle
 
-The server creates a cryptographically random six-digit code, stores only an HMAC
+The server creates a cryptographically random four-digit code, stores only an HMAC
 bound to the normalized phone and random browser challenge token, and sends it by
 SMS. Local verification is transactional and uses constant-time digest comparison.
 TTL 10 minutes; resend cooldown 60 seconds; at most five wrong guesses; successful
 proof is consumed once by registration. Persisted send quotas apply across workers.
-Failed sends remain unusable. Old Authentica challenges require a fresh code.
+Failed sends remain unusable. Old Authentica and pending six-digit challenges require a fresh code.
 Provider and database failures return safe errors without logging OTP/message/key.
 No WhatsApp selector or automatic fallback is present.
 
@@ -53,3 +56,16 @@ This checks credential acceptance, not SMS delivery or sender approval.
 After configuring the approved sender, test on an authorized test phone: send, wrong
 code, correct code, register, then verify replay is rejected. Also test resend and
 expiry. Automated tests use simulated provider responses; they do not send SMS.
+
+## Template update deployment (2026-09-30)
+
+Keep the current API key and EVENTS_OTP_SECRET unchanged. Set sender and template
+above in production and preview; publish server and frontend together. No new DB
+migration is needed for this template update. Existing verified sessions remain valid.
+Ask participants with pending six-digit codes to request a new four-digit code.
+The example 1235 from support is not a fixed code; new codes are generated securely,
+including leading zeros. Confirm actual delivery and verification on staging.
+
+When the hosting secret editor rejects spaces, set OURSMS_SENDER_ID=RAWZ%20OTP.
+The server decodes it to RAWZ OTP before sending. This does not replace the
+required OURSMS_TEMPLATE_ID=MGtF_xgC. Changing only the sender is insufficient.

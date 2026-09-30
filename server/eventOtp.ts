@@ -36,11 +36,12 @@ function otpSender(value: string) {
 export function otpConfiguration() {
   const key = process.env.OURSMS_API_KEY?.trim();
   const configuredSender = process.env.OURSMS_SENDER_ID?.trim();
+  const templateId = process.env.OURSMS_TEMPLATE_ID?.trim();
   const secret = process.env.EVENTS_OTP_SECRET;
-  if (!otpEnabled() || !key || !configuredSender || !secret || secret.length < 32)
+  if (!otpEnabled() || !key || !configuredSender || !templateId || !secret || secret.length < 32)
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "التحقق بالجوال غير متاح حاليًا. تواصل مع منظم الفعالية. (OTP-CONFIG)" });
   const sender = otpSender(configuredSender);
-  return { key, sender, secret };
+  return { key, sender, templateId, secret };
 }
 export function otpDigest(phoneHash: string, tokenHash: string, code: string) {
   return crypto.createHmac("sha256", otpConfiguration().secret)
@@ -65,15 +66,14 @@ function providerFailure(action: string, category: string, httpStatus?: number):
   throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: `${messages[category]} (${diagnostic})` });
 }
 export async function sendOurSms(phone: string, code: string) {
-  const { key, sender } = otpConfiguration();
+  const { key, sender, templateId } = otpConfiguration();
   let response: Response;
   try {
     response = await fetch("https://api.oursms.com/msgs/sms", {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
       headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({ src: sender, dests: [phone.replace(/^\+/, "")],
-        body: `رمز التحقق في ليم: ${code}. صالح لمدة 10 دقائق. لا تشارك الرمز مع أحد.`,
-        msgClass: "transactional", secure: true, validity: 10 }),
+        templateId, vars: { CODE: code } }),
     });
   } catch (error) {
     providerFailure("send", error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "TIMEOUT" : "NETWORK");
@@ -121,7 +121,7 @@ export async function sendEventOtp(rawPhone: string, ip: string) {
   const phone = otpPhone(rawPhone), phoneHash = hash(phone);
   const token = crypto.randomBytes(32).toString("base64url"), tokenHash = hash(token);
   const db = await database(), now = new Date();
-  const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const code = crypto.randomInt(0, 10_000).toString().padStart(4, "0");
   const codeHash = otpDigest(phoneHash, tokenHash, code);
   await runOtpPersistence(() => db.transaction(async tx => {
     const hour = Math.floor(now.getTime() / 3_600_000), day = Math.floor(now.getTime() / 86_400_000);
@@ -164,7 +164,7 @@ export async function verifyEventOtp(rawPhone: string, token: string, code: stri
     const [row] = await tx.select().from(eventOtpChallenges).where(eq(eventOtpChallenges.phoneHash, phoneHash)).for("update");
     if (!row || row.tokenHash !== tokenHash || row.expiresAt.getTime() <= Date.now() || row.attempts >= 5 || row.state !== "pending" || !row.codeHash) throw invalid();
     const candidate = otpDigest(phoneHash, tokenHash, code);
-    const matches = /^\d{6}$/.test(code) && /^[a-f0-9]{64}$/.test(row.codeHash) &&
+    const matches = /^\d{4}$/.test(code) && /^[a-f0-9]{64}$/.test(row.codeHash) &&
       crypto.timingSafeEqual(Buffer.from(row.codeHash, "hex"), Buffer.from(candidate, "hex"));
     // Wrong attempts commit before throwing; otherwise a transaction rollback
     // would permit unlimited guesses. Verification and consumption are atomic.

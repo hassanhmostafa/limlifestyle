@@ -65,7 +65,7 @@ export const eventsRouter = router({
     await requireOpenEvent();
     return sendEventOtp(input.phone, ctx.req.ip || ctx.req.socket?.remoteAddress || "unknown");
   }),
-  verifyOtp: publicProcedure.input(z.object({ phone: z.string().min(8).max(32), challengeToken: z.string().min(32).max(128), code: z.string().regex(/^\d{4,8}$/) })).mutation(async ({ input }) => {
+  verifyOtp: publicProcedure.input(z.object({ phone: z.string().min(8).max(32), challengeToken: z.string().min(32).max(128), code: z.string().regex(/^\d{4}$/) })).mutation(async ({ input }) => {
     await requireOpenEvent();
     return verifyEventOtp(input.phone, input.challengeToken, input.code);
   }),
