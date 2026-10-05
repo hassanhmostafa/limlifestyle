@@ -69,6 +69,13 @@ describe("research access boundaries", () => {
     );
     expect(store.saveResearcher.mock.calls[0][1]).not.toBe(result.code);
   });
+  it("rejects identified researcher access until separate research consent exists", async () => {
+    const caller = eventResearchRouter.createCaller(context(admin));
+    await expect(
+      caller.save({ ...input, includeIdentity: true as false })
+    ).rejects.toThrow("منزوعة الهوية");
+    expect(store.saveResearcher).not.toHaveBeenCalled();
+  });
   it("does not accept a doctor cookie or an unsigned research identity", async () => {
     const caller = eventResearchRouter.createCaller(
       context(null, `lim_event_staff=${token}`)
@@ -113,7 +120,10 @@ describe("research access boundaries", () => {
     ).rejects.toThrow();
   });
   it("returns only public identity, not credential fields", async () => {
-    vi.mocked(store.researcherBySession).mockResolvedValue(r);
+    vi.mocked(store.researcherBySession).mockResolvedValue({
+      ...r,
+      includeIdentity: 1,
+    });
     vi.mocked(store.allowedResearchEvents).mockResolvedValue([]);
     expect(
       await eventResearchRouter
@@ -181,7 +191,7 @@ describe("raw data projection and export", () => {
     },
   ];
   it("omits identifiers, unapproved extra answer keys and free text by default", () => {
-    const record = researchRecord(row, readings, false);
+    const record = researchRecord(row, readings);
     expect(JSON.stringify(record)).not.toMatch(/private/i);
     expect(record.participantId).toBe("P-9");
     expect(record.readings[0].machineMetrics).toEqual({
@@ -190,11 +200,11 @@ describe("raw data projection and export", () => {
     });
     expect(record.answers).toEqual({ fruit: "2" });
   });
-  it("includes requested identity fields but never bearer credentials", () => {
-    const record = researchRecord(row, readings, true);
-    expect(record.phone).toBe(row.phone);
-    expect(record.nurseNotes).toBe(row.nurseNotes);
-    expect(JSON.stringify(record)).not.toContain("private token");
+  it("never includes identity or free text in the researcher projection", () => {
+    const record = researchRecord(row, readings);
+    expect(JSON.stringify(record)).not.toMatch(/private/i);
+    expect(record).not.toHaveProperty("phone");
+    expect(record).not.toHaveProperty("nurseNotes");
   });
   it("flattens questionnaire and nursing values and blocks CSV formulas", () => {
     const csv = researchCsv([

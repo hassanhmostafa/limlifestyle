@@ -262,7 +262,7 @@ export default function EventResearch() {
                     >
                       <div className="flex flex-wrap justify-between gap-2">
                         <h3 className="font-bold">الزيارة {r.id}</h3>
-                        <span>{r.name ?? r.participantId}</span>
+                        <span>{r.participantId}</span>
                       </div>
                       <dl className="grid grid-cols-2 gap-3 text-sm">
                         <div>

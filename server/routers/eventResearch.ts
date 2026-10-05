@@ -43,7 +43,9 @@ const assignment = z.object({
   username,
   active: z.boolean(),
   allEvents: z.boolean(),
-  includeIdentity: z.boolean(),
+  includeIdentity: z.literal(false, {
+    error: "بيانات الباحثين منزوعة الهوية حتى تُسجل موافقة بحثية مستقلة",
+  }),
   eventCodes: z
     .array(z.string().min(1).max(64))
     .max(500)
@@ -117,7 +119,7 @@ export const eventResearchRouter = router({
   me: researcherProcedure.query(async ({ ctx }) => ({
     name: ctx.researcher.name,
     username: ctx.researcher.username,
-    includeIdentity: ctx.researcher.includeIdentity === 1,
+    includeIdentity: false,
     events: await store.allowedResearchEvents(ctx.researcher),
   })),
   data: researcherProcedure

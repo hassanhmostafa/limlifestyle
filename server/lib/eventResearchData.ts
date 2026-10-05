@@ -19,8 +19,7 @@ const metricKeys = new Set(
 /** Explicit projection: no bearer tokens, credential hashes or unrelated user records. */
 export function researchRecord(
   row: any,
-  readings: any[],
-  includeIdentity: boolean
+  readings: any[]
 ) {
   const answers = row.answers ?? {};
   const known = new Set(
@@ -48,17 +47,6 @@ export function researchRecord(
     approvedAt: row.approvedAt,
     consultationCompletedAt: row.consultationCompletedAt,
     reportCompletedAt: row.reportCompletedAt,
-    ...(includeIdentity
-      ? {
-          name: row.name,
-          phone: row.phone,
-          code: row.code,
-          recordNo: row.recordNo,
-          nurseNotes: row.nurseNotes,
-          advice: row.advice,
-          doctorName: row.doctorName,
-        }
-      : {}),
     readings: readings.map(r => ({
       source: r.source,
       recordedAt: r.recordedAt,
@@ -69,23 +57,11 @@ export function researchRecord(
       dbp: r.dbp,
       hr: r.hr,
       temperature: r.temperature,
-      machineMetrics: includeIdentity
-        ? r.machineMetrics
-        : Object.fromEntries(
-            Object.entries(r.machineMetrics ?? {}).filter(([k]) =>
-              metricKeys.has(k)
-            )
-          ),
-      ...(includeIdentity
-        ? {
-            patientName: r.patientName,
-            patientAge: r.patientAge,
-            patientSex: r.patientSex,
-            recordNo: r.recordNo,
-            deviceNo: r.deviceNo,
-            notes: r.notes,
-          }
-        : {}),
+      machineMetrics: Object.fromEntries(
+        Object.entries(r.machineMetrics ?? {}).filter(([k]) =>
+          metricKeys.has(k)
+        )
+      ),
     })),
   };
 }
