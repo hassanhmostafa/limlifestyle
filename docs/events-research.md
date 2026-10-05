@@ -22,12 +22,15 @@ pages and admin credential/permission changes are audited. No bearer/session tok
 or password hashes are exported. Every data request enforces the event on the
 server and SQL query. Exports abort without a partial download if a later page fails.
 
-By default direct identifiers and free-text clinical notes are excluded. A separate
-admin checkbox enables names/phone/notes for that researcher. This is a field-level
-restriction, NOT a claim of anonymization; demographic and measurement data can still
-be identifying. Raw nursing data may include drafts: completion timestamps mark
-finalization. Real/test device source labels are retained. Only consenting visits
-are exported; other personal app records outside the selected visit are not read.
+Direct identifiers and free-text clinical notes are always excluded. The former
+admin identity checkbox is intentionally disabled until the product records a
+separate, explicit participant consent for identified research. Existing database
+flags cannot override this server-side restriction. This is a field-level
+de-identification measure, not a claim of irreversible anonymization; demographic
+and measurement data can still be identifying. Raw nursing data may include drafts:
+completion timestamps mark finalization. Real/test device source labels are retained.
+Only consenting visits are exported; other personal app records outside the selected
+visit are not read.
 
 ## Event identity limitation
 

@@ -81,6 +81,9 @@ export async function listResearchers() {
   const access = await db.select().from(grants);
   return rows.map(r => ({
     ...r,
+    // Identified research exports are disabled until a separate, explicit
+    // participant research-consent grant is implemented.
+    includeIdentity: 0,
     eventCodes: access
       .filter(g => g.researcherId === r.id)
       .map(g => g.eventCode),
@@ -106,7 +109,7 @@ export async function saveResearcher(
         username: rest.username,
         active: Number(rest.active),
         allEvents: Number(rest.allEvents),
-        includeIdentity: Number(rest.includeIdentity),
+        includeIdentity: 0,
       };
       let researcherId = id;
       if (researcherId) {
@@ -317,8 +320,7 @@ export async function researchPage(
         row,
         row.recordNo
           ? await getEventReadingByRecordNo(row.userId, row.recordNo)
-          : [],
-        r.includeIdentity === 1
+          : []
       )
     )
   );

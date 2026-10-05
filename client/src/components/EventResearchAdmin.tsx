@@ -104,7 +104,7 @@ export default function EventResearchAdmin() {
             className="space-y-4"
             onSubmit={e => {
               e.preventDefault();
-              save.mutate(form);
+              save.mutate({ ...form, includeIdentity: false });
             }}
           >
             <h3 className="font-bold">
@@ -173,16 +173,10 @@ export default function EventResearchAdmin() {
                 ))}
               </fieldset>
             )}
-            <label className="flex gap-3">
-              <input
-                type="checkbox"
-                checked={form.includeIdentity}
-                onChange={e =>
-                  setForm({ ...form, includeIdentity: e.target.checked })
-                }
-              />
-              إتاحة الأسماء والجوال والملاحظات النصية إلى جانب النتائج الخام
-            </label>
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-7 text-amber-950">
+              بيانات الباحثين منزوعة الهوية. إتاحة الاسم والجوال والملاحظات
+              النصية متوقفة حتى إضافة موافقة بحثية مستقلة من المشارك.
+            </div>
             <label className="flex gap-3">
               <input
                 type="checkbox"
@@ -231,9 +225,7 @@ export default function EventResearchAdmin() {
                     ? "جميع الفعاليات"
                     : `${r.eventCodes.length} فعالية محددة`}{" "}
                   ·{" "}
-                  {r.includeIdentity
-                    ? "مع بيانات التعريف"
-                    : "دون حقول التعريف والملاحظات النصية"}
+                  دون حقول التعريف والملاحظات النصية
                 </p>
                 <button
                   className="underline"
@@ -243,7 +235,7 @@ export default function EventResearchAdmin() {
                       ...r,
                       active: Boolean(r.active),
                       allEvents: Boolean(r.allEvents),
-                      includeIdentity: Boolean(r.includeIdentity),
+                      includeIdentity: false,
                     });
                   }}
                 >
