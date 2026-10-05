@@ -33,7 +33,7 @@ try {
     'SELECT tokenHash, researcherId, credentialVersion, expiresAt FROM event_research_sessions LIMIT 0',
     'SELECT actorId, action, eventCode, rowCount FROM event_research_audit LIMIT 0',
     'SELECT eventCode, name, startsOn, endsOn, location, organizer, poster, questionnaireIds, closed FROM event_profiles LIMIT 0',
-    'SELECT questionnaireIds FROM event_participant_sessions LIMIT 0',
+    'SELECT questionnaireIds, consentVersion, consentedAt FROM event_participant_sessions LIMIT 0',
     'SELECT id, eventCode, name, active FROM event_tracks LIMIT 0',
     'SELECT eventCode, nursingEnabled, testIds FROM event_settings LIMIT 0',
     'SELECT trackId FROM event_participant_sessions LIMIT 0',
@@ -51,6 +51,6 @@ try {
   console.log('Events schema and active registration track: ready.');
 } catch (error) {
   console.error('Events deployment blocked:', error.code ?? error.message);
-  console.error('Check DATABASE_URL targets the deployed database and review migrations 0011/0012/0013/0014/0015. Apply pending migrations with pnpm exec drizzle-kit migrate, then rerun pnpm db:check-events. Do not mark readiness as successful until this passes.');
+  console.error('Check DATABASE_URL targets the deployed database and review migrations 0011 through 0016. Apply pending migrations with pnpm exec drizzle-kit migrate, then rerun pnpm db:check-events. Do not mark readiness as successful until this passes.');
   process.exitCode = 1;
 } finally { await connection.end(); }

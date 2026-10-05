@@ -1,4 +1,5 @@
 import { EVENT_LIFESTYLE_VERSION, revisedLifestyleComplete } from "../../shared/eventLifestyle";
+import { EVENT_CONSENT_VERSION } from "../../shared/eventConsent";
 import { otpEnabled, sendEventOtp, verifyEventOtp, consumeEventOtp } from "../eventOtp";
 import { requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
@@ -78,6 +79,7 @@ export const eventsRouter = router({
       phone: z.string().trim().min(8).max(32),
       city: z.string().trim().max(128).optional(),
       consent: z.literal(true),
+      consentVersion: z.literal(EVENT_CONSENT_VERSION),
       otpChallengeToken: z.string().min(32).max(128).optional(),
       trackId: z.number().int().positive().optional(),
     }))
@@ -116,6 +118,8 @@ export const eventsRouter = router({
         sex: input.sex,
         city: input.city || null,
         consent: "true",
+        consentVersion: input.consentVersion,
+        consentedAt: new Date(),
         answers: {},
         status: "checked_in",
       });

@@ -30,10 +30,12 @@ import {
   EVENT_LIFESTYLE_VERSION,
   eventQuestionAnswered,
   type EventAnswers,
-  scoreEventLifestyle,
 } from "@/lib/eventLifestyle";
 import { completedEventJourneySteps } from "@/lib/eventJourney";
 import EventCareSummary from "@/components/EventCareSummary";
+import EventLifestyleCharts from "@/components/EventLifestyleCharts";
+import { Link } from "wouter";
+import { EVENT_CONSENT_VERSION } from "@shared/eventConsent";
 
 type Registration = {
   firstName: string;
@@ -107,7 +109,7 @@ export default function Events() {
     if (!registration.sex || !otpStatus.data?.enabled || otpChallenge?.phone !== registration.phone || !otpChallenge?.token) return;
     const otpChallengeToken = otpChallenge.token;
     setError("");
-    createSession.mutate({ firstName: registration.firstName.trim() || undefined, age: Number(registration.age), sex: registration.sex, phone: registration.phone, city: registration.city.trim() || undefined, consent: true, trackId, otpChallengeToken });
+    createSession.mutate({ firstName: registration.firstName.trim() || undefined, age: Number(registration.age), sex: registration.sex, phone: registration.phone, city: registration.city.trim() || undefined, consent: true, consentVersion: EVENT_CONSENT_VERSION, trackId, otpChallengeToken });
   };
   const saveLifestyle = trpc.events.saveLifestyle.useMutation({
     onSuccess: () => {
@@ -245,7 +247,7 @@ export default function Events() {
       }} />}
       {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { careQuery.refetch(); sessionQuery.refetch(); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>متابعة إلى الطبيب</PrimaryButton>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
       {screen === "report" && session && (care?.approvedAt ? <div data-final-report data-pdf-report>
-        <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">نصائح الطبيب</h2><p className="whitespace-pre-wrap rounded-2xl bg-white p-5">{care.advice}</p><p className="text-sm">اعتمدها: {care.doctorName}</p>{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
+        <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">نصائح الطبيب</h2><div data-doctor-advice dir="rtl" lang="ar" className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-right leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]">{care.advice}</div><p className="text-sm">اعتمدها: {care.doctorName}</p>{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
         <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} />
       </div> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
@@ -268,7 +270,10 @@ function RegistrationView({ form, setForm, error, saving, blocked, onSubmit, otp
       <Field label="رقم الجوال"><Input dir="ltr" inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="05XXXXXXXX" className="text-left" /></Field>
       {otp}
       <Field label="المدينة (اختياري)"><Input value={form.city} onChange={(event) => update("city", event.target.value)} /></Field>
-      <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#f3f8f6] p-4"><Checkbox checked={form.consent} onCheckedChange={(value) => update("consent", value === true)} className="mt-1" /><span className="text-sm leading-6 text-[#45665f]">أوافق على استخدام بياناتي لإتمام التقييم وربط نتائج الفحص بهذه الجلسة وإتاحتها لفريق التمريض والطبيب المصرح لهم في هذه الفعالية وفق سياسة الخصوصية.</span></label>
+      <div className={`rounded-2xl border-2 p-4 transition ${form.consent ? "border-[#197f6f] bg-[#e7f6f1]" : "border-[#d0a400] bg-[#fff9db]"}`}>
+        <label className="flex cursor-pointer items-start gap-3"><Checkbox aria-required="true" checked={form.consent} onCheckedChange={(value) => update("consent", value === true)} className="mt-1 h-6 w-6 border-2 border-[#123f37] data-[state=checked]:bg-[#197f6f]" /><span className="text-sm font-bold leading-7 text-[#123a34]">أوافق على استخدام بياناتي لإتمام التقييم وربط نتائج الفحص بهذه الجلسة وإتاحتها لفريق التمريض والطبيب المصرح لهم في هذه الفعالية.</span></label>
+        <p className="mr-9 mt-2 text-xs leading-6 text-[#526f68]">قرأت وأوافق على <Link href="/events/terms" target="_blank" rel="noreferrer" className="font-black text-[#126b5d] underline">الشروط والأحكام</Link> و<Link href="/events/privacy" target="_blank" rel="noreferrer" className="font-black text-[#126b5d] underline">سياسة الخصوصية</Link>. الموافقة مطلوبة لإنشاء الجلسة.</p>
+      </div>
       {error && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
       <PrimaryButton disabled={!valid || saving || blocked}>{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <>إنشاء جلستي الصحية<ChevronLeft className="mr-2 h-5 w-5" /></>}</PrimaryButton>
     </form></section>;
@@ -315,18 +320,14 @@ function DeviceView({ session, readings, loading, testing, onBack, onRefresh, on
 }
 
 function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, onFinish }: { lifestyleEnabled: boolean; session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void }) {
-  const lifestyle = scoreEventLifestyle(session.answers);
   return <section className="px-5 pb-14 pt-6 print:px-0">
     <div className="print:hidden"><BackButton onClick={onBack} /></div>
     <div className="rounded-[28px] border border-[#dce9e5] bg-white p-5">
       <p className="text-sm font-bold text-[#197f6f]">التقرير الصحي</p>
       <h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1>
       <p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p>
-      {lifestyleEnabled && <div className="mt-6">
-        <div className="flex items-end justify-between"><h2 className="font-black">تقييم نمط الحياة</h2><strong className="text-2xl text-[#197f6f]">{lifestyle.overall}<span className="text-sm">/100</span></strong></div>
-        <div className="mt-4 space-y-3">{Object.entries(lifestyle.domains).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{({ nutrition: "التغذية", activity: "النشاط", sleep: "النوم", mood: "المزاج والضغوط", connection: "المعنى والترابط", substances: "تجنب المواد الضارة" } as Record<string, string>)[key]}</span><strong>{value}/10</strong></div><Progress value={value * 10} className="h-2" /></div>)}</div>
-      </div>}
     </div>
+    {lifestyleEnabled && <div className="mt-6"><EventLifestyleCharts answers={session.answers} /></div>}
     {/* This deliberately shares the exact same parent width as DeviceView.
         It prevents the report's extra padded card from reflowing the anatomy stage. */}
     {readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}

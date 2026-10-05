@@ -38,6 +38,21 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
             "[data-pdf-hide], .lim-print-hide, .print\\:hidden"
           )
           .forEach(node => (node.style.display = "none"));
+        // Keep physician advice readable when Arabic, Latin text and numbers
+        // share a line. Explicit clone styles also preserve authored line
+        // breaks and bullets in html2canvas PDF captures.
+        root
+          .querySelectorAll<HTMLElement>("[data-doctor-advice]")
+          .forEach(node => {
+            node.setAttribute("dir", "rtl");
+            node.setAttribute("lang", "ar");
+            node.style.setProperty("direction", "rtl", "important");
+            node.style.setProperty("text-align", "right", "important");
+            node.style.setProperty("unicode-bidi", "plaintext", "important");
+            node.style.setProperty("white-space", "pre-wrap", "important");
+            node.style.setProperty("overflow-wrap", "anywhere", "important");
+            node.style.setProperty("word-break", "normal", "important");
+          });
         // html2canvas does not parse CSS Color 4 values emitted by Tailwind v4.
         // Let the browser convert them before the PDF renderer reads styles.
         const pixel = doc.createElement("canvas");
@@ -87,7 +102,7 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
         // Keep headings, text lines and metric cards off page boundaries.
         keepTogether = Array.from(
           root.querySelectorAll(
-            "p,h1,h2,h3,h4,.lim-result-metric,.lim-quick-indicator,.lim-results-card"
+            "[data-pdf-keep],p,h1,h2,h3,h4,.lim-result-metric,.lim-quick-indicator,.lim-results-card"
           )
         )
           .map(node => node.getBoundingClientRect())

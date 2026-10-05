@@ -81,7 +81,7 @@ describe("standalone events.createSession", () => {
     try {
       const actual = await vi.importActual<typeof import("./eventOtp")>("./eventOtp");
       vi.mocked(otp.consumeEventOtp).mockImplementation(actual.consumeEventOtp);
-      await expect(appRouter.createCaller(anonymousContext).events.createSession({ age: 40, sex: "male", phone: "0501234567", consent: true })).rejects.toThrow("رمز التحقق");
+      await expect(appRouter.createCaller(anonymousContext).events.createSession({ age: 40, sex: "male", phone: "0501234567", consent: true, consentVersion: "events-service-2026-10-05" })).rejects.toThrow("رمز التحقق");
       expect(mockedDb.getUserByPhone).not.toHaveBeenCalled();
       expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
     } finally { vi.unstubAllEnvs(); }
@@ -91,7 +91,7 @@ describe("standalone events.createSession", () => {
     mockedDb.createEventParticipantSession.mockResolvedValue(eventSession);
     const caller = appRouter.createCaller(anonymousContext);
     const result = await caller.events.createSession({
-      firstName: "Event Participant", age: 30, sex: "male", phone: "0501234567", city: "Jeddah", consent: true,
+      firstName: "Event Participant", age: 30, sex: "male", phone: "0501234567", city: "Jeddah", consent: true, consentVersion: "events-service-2026-10-05",
     });
 
     expect(result.accessToken.length).toBeGreaterThanOrEqual(32);
@@ -100,26 +100,40 @@ describe("standalone events.createSession", () => {
       userId: 42,
       accessTokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       consent: "true",
+      consentVersion: "events-service-2026-10-05",
+      consentedAt: expect.any(Date),
     }));
+  });
+
+  it("rejects a stale consent text version instead of recording ambiguous consent", async () => {
+    const caller = appRouter.createCaller(anonymousContext);
+    await expect(caller.events.createSession({
+      age: 30,
+      sex: "male",
+      phone: "0501234567",
+      consent: true,
+      consentVersion: "old-version" as "events-service-2026-10-05",
+    })).rejects.toThrow();
+    expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
   });
 
   it("does not create a participant or visit after the event is closed", async () => {
     vi.mocked(requireOpenEvent).mockRejectedValue(new Error("انتهى التسجيل"));
     const caller=appRouter.createCaller(anonymousContext);
-    await expect(caller.events.createSession({age:30,sex:"male",phone:"0501234567",consent:true})).rejects.toThrow("انتهى التسجيل");
+    await expect(caller.events.createSession({age:30,sex:"male",phone:"0501234567",consent:true,consentVersion:"events-service-2026-10-05"})).rejects.toThrow("انتهى التسجيل");
     expect(mockedDb.createMachinePhoneUser).not.toHaveBeenCalled();
     expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
   });
   it("snapshots an empty questionnaire selection for a new visit", async () => {
     vi.mocked(requireOpenEvent).mockResolvedValue({questionnaireIds:[],closed:0} as never);
     mockedDb.createEventParticipantSession.mockResolvedValue({...eventSession,questionnaireIds:[]});
-    await appRouter.createCaller(anonymousContext).events.createSession({age:30,sex:"male",phone:"0501234567",consent:true});
+    await appRouter.createCaller(anonymousContext).events.createSession({age:30,sex:"male",phone:"0501234567",consent:true,consentVersion:"events-service-2026-10-05"});
     expect(mockedDb.createEventParticipantSession).toHaveBeenCalledWith(expect.objectContaining({questionnaireIds:[]}));
   });
   it("rejects invalid event phone numbers", async () => {
     const caller = appRouter.createCaller(anonymousContext);
     await expect(caller.events.createSession({
-      age: 30, sex: "male", phone: "0123456789", consent: true,
+      age: 30, sex: "male", phone: "0123456789", consent: true, consentVersion: "events-service-2026-10-05",
     })).rejects.toThrow("valid Saudi mobile");
   });
 });
