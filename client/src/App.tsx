@@ -24,6 +24,7 @@ import KioskQR from "./pages/KioskQR";
 import EventTeam from "./pages/EventTeam";
 import EventCareAdmin from "./pages/EventCareAdmin";
 import Events from "./pages/Events";
+import { EventPrivacy, EventTerms } from "./pages/EventLegal";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { shouldShowInstallPrompt } from "./lib/appRoute";
 
@@ -49,6 +50,8 @@ function Router() {
       <Route path={"/events/research"} component={EventResearch} />
       <Route path={"/events/team"} component={EventTeam} />
       <Route path={"/events/care-admin"} component={EventCareAdmin} />
+      <Route path={"/events/terms"} component={EventTerms} />
+      <Route path={"/events/privacy"} component={EventPrivacy} />
       <Route path={"/events"} component={Events} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

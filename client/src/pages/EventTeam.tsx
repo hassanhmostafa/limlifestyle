@@ -7,6 +7,7 @@ import EventCareSummary from "@/components/EventCareSummary";
 import { EventBodyResults } from "@/components/EventBodyResults";
 
 const inputClass = "w-full rounded-xl border border-emerald-200 bg-white p-3";
+const multilineInputClass = `${inputClass} resize-y whitespace-pre-wrap break-words text-right leading-8`;
 const buttonClass =
   "rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white disabled:opacity-40";
 export default function EventTeam() {
@@ -421,8 +422,13 @@ export default function EventTeam() {
                         نصائح الطبيب التي تظهر للمستفيد
                       </span>
                       <textarea
-                        className={inputClass}
+                        className={multilineInputClass}
                         rows={6}
+                        dir="rtl"
+                        lang="ar"
+                        wrap="soft"
+                        spellCheck
+                        style={{ unicodeBidi: "plaintext" }}
                         value={advice}
                         maxLength={10000}
                         disabled={Boolean(care.approvedAt) || pending}
