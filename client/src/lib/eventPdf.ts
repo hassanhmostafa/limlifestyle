@@ -26,13 +26,35 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
             )
         )
       ),
-      onclone: doc => {
+      onclone: async doc => {
         const root = doc.querySelector<HTMLElement>(
           `[data-pdf-capture="${marker}"]`
         )!;
         // Use a consistent paper layout, independent of the phone viewport.
         root.style.width = "760px";
         root.style.maxWidth = "none";
+        const printReport = root.querySelector<HTMLElement>(
+          "[data-print-report]"
+        );
+        if (printReport) {
+          for (const child of Array.from(root.children)) {
+            if (child instanceof doc.defaultView!.HTMLElement) {
+              (child as HTMLElement).style.display =
+                child === printReport ? "block" : "none";
+            }
+          }
+          printReport.removeAttribute("aria-hidden");
+          root.style.background = "#fff";
+        }
+        // A report can be downloaded immediately after opening it. Wait for
+        // both anatomy images and the approved logo before taking the capture.
+        await Promise.all(
+          Array.from(root.querySelectorAll("img")).map(img =>
+            img.decode().catch(() => {
+              throw new Error("Report image failed to load");
+            })
+          )
+        );
         root
           .querySelectorAll<HTMLElement>(
             "[data-pdf-hide], .lim-print-hide, .print\\:hidden"

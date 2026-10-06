@@ -5,6 +5,8 @@ import { EventBodyResults } from "../client/src/components/EventBodyResults";
 import {
   eventAdultWeightRange,
   eventMuscleBalance,
+  eventMetricReference,
+  eventMetricStatus,
 } from "../client/src/lib/eventResultsData";
 
 describe("Events approved body-composition report", () => {
@@ -62,11 +64,24 @@ describe("Events approved body-composition report", () => {
     expect(markup).toContain("العضلات الهيكلية");
     expect(markup).toContain("نسبة الخصر إلى الورك");
     expect(markup).toContain("العمر الجسدي التقديري");
-    expect(markup).toContain("توازن العضلات");
-    expect(markup).toContain("النطاق الإرشادي حسب الطول");
-    expect(markup).toContain("أعلى من النطاق الإرشادي");
+    expect(markup).not.toContain("توازن العضلات");
+    expect(markup).not.toContain("معدل الأيض الأساسي");
+    expect(markup).toContain("الطبيعي حسب الطول للبالغين");
+    expect(markup).toContain("مرتفع");
     expect(markup).not.toContain("كتلة العظام");
     expect(markup).not.toContain("ماء الجسم");
     expect(markup).not.toContain("الضغط الانقباضي");
+  });
+
+  it("classifies against the displayed range even if the device flag contradicts it", () => {
+    expect(eventMetricStatus({ bmi: "29.9", bmi_s: "1", bmi_n: "18.5 - 24.9" }, "bmi")).toEqual({ code: "2", label: "مرتفع" });
+    expect(eventMetricStatus({ fatRate: "9", fatRate_n: "10–20" }, "fatRate")?.label).toBe("منخفض");
+    expect(eventMetricStatus({ fatRate: "20", fatRate_n: "10–20" }, "fatRate")?.label).toBe("طبيعي");
+    expect(eventMetricStatus({ fatRate: "", fatRate_s: "1" }, "fatRate")).toBeNull();
+    expect(eventMetricStatus({ vfal: "5" }, "vfal")).toBeNull();
+    for (const key of ["height", "bodyAge"]) {
+      expect(eventMetricStatus({ [key]: "50", [`${key}_s`]: "2" }, key)).toBeNull();
+      expect(eventMetricReference({ [`${key}_n`]: "20 - 30" }, key)).toBeNull();
+    }
   });
 });

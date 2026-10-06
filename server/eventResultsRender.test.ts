@@ -37,8 +37,11 @@ describe("EventBodyResults", () => {
 
     expect(markup).toContain("نتائج تحليل الجسم");
     expect(markup).toContain("توزيع الدهون والعضلات");
-    expect(markup).toContain("الحرق ومؤشرات إضافية");
+    expect(markup).not.toContain("الحرق ومؤشرات إضافية");
     expect(markup).toContain("/api/events/anatomy/muscle");
+    expect(markup).toContain("/api/events/anatomy/fat");
+    expect(markup).not.toContain("تحميل التقرير للطباعة");
+    expect(markup.match(/data-body-metric=/g)).toHaveLength(8);
     expect(markup).toContain("الدهون");
     expect(markup).toContain("عبداللطيف");
     expect(markup).toContain("34 سنة");

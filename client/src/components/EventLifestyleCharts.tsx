@@ -87,8 +87,10 @@ function SummaryScore({
 
 export default function EventLifestyleCharts({
   answers,
+  compact = false,
 }: {
   answers: EventAnswers;
+  compact?: boolean;
 }) {
   const complete = lifestyleSectionsForAnswers(answers).every(section =>
     section.questions.every(question =>
@@ -125,6 +127,20 @@ export default function EventLifestyleCharts({
       typeof value === "string" ? priorityLabels[value] : undefined
     )
     .filter((value): value is string => Boolean(value));
+
+  if (compact) return <section className="lim-print-panel" data-pdf-keep>
+    <h2>نمط الحياة <bdi>{score.overall} / 100</bdi></h2>
+    <p className="lim-print-band">{activeBand.label}</p>
+    <div className="lim-print-bars">{domains.map(domain => <div key={domain.key}>
+      <div><span>{domain.label}</span><bdi>{score.domains[domain.key]} / 10</bdi></div>
+      <div className="lim-print-track"><i style={{ width: `${clampScore(score.domains[domain.key]) * 10}%`, background: domain.color }} /></div>
+    </div>)}</div>
+    <p>أهمية التغيير: {importance}/10 · الثقة: {confidence}/10 · الاستعداد: {readiness}/10</p>
+    {priorities.length > 0 && <p>أولوياتك: {priorities.join("، ")}</p>}
+    <p>جوانب قوية: {strengths.map(item => item.label).join("، ")}</p>
+    <p>فرص التحسين: {opportunities.map(item => item.label).join("، ")}</p>
+    <small>ملخص توعوي مبني على إجاباتك، وليس تشخيصًا طبيًا.</small>
+  </section>;
 
   return (
     <section
