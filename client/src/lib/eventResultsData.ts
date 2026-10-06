@@ -24,12 +24,12 @@ export function eventMetricReference(
 ) {
   if (key === "height" || key === "bodyAge") return null;
   const device = eventReferenceRange(values, key);
-  if (device) return { value: device, label: "الطبيعي حسب الجهاز" };
+  if (device) return { value: device, label: "الطبيعي حسب نتائجك" };
   if (key === "weight") {
     const value = eventAdultWeightRange(values.height);
-    return value ? { value, label: "الطبيعي حسب الطول للبالغين" } : null;
+    return value ? { value, label: "الطبيعي حسب نتائجك" } : null;
   }
-  if (key === "bmi") return { value: "18.5 - 24.9", label: "الطبيعي للبالغين" };
+  if (key === "bmi") return { value: "18.5 - 24.9", label: "الطبيعي حسب نتائجك" };
   return null;
 }
 
@@ -181,4 +181,22 @@ export function eventMuscleBalance(
     maximumDifference,
     isClose: maximumDifference <= 10,
   };
+}
+
+/** Visual distance only, never a clinical severity or diagnostic threshold.
+ * Outside the range interpolate orange to red over one reference-range width.
+ * Missing ranges remain neutral instead of inventing a severity classification.
+ */
+export function eventMetricBackground(values: Record<string, string>, key: string) {
+  const value = eventNumeric(values[key]);
+  const ref = eventMetricReference(values, key);
+  const match = ref?.value.match(/^\s*(\d+(?:\.\d+)?)\s*[-–—~]\s*(\d+(?:\.\d+)?)\s*$/);
+  if (value === null || !match) return undefined;
+  const low = Number(match[1]), high = Number(match[2]);
+  if (high <= low) return undefined;
+  if (value >= low && value <= high) return "#e2f3e8";
+  const distance = Math.max(low - value, value - high, 0);
+  const fraction = Math.min(1, distance / (high - low));
+  const from = [255, 237, 213], to = [254, 202, 202];
+  return `rgb(${from.map((v, i) => Math.round(v + (to[i] - v) * fraction)).join(", ")})`;
 }

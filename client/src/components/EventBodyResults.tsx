@@ -3,6 +3,7 @@ import { CalendarDays } from "lucide-react";
 import type { DashboardReading } from "@/components/BodyCompositionReport";
 import {
   eventBodyFields,
+  eventMetricBackground,
   eventMetricReference,
   eventMetricStatus,
   eventNumeric,
@@ -55,6 +56,7 @@ function MetricCard({
   return (
     <article
       data-body-metric={key}
+      style={{ background: eventMetricBackground(values, key) }}
       className={`lim-result-metric${status ? ` lim-result-metric-status-${status.code}` : ""}`}
     >
       <img className="lim-metric-icon" src={iconSource} alt="" aria-hidden="true" />
@@ -165,6 +167,9 @@ export function EventBodyResults({
           {reading.source === "x18_test"
             ? "قيم اختبار مولّدة عشوائيًا ومرفوعة عبر رابط بيانات X18، وليست نتيجة من جهاز فعلي."
             : "القياسات تقديرية. التصنيف حسب المدى الموضح أو تقييم الجهاز عند غيابه. اليمين واليسار من منظور صاحب القياس."}
+          <span className="lim-footer-legend">
+            {" "}الأخضر: طبيعي؛ البرتقالي إلى الأحمر: ابتعاد عن المدى فقط، وليس شدة حالة.
+          </span>
         </p>
         <span>
           رقم التحليل: <bdi>{reading.recordNo ?? "—"}</bdi>

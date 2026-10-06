@@ -1,11 +1,14 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { EventBodyResults } from "../client/src/components/EventBodyResults";
 import {
+  eventBodyFields,
   eventAdultWeightRange,
   eventMuscleBalance,
   eventMetricReference,
+  eventMetricBackground,
   eventMetricStatus,
 } from "../client/src/lib/eventResultsData";
 
@@ -66,7 +69,7 @@ describe("Events approved body-composition report", () => {
     expect(markup).toContain("العمر الجسدي التقديري");
     expect(markup).not.toContain("توازن العضلات");
     expect(markup).not.toContain("معدل الأيض الأساسي");
-    expect(markup).toContain("الطبيعي حسب الطول للبالغين");
+    expect(markup).toContain("الطبيعي حسب نتائجك");
     expect(markup).toContain("مرتفع");
     expect(markup).not.toContain("كتلة العظام");
     expect(markup).not.toContain("ماء الجسم");
@@ -84,4 +87,70 @@ describe("Events approved body-composition report", () => {
       expect(eventMetricReference({ [`${key}_n`]: "20 - 30" }, key)).toBeNull();
     }
   });
+});
+
+it("uses continuous reference distance for display color, keeping missing references neutral", () => {
+  const values = { fatRate_n: "10 - 20" };
+  expect(eventMetricBackground({ ...values, fatRate: "10" }, "fatRate")).toBe("#e2f3e8");
+  expect(eventMetricBackground({ ...values, fatRate: "20" }, "fatRate")).toBe("#e2f3e8");
+  expect(eventMetricBackground({ ...values, fatRate: "9" }, "fatRate")).toBe(eventMetricBackground({ ...values, fatRate: "21" }, "fatRate"));
+  expect(eventMetricBackground({ ...values, fatRate: "30" }, "fatRate")).toBe("rgb(254, 202, 202)");
+  expect(eventMetricBackground({ vfal: "30" }, "vfal")).toBeUndefined();
+  expect(eventMetricBackground({ height: "150", height_n: "170 - 180" }, "height")).toBeUndefined();
+});
+
+it("makes the clinician and participant Events views share only the approved eight cards", () => {
+  const clinicianSource = readFileSync(
+    new URL("../client/src/pages/EventTeam.tsx", import.meta.url),
+    "utf8"
+  );
+  const participantSource = readFileSync(
+    new URL("../client/src/pages/Events.tsx", import.meta.url),
+    "utf8"
+  );
+  const fields = eventBodyFields.map(([key]) => key);
+
+  expect(fields).toEqual([
+    "height",
+    "weight",
+    "bmi",
+    "fatRate",
+    "skeletalMuscle",
+    "vfal",
+    "whr",
+    "bodyAge",
+  ]);
+  expect(clinicianSource).toContain('import { EventBodyResults }');
+  expect(clinicianSource.match(/<EventBodyResults/g)).toHaveLength(1);
+  expect(clinicianSource).not.toContain("BodyCompositionReport");
+  expect(participantSource.match(/<EventBodyResults/g)).toHaveLength(2);
+
+  const markup = renderToStaticMarkup(
+    createElement(EventBodyResults, {
+      readings: [
+        {
+          id: 74,
+          recordedAt: new Date("2026-10-06T10:00:00Z"),
+          height: "161.5",
+          weight: "75.2",
+          bmi: "28.8",
+          machineMetrics: {
+            fatRate: "38.1",
+            skeletalMuscle: "25.9",
+            vfal: "13",
+            whr: "0.94",
+            bodyAge: "51",
+            waterRate: "47.3",
+            waterICW: "22.4",
+            protein: "9.6",
+            bone: "2.8",
+          },
+        },
+      ],
+    })
+  );
+  expect(markup.match(/data-body-metric=/g)).toHaveLength(8);
+  for (const excludedValue of ["47.3", "22.4", "9.6", "2.8"]) {
+    expect(markup).not.toContain(excludedValue);
+  }
 });

@@ -5,7 +5,7 @@ import "@/styles/event-results.css";
 export default function LimLogo() {
   return (
     <span className="lim-approved-logo" role="img" aria-label="ليم LIM">
-      <img src="/brand/lim-approved.jpeg" alt="" aria-hidden="true" />
+      <img src="/brand/lim-leaf-approved.png" alt="" aria-hidden="true" />
     </span>
   );
 }
