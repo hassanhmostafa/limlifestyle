@@ -1,4 +1,40 @@
 /** Export the visible report as paginated A4 PDF; does not depend on window.print. */
+type PdfKeepTogether = { top: number; bottom: number };
+
+/**
+ * A tall advice or nursing block must still be splittable across pages, but each
+ * rendered line is kept whole. Range rectangles give one box per wrapped line.
+ */
+export function appendTextLineRectangles(
+  doc: Document,
+  root: HTMLElement,
+  bounds: DOMRect,
+  keepTogether: PdfKeepTogether[]
+) {
+  const nodeFilter = doc.defaultView?.NodeFilter;
+  if (!nodeFilter) return;
+  for (const container of Array.from(
+    root.querySelectorAll<HTMLElement>(
+      "[data-doctor-advice], .lim-print-notes"
+    )
+  )) {
+    const walker = doc.createTreeWalker(container, nodeFilter.SHOW_TEXT);
+    let textNode: Node | null;
+    while ((textNode = walker.nextNode())) {
+      if (!textNode.textContent?.trim()) continue;
+      const range = doc.createRange();
+      range.selectNodeContents(textNode);
+      for (const rect of Array.from(range.getClientRects())) {
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        keepTogether.push({
+          top: rect.top - bounds.top,
+          bottom: rect.bottom - bounds.top,
+        });
+      }
+    }
+  }
+}
+
 export async function downloadEventPdf(element: HTMLElement, filename: string) {
   const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
     import("html2canvas"),
@@ -7,10 +43,30 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
   await document.fonts.ready;
   const marker = "pdf-" + crypto.randomUUID();
   element.dataset.pdfCapture = marker;
+  const sourcePrintReport = element.querySelector<HTMLElement>(
+    "[data-print-report]"
+  );
+  const sourceRootStyle = element.getAttribute("style");
+  const sourceChildStyles = Array.from(element.children).map(child => ({
+    child: child as HTMLElement,
+    style: child.getAttribute("style"),
+  }));
+  const sourcePrintAriaHidden = sourcePrintReport?.getAttribute("aria-hidden");
   let canvas: HTMLCanvasElement;
   let captureWidth = 760;
-  let keepTogether: { top: number; bottom: number }[] = [];
+  let keepTogether: PdfKeepTogether[] = [];
   try {
+    // html2canvas measures its target before cloning it. The printable report is
+    // normally hidden in the interactive UI, so reveal it briefly in the source
+    // tree to ensure canvas height includes lifestyle, nursing and doctor advice.
+    if (sourcePrintReport) {
+      element.style.width = "760px";
+      element.style.maxWidth = "none";
+      element.style.background = "#fff";
+      for (const { child } of sourceChildStyles)
+        child.style.display = child === sourcePrintReport ? "block" : "none";
+      sourcePrintReport.removeAttribute("aria-hidden");
+    }
     canvas = await html2canvas(element, {
       backgroundColor: "#ffffff",
       useCORS: true,
@@ -135,10 +191,22 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
             top: rect.top - bounds.top,
             bottom: rect.bottom - bounds.top,
           }));
+        appendTextLineRectangles(doc, root, bounds, keepTogether);
       },
     });
   } finally {
     delete element.dataset.pdfCapture;
+    if (sourcePrintReport) {
+      if (sourceRootStyle === null) element.removeAttribute("style");
+      else element.setAttribute("style", sourceRootStyle);
+      for (const { child, style } of sourceChildStyles) {
+        if (style === null) child.removeAttribute("style");
+        else child.setAttribute("style", style);
+      }
+      if (sourcePrintAriaHidden == null)
+        sourcePrintReport.removeAttribute("aria-hidden");
+      else sourcePrintReport.setAttribute("aria-hidden", sourcePrintAriaHidden);
+    }
   }
   const pdf = new JsPDF({ unit: "mm", format: "a4", compress: true });
   const margin = 10,

@@ -213,7 +213,7 @@
 .lim-print-heading > span:last-child { margin-right: auto; color: #5c796f; }
 .lim-print-heading .lim-approved-logo { width: 84px; height: 60px; }
 .lim-print-heading .lim-approved-logo img { width: 123px; left: -20px; top: -27px; }
-.lim-print-report .lim-results-page { gap: 7px; font-size: 12px; }
+.lim-print-report .lim-results-page { gap: 5px; font-size: 11px; }
 .lim-print-report .lim-results-header { display: block; padding: 0; }
 .lim-print-report .lim-results-header > .lim-approved-logo { display: none; }
 .lim-print-report .lim-results-title { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; }
@@ -221,40 +221,41 @@
 .lim-print-report .lim-results-title > span { font-size: 10px; padding: 2px 6px; }
 .lim-print-report .lim-results-title p { font-size: 11px; margin: 0; }
 .lim-print-report .lim-top-metrics { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; }
-.lim-print-report .lim-result-metric { padding: 6px; border-radius: 10px; box-shadow: none; }
-.lim-print-report .lim-metric-icon { width: 20px; height: 20px; margin-bottom: 3px; }
-.lim-print-report .lim-result-metric > p { min-height: 0; font-size: 12px; }
+.lim-print-report .lim-result-metric { padding: 5px; border-radius: 10px; box-shadow: none; }
+.lim-print-report .lim-metric-icon { width: 18px; height: 18px; margin-bottom: 2px; }
+.lim-print-report .lim-result-metric > p { min-height: 0; font-size: 11px; line-height: 1.2; }
 .lim-print-report .lim-result-value { margin-top: 2px; }
-.lim-print-report .lim-result-value strong { font-size: 23px; }
-.lim-print-report .lim-result-value small { font-size: 10px; }
-.lim-print-report .lim-result-status, .lim-print-report .lim-result-unavailable { font-size: 11px; margin-top: 3px; padding: 1px 7px; }
-.lim-print-report .lim-result-reference { min-height: 0; margin-top: 3px; font-size: 10px; }
+.lim-print-report .lim-result-value strong { font-size: 21px; }
+.lim-print-report .lim-result-value small { font-size: 9px; }
+.lim-print-report .lim-result-status, .lim-print-report .lim-result-unavailable { font-size: 10px; margin-top: 2px; padding: 1px 6px; }
+.lim-print-report .lim-result-reference { min-height: 0; margin-top: 2px; font-size: 9px; line-height: 1.25; }
 .lim-print-report .lim-distributions { grid-template-columns: 1fr 1fr; gap: 8px; }
-.lim-print-report .lim-results-card { border-radius: 12px; padding: 5px 8px; box-shadow: none; }
+.lim-print-report .lim-results-card { border-radius: 12px; padding: 4px 7px; box-shadow: none; }
 .lim-print-report .lim-distributions h3 { font-size: 13px; margin: 0; }
-.lim-print-report .lim-anatomy-stage { width: 220px; margin: 0 auto; }
+.lim-print-report .lim-anatomy-stage { width: 180px; margin: 0 auto; }
 .lim-print-report .lim-segment-card { padding: 4px 2px; border-radius: 6px; box-shadow: none; }
 .lim-print-report .lim-segment-card span { font-size: 10px; }
 .lim-print-report .lim-segment-card strong { font-size: 11px; }
 .lim-print-report .lim-anatomy-figure img { filter: none; }
-.lim-print-report .lim-results-footer { font-size: 10px; padding: 0; gap: 1px; }
-.lim-print-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 8px; margin-top: 8px; }
-.lim-print-panel { border: 1px solid #dce7e1; border-radius: 12px; padding: 9px 11px; }
-.lim-print-panel h2 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; gap: 8px; }
-.lim-print-panel h2 span { font-size: 11px; font-weight: 400; }
-.lim-print-panel p { margin-top: 3px; font-size: 11px; }
+.lim-print-report .lim-results-footer { font-size: 9px; line-height: 1.25; padding: 0; gap: 1px; }
+.lim-print-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 6px; margin-top: 5px; }
+.lim-print-panel { border: 1px solid #dce7e1; border-radius: 12px; padding: 6px 8px; }
+.lim-print-panel h2 { font-size: 13px; font-weight: 800; display: flex; justify-content: space-between; gap: 8px; line-height: 1.2; }
+.lim-print-panel h2 span { font-size: 10px; font-weight: 400; }
+.lim-print-panel p { margin-top: 2px; font-size: 10px; line-height: 1.25; }
 .lim-print-band { color: #197f6f; font-weight: bold; }
-.lim-print-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; margin: 7px 0; }
-.lim-print-bars > div > div:first-child { display: flex; justify-content: space-between; gap: 5px; font-size: 10px; }
-.lim-print-track { background: #e9efec; height: 5px; border-radius: 4px; margin-top: 3px; overflow: hidden; }
+.lim-print-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin: 4px 0; }
+.lim-print-bars > div > div:first-child { display: flex; justify-content: space-between; gap: 5px; font-size: 9px; line-height: 1.2; }
+.lim-print-track { background: #e9efec; height: 4px; border-radius: 4px; margin-top: 2px; overflow: hidden; }
 .lim-print-track i { display: block; height: 100%; }
-.lim-print-panel small { font-size: 9px; color: #5c7168; }
-.lim-print-nursing > div { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid #edf1ee; font-size: 11px; }
+.lim-print-panel small { font-size: 8px; color: #5c7168; line-height: 1.2; }
+.lim-print-nursing { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 8px; }
+.lim-print-nursing > div { display: flex; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px solid #edf1ee; font-size: 10px; }
 .lim-print-nursing dd { font-weight: bold; }
 .lim-print-notes, .lim-print-advice [data-doctor-advice] { white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: plaintext; text-align: right; }
-.lim-print-advice { margin-top: 8px; }
-.lim-print-advice [data-doctor-advice] { font-size: 12px; line-height: 1.6; margin-top: 5px; }
-.lim-print-disclaimer { font-size: 10px; text-align: center; margin-top: 6px; color: #5c7168; }
+.lim-print-advice { margin-top: 5px; }
+.lim-print-advice [data-doctor-advice] { font-size: 11px; line-height: 1.35; margin-top: 3px; }
+.lim-print-disclaimer { font-size: 9px; line-height: 1.25; text-align: center; margin-top: 4px; color: #5c7168; }
 @media print {
   [data-final-report] > :not([data-print-report]) { display: none !important; }
   [data-final-report] > [data-print-report] { display: block; max-width: 100%; }
