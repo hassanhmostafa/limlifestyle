@@ -1,10 +1,11 @@
 import EventLifestyleCharts from "@/components/EventLifestyleCharts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { nursingCatalog } from "@shared/eventNursing";
 import type { Measurements } from "@shared/eventCare";
 import EventCareSummary from "@/components/EventCareSummary";
 import { EventBodyResults } from "@/components/EventBodyResults";
+import LimLogo from "@/components/LimLogo";
 
 const inputClass = "w-full rounded-xl border border-emerald-200 bg-white p-3";
 const multilineInputClass = `${inputClass} resize-y whitespace-pre-wrap break-words text-right leading-8`;
@@ -34,7 +35,8 @@ export default function EventTeam() {
     {
       enabled: Boolean(participant && confirmed && me.data && !me.isError),
       retry: false,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
+      refetchInterval: 10_000,
     }
   );
   const [measurements, setMeasurements] = useState<Measurements>({});
@@ -54,17 +56,22 @@ export default function EventTeam() {
     onError: e => setMessage(e.message),
   });
   const care = record.data?.care;
+  const lastLoaded = useRef<{ sessionId: number | undefined; care: typeof care } | null>(null);
   useEffect(() => {
-    setMeasurements(care?.measurements ?? {});
-    setNotes(care?.nurseNotes ?? "");
-    setAdvice(care?.advice ?? "");
-  }, [care]);
+    const previous = lastLoaded.current;
+    const changedParticipant = !previous || previous.sessionId !== participant?.id;
+    // Poll the latest measurement without overwriting unsaved clinician edits.
+    setMeasurements(current => changedParticipant || JSON.stringify(current) === JSON.stringify(previous?.care?.measurements ?? {}) ? care?.measurements ?? {} : current);
+    setNotes(current => changedParticipant || current === (previous?.care?.nurseNotes ?? "") ? care?.nurseNotes ?? "" : current);
+    setAdvice(current => changedParticipant || current === (previous?.care?.advice ?? "") ? care?.advice ?? "" : current);
+    lastLoaded.current = { sessionId: participant?.id, care };
+  }, [care, participant?.id]);
   const pending = nursing.isPending || doctor.isPending;
   return (
     <main dir="rtl" className="min-h-screen bg-[#f3f8f6] p-5 text-[#123a34]">
       <div className="mx-auto max-w-3xl space-y-5">
         <header className="rounded-3xl bg-[#123f37] p-6 text-white">
-          <p className="text-[#dff33d]">ليم LIM · فريق الفعالية</p>
+          <LimLogo /><p className="text-[#dff33d]">فريق الفعالية</p>
           <h1 className="mt-3 text-2xl font-bold">
             {!me.data || me.isError
               ? "دخول فريق الفعالية"

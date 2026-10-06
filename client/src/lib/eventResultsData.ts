@@ -6,20 +6,55 @@ export type EventResultField = readonly [
   unit: string,
 ];
 
-export const eventResultCategories = {
-  primary: [
-    ["weight", "الوزن", "كجم"],
-    ["bmi", "مؤشر كتلة الجسم", ""],
-    ["fatRate", "نسبة الدهون", "%"],
-    ["skeletalMuscle", "العضلات الهيكلية", "كجم"],
-  ],
-  indicators: [
-    ["vfal", "الدهون الحشوية", "مستوى"],
-    ["whr", "نسبة الخصر إلى الورك", ""],
-    ["bodyAge", "العمر الجسدي التقديري", "سنة"],
-  ],
-  metabolism: [["bmr", "معدل الأيض الأساسي", "سعرة / يوم"]],
-} as const satisfies Record<string, readonly EventResultField[]>;
+/** One approved list for clinician, participant and printable report. */
+export const eventBodyFields: readonly EventResultField[] = [
+  ["height", "الطول", "سم"],
+  ["weight", "الوزن", "كجم"],
+  ["bmi", "مؤشر كتلة الجسم", ""],
+  ["fatRate", "نسبة الدهون", "%"],
+  ["skeletalMuscle", "العضلات الهيكلية", "كجم"],
+  ["vfal", "الدهون الحشوية", "مستوى"],
+  ["whr", "نسبة الخصر إلى الورك", ""],
+  ["bodyAge", "العمر الجسدي التقديري", "سنة"],
+];
+
+export function eventMetricReference(
+  values: Record<string, string>,
+  key: string
+) {
+  if (key === "height" || key === "bodyAge") return null;
+  const device = eventReferenceRange(values, key);
+  if (device) return { value: device, label: "الطبيعي حسب الجهاز" };
+  if (key === "weight") {
+    const value = eventAdultWeightRange(values.height);
+    return value ? { value, label: "الطبيعي حسب الطول للبالغين" } : null;
+  }
+  if (key === "bmi") return { value: "18.5 - 24.9", label: "الطبيعي للبالغين" };
+  return null;
+}
+
+export function eventMetricStatus(values: Record<string, string>, key: string) {
+  if (key === "height" || key === "bodyAge") return null;
+  const value = eventNumeric(values[key]);
+  if (value === null) return null;
+  const reference = eventMetricReference(values, key);
+  const bounds = reference?.value.match(
+    /^\s*(\d+(?:\.\d+)?)\s*[-–—~]\s*(\d+(?:\.\d+)?)\s*$/
+  );
+  let code: string | undefined;
+  // The visible numeric reference takes precedence over contradictory device flags.
+  if (bounds && Number(bounds[1]) <= Number(bounds[2])) {
+    code =
+      value < Number(bounds[1]) ? "0" : value > Number(bounds[2]) ? "2" : "1";
+  } else {
+    code = values[`${key}_s`];
+  }
+  if (code !== "0" && code !== "1" && code !== "2") return null;
+  return {
+    code,
+    label: code === "0" ? "منخفض" : code === "2" ? "مرتفع" : "طبيعي",
+  };
+}
 
 export type EventMuscleBalance = {
   armsDifference: number | null;
