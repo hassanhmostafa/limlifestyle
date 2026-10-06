@@ -1,15 +1,5 @@
 import React from "react";
-import {
-  CalendarDays,
-  Ruler,
-  Scale,
-  Gauge,
-  Droplets,
-  Dumbbell,
-  HeartPulse,
-  ScanLine,
-  CalendarClock,
-} from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import type { DashboardReading } from "@/components/BodyCompositionReport";
 import {
   eventBodyFields,
@@ -39,15 +29,15 @@ export function eventReadingDate(value: Date | string) {
         calendar: "gregory",
       });
 }
-const metricIcons = {
-  height: Ruler,
-  weight: Scale,
-  bmi: Gauge,
-  fatRate: Droplets,
-  skeletalMuscle: Dumbbell,
-  vfal: HeartPulse,
-  whr: ScanLine,
-  bodyAge: CalendarClock,
+const metricIconSources = {
+  height: "/brand/metrics/height.png",
+  weight: "/brand/metrics/weight.png",
+  bmi: "/brand/metrics/bmi.png",
+  fatRate: "/brand/metrics/fatRate.png",
+  skeletalMuscle: "/brand/metrics/skeletalMuscle.png",
+  vfal: "/brand/metrics/vfal.png",
+  whr: "/brand/metrics/whr.png",
+  bodyAge: "/brand/metrics/bodyAge.png",
 };
 
 function MetricCard({
@@ -61,13 +51,13 @@ function MetricCard({
   const value = eventNumeric(values[key]);
   const status = eventMetricStatus(values, key);
   const reference = eventMetricReference(values, key);
-  const Icon = metricIcons[key as keyof typeof metricIcons];
+  const iconSource = metricIconSources[key as keyof typeof metricIconSources];
   return (
     <article
       data-body-metric={key}
       className={`lim-result-metric${status ? ` lim-result-metric-status-${status.code}` : ""}`}
     >
-      <Icon className="lim-metric-icon" aria-hidden="true" />
+      <img className="lim-metric-icon" src={iconSource} alt="" aria-hidden="true" />
       <p>{label}</p>
       <div className="lim-result-value">
         <strong dir="ltr">

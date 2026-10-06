@@ -84,7 +84,13 @@ export default function EventPrintReport({
         <h2>
           توصيات الطبيب <span>{care.doctorName}</span>
         </h2>
-        <div data-doctor-advice>{care.advice || "لم تُضف توصيات."}</div>
+        <div data-doctor-advice>
+          {(care.advice || "لم تُضف توصيات.").split("\n").map((line, index) => (
+            <span className="lim-print-advice-line" data-pdf-keep key={index}>
+              {line || " "}
+            </span>
+          ))}
+        </div>
       </section>
       <footer className="lim-print-disclaimer">
         نتائج التقييم والقياسات كما سُجلت؛ لا تُعد تشخيصًا طبيًا بمفردها.

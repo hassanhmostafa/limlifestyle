@@ -40,6 +40,10 @@ it("prints the exact same eight measurements and both distributions, preserving 
   expect(cards(print)).toHaveLength(8);
   expect(print).toContain("/api/events/anatomy/fat");
   expect(print).toContain("/api/events/anatomy/muscle");
-  expect(print).toContain(advice);
+  expect(print.match(/lim-print-advice-line/g)).toHaveLength(
+    advice.split("\n").length
+  );
+  expect(print).toContain("نص عربي مع English 123.");
+  expect(print).toContain("نهاية التوصيات");
   expect(print).toContain("SAME-RECORD");
 });

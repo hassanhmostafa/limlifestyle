@@ -1,6 +1,7 @@
 // Local-only synthetic fixture. Bundle for visual/PDF QA; never uses participant data.
 import React from "react";
 import { createRoot } from "react-dom/client";
+import "../client/src/index.css";
 import EventPrintReport from "../client/src/components/EventPrintReport";
 import { EventBodyResults } from "../client/src/components/EventBodyResults";
 import { downloadEventPdf } from "../client/src/lib/eventPdf";

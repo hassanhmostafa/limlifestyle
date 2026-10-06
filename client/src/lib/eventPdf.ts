@@ -13,6 +13,7 @@ export function appendTextLineRectangles(
 ) {
   const nodeFilter = doc.defaultView?.NodeFilter;
   if (!nodeFilter) return;
+  const renderedLines = new Map<string, PdfKeepTogether>();
   for (const container of Array.from(
     root.querySelectorAll<HTMLElement>(
       "[data-doctor-advice], .lim-print-notes"
@@ -26,13 +27,20 @@ export function appendTextLineRectangles(
       range.selectNodeContents(textNode);
       for (const rect of Array.from(range.getClientRects())) {
         if (rect.width <= 0 || rect.height <= 0) continue;
-        keepTogether.push({
+        const line = {
           top: rect.top - bounds.top,
           bottom: rect.bottom - bounds.top,
-        });
+        };
+        // Arabic/Latin text can create several client rects for one visual
+        // line. Protect the shared line, not each bidi fragment separately.
+        const key = `${Math.round(line.top * 100)}:${Math.round(
+          line.bottom * 100
+        )}`;
+        renderedLines.set(key, line);
       }
     }
   }
+  keepTogether.push(...Array.from(renderedLines.values()));
 }
 
 export async function downloadEventPdf(element: HTMLElement, filename: string) {
@@ -55,6 +63,11 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
   let canvas: HTMLCanvasElement;
   let captureWidth = 760;
   let keepTogether: PdfKeepTogether[] = [];
+  let sourceLineHeights: Array<{
+    node: HTMLElement;
+    value: string;
+    priority: string;
+  }> = [];
   try {
     // html2canvas measures its target before cloning it. The printable report is
     // normally hidden in the interactive UI, so reveal it briefly in the source
@@ -66,6 +79,22 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
       for (const { child } of sourceChildStyles)
         child.style.display = child === sourcePrintReport ? "block" : "none";
       sourcePrintReport.removeAttribute("aria-hidden");
+      // Apply the same line-height normalization used in the clone before
+      // measuring the source tree, so the capture geometry stays consistent.
+      const sourceNodes = [
+        element,
+        ...Array.from(element.querySelectorAll<HTMLElement>("*")),
+      ];
+      sourceLineHeights = sourceNodes.map(node => ({
+        node,
+        value: node.style.getPropertyValue("line-height"),
+        priority: node.style.getPropertyPriority("line-height"),
+      }));
+      for (const node of sourceNodes) {
+        const css = getComputedStyle(node);
+        if (parseFloat(css.lineHeight) < parseFloat(css.fontSize) * 1.3)
+          node.style.setProperty("line-height", "1.3", "important");
+      }
     }
     canvas = await html2canvas(element, {
       backgroundColor: "#ffffff",
@@ -196,6 +225,10 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
     });
   } finally {
     delete element.dataset.pdfCapture;
+    for (const { node, value, priority } of sourceLineHeights) {
+      if (value) node.style.setProperty("line-height", value, priority);
+      else node.style.removeProperty("line-height");
+    }
     if (sourcePrintReport) {
       if (sourceRootStyle === null) element.removeAttribute("style");
       else element.setAttribute("style", sourceRootStyle);
@@ -209,9 +242,12 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
     }
   }
   const pdf = new JsPDF({ unit: "mm", format: "a4", compress: true });
-  const margin = 10,
+  // Keep generous side margins for labels, but use the printable A4 height
+  // efficiently so the ordinary report is not split by a tiny trailing slice.
+  const marginX = 10,
+    marginY = 8,
     width = 190,
-    height = 277;
+    height = 281;
   const sliceHeight = Math.floor((canvas.width * height) / width);
   const pixelScale = canvas.width / captureWidth;
   for (let top = 0, index = 0; top < canvas.height; index++) {
@@ -225,7 +261,11 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
       );
       if (crossing.length)
         bottom = Math.floor(
-          Math.min(...crossing.map(block => block.top * pixelScale))
+          Math.max(
+            top + 1,
+            Math.min(...crossing.map(block => block.top * pixelScale)) -
+              pixelScale * 12
+          )
         );
     }
     const slice = document.createElement("canvas");
@@ -248,8 +288,8 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
     pdf.addImage(
       slice.toDataURL("image/png"),
       "PNG",
-      margin,
-      margin,
+      marginX,
+      marginY,
       width,
       (slice.height * width) / canvas.width
     );
