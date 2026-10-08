@@ -47,7 +47,8 @@ export type MinimizedRecommendationInput = {
 };
 
 function numeric(value: unknown) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value : undefined;
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   if (!trimmed) return undefined;
@@ -57,7 +58,10 @@ function numeric(value: unknown) {
 
 function integerInRange(value: unknown, min: number, max: number) {
   const parsed = numeric(value);
-  return parsed !== undefined && Number.isInteger(parsed) && parsed >= min && parsed <= max
+  return parsed !== undefined &&
+    Number.isInteger(parsed) &&
+    parsed >= min &&
+    parsed <= max
     ? parsed
     : undefined;
 }
@@ -67,7 +71,9 @@ function closedValue(value: unknown, allowed: Set<string>) {
 }
 
 /** Only recognized, closed questionnaire fields are retained. Missing is unknown. */
-export function minimizeQuestionnaire(answers: EventAnswers | null | undefined) {
+export function minimizeQuestionnaire(
+  answers: EventAnswers | null | undefined
+) {
   const source = answers ?? {};
   const output: Record<string, string | number | string[]> = {};
   for (const id of ["fruit", "vegetables", "wholeGrains", "sugary"] as const) {
@@ -89,7 +95,15 @@ export function minimizeQuestionnaire(answers: EventAnswers | null | undefined) 
   const activeMinutes = integerInRange(source.activeMinutes, 0, 300);
   if (activeMinutes !== undefined) output.activeMinutes = activeMinutes;
   // Keep only known, closed survey responses; no explanatory free text survives.
-  for (const id of ["dayTired", "lowInterest", "lowMood", "notOnTop", "overwhelmed", "purpose", "support"] as const) {
+  for (const id of [
+    "dayTired",
+    "lowInterest",
+    "lowMood",
+    "notOnTop",
+    "overwhelmed",
+    "purpose",
+    "support",
+  ] as const) {
     const value = closedValue(source[id], recentFrequencyValues);
     if (value !== undefined) output[id] = value;
   }
@@ -108,7 +122,8 @@ export function minimizeBodyReading(latest: {
   const output: Record<string, number> = {};
   const add = (key: string, value: unknown, min: number, max: number) => {
     const parsed = numeric(value);
-    if (parsed !== undefined && parsed >= min && parsed <= max) output[key] = parsed;
+    if (parsed !== undefined && parsed >= min && parsed <= max)
+      output[key] = parsed;
   };
   add("height", latest.height, 80, 260);
   add("weight", latest.weight, 20, 350);
@@ -116,7 +131,9 @@ export function minimizeBodyReading(latest: {
   add("systolic", latest.sbp, 40, 300);
   add("diastolic", latest.dbp, 20, 200);
   const metrics =
-    latest.machineMetrics && typeof latest.machineMetrics === "object" && !Array.isArray(latest.machineMetrics)
+    latest.machineMetrics &&
+    typeof latest.machineMetrics === "object" &&
+    !Array.isArray(latest.machineMetrics)
       ? (latest.machineMetrics as Record<string, unknown>)
       : {};
   add("fatRate", metrics.fatRate, 0, 100);
@@ -132,10 +149,19 @@ export function minimizeBodyReading(latest: {
  * A recommendation requires the core triad plus at least two composition
  * measures; a record number, BP, or temperature alone is never sufficient.
  */
-export function hasSubstantiveBodyCompositionResult(body: Record<string, number>) {
-  const core = ["height", "weight", "bmi"].every(key => body[key] !== undefined);
-  const compositionCount = ["fatRate", "skeletalMuscle", "vfal", "whr", "bodyAge"]
-    .filter(key => body[key] !== undefined).length;
+export function hasSubstantiveBodyCompositionResult(
+  body: Record<string, number>
+) {
+  const core = ["height", "weight", "bmi"].every(
+    key => body[key] !== undefined
+  );
+  const compositionCount = [
+    "fatRate",
+    "skeletalMuscle",
+    "vfal",
+    "whr",
+    "bodyAge",
+  ].filter(key => body[key] !== undefined).length;
   return core && compositionCount >= 2;
 }
 
@@ -143,7 +169,9 @@ export function hasSubstantiveBodyCompositionResult(body: Record<string, number>
  * Retains numeric nursing fields and catalog-defined closed enums only. It
  * deliberately excludes nurse notes and bone/device/site/result free text.
  */
-export function minimizeNursingMeasurements(measurements: Measurements | null | undefined) {
+export function minimizeNursingMeasurements(
+  measurements: Measurements | null | undefined
+) {
   const source = measurements ?? {};
   const output: Record<string, Record<string, string | number>> = {};
   for (const test of nursingCatalog) {
@@ -154,7 +182,11 @@ export function minimizeNursingMeasurements(measurements: Measurements | null | 
       const value = values[field.key];
       if (field.unit) {
         const parsed = numeric(value);
-        if (parsed !== undefined && parsed >= 0 && parsed <= MAX_NUMERIC_NURSING_VALUE)
+        if (
+          parsed !== undefined &&
+          parsed >= 0 &&
+          parsed <= MAX_NUMERIC_NURSING_VALUE
+        )
           safe[field.key] = parsed;
       } else if (field.options?.includes(String(value))) {
         safe[field.key] = String(value);
@@ -165,12 +197,17 @@ export function minimizeNursingMeasurements(measurements: Measurements | null | 
   return output;
 }
 
-function knownNumber(answers: Record<string, string | number | string[]>, id: string) {
+function knownNumber(
+  answers: Record<string, string | number | string[]>,
+  id: string
+) {
   const value = answers[id];
   return typeof value === "number" ? value : undefined;
 }
 
-export function candidateSuggestionIds(answers: Record<string, string | number | string[]>) {
+export function candidateSuggestionIds(
+  answers: Record<string, string | number | string[]>
+) {
   // Unknown answers must not be treated as a deficiency. These neutral cards are
   // nevertheless appropriate for any adult completing a body-composition visit.
   const ids = new Set<string>([
@@ -184,7 +221,9 @@ export function candidateSuggestionIds(answers: Record<string, string | number |
   const activityMinutes = knownNumber(answers, "activeMinutes");
   const strengthDays = knownNumber(answers, "strengthDays");
   if (
-    (activityDays !== undefined && activityMinutes !== undefined && activityDays * activityMinutes < 150) ||
+    (activityDays !== undefined &&
+      activityMinutes !== undefined &&
+      activityDays * activityMinutes < 150) ||
     (strengthDays !== undefined && strengthDays < 2)
   )
     ids.add("activity-target");
@@ -196,15 +235,22 @@ export function candidateSuggestionIds(answers: Record<string, string | number |
     strengthDays >= 2
   )
     ids.add("activity-gradual");
-  if (["0", "1", "2"].includes(String(answers.sleepHours ?? ""))) ids.add("sleep-routine");
+  if (["0", "1", "2"].includes(String(answers.sleepHours ?? "")))
+    ids.add("sleep-routine");
   if (answers.tobacco && answers.tobacco !== "3") ids.add("tobacco-support");
   if (Number(answers.sugary) >= 2) ids.add("nutrition-sugary");
-  if (["fruit", "vegetables", "wholeGrains"].some(id => {
-    const value = answers[id];
-    return typeof value === "string" && Number(value) < 2;
-  }))
+  if (
+    ["fruit", "vegetables", "wholeGrains"].some(id => {
+      const value = answers[id];
+      return typeof value === "string" && Number(value) < 2;
+    })
+  )
     ids.add("nutrition-plants");
-  if ([answers.priority1, answers.priority2, answers.priority3].includes("connection"))
+  if (
+    [answers.priority1, answers.priority2, answers.priority3].includes(
+      "connection"
+    )
+  )
     ids.add("support-connection");
   return Array.from(ids);
 }
@@ -218,14 +264,20 @@ function bloodPressureFromInput(input: MinimizedRecommendationInput) {
   return [
     device,
     {
-      systolic: typeof nursing.systolic === "number" ? nursing.systolic : undefined,
-      diastolic: typeof nursing.diastolic === "number" ? nursing.diastolic : undefined,
+      systolic:
+        typeof nursing.systolic === "number" ? nursing.systolic : undefined,
+      diastolic:
+        typeof nursing.diastolic === "number" ? nursing.diastolic : undefined,
     },
   ];
 }
 
-function isUrgentBloodPressure(values: Array<{ systolic?: number; diastolic?: number }>) {
-  return values.some(value => (value.systolic ?? 0) > 180 || (value.diastolic ?? 0) > 120);
+function isUrgentBloodPressure(
+  values: Array<{ systolic?: number; diastolic?: number }>
+) {
+  return values.some(
+    value => (value.systolic ?? 0) > 180 || (value.diastolic ?? 0) > 120
+  );
 }
 
 function urgentAdvice() {
@@ -233,7 +285,10 @@ function urgentAdvice() {
 }
 
 function stableFingerprint(value: unknown) {
-  return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex");
 }
 
 async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
@@ -249,7 +304,10 @@ async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
   });
   const models = await listLLMModels({ timeoutMs: MODEL_CATALOG_DEADLINE_MS });
   const model = models.data.find(item => item.id === "gpt-5-mini")?.id;
-  if (!model) throw new Error("Configured structured recommendation model is unavailable.");
+  if (!model)
+    throw new Error(
+      "Configured structured recommendation model is unavailable."
+    );
   const response = await invokeLLM({
     model,
     timeoutMs: MODEL_SELECTION_DEADLINE_MS,
@@ -280,7 +338,6 @@ async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
               type: "array",
               minItems: 2,
               maxItems: 4,
-              uniqueItems: true,
               items: { type: "string", enum: candidateIds },
             },
           },
@@ -291,14 +348,17 @@ async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
     },
   });
   const text = response.choices[0]?.message.content;
-  if (typeof text !== "string") throw new Error("Recommendation selection was empty.");
+  if (typeof text !== "string")
+    throw new Error("Recommendation selection was empty.");
   const parsed = JSON.parse(text) as { suggestionIds?: unknown };
   if (
     !Array.isArray(parsed.suggestionIds) ||
     parsed.suggestionIds.length < 2 ||
     parsed.suggestionIds.length > 4 ||
     new Set(parsed.suggestionIds).size !== parsed.suggestionIds.length ||
-    parsed.suggestionIds.some(id => typeof id !== "string" || !candidateIds.includes(id))
+    parsed.suggestionIds.some(
+      id => typeof id !== "string" || !candidateIds.includes(id)
+    )
   )
     throw new Error("Recommendation selection did not satisfy the allowlist.");
   return { model, ids: parsed.suggestionIds as string[] };
@@ -358,8 +418,14 @@ async function inputStillMatches(
   }
 }
 
-function recommendationMeta(ids: string[], fingerprint: string, mode: EventConsultationMode) {
-  const chosen = ids.map(id => eventRecommendationById.get(id)!).filter(Boolean);
+function recommendationMeta(
+  ids: string[],
+  fingerprint: string,
+  mode: EventConsultationMode
+) {
+  const chosen = ids
+    .map(id => eventRecommendationById.get(id)!)
+    .filter(Boolean);
   return {
     promptVersion: EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION,
     mode,
@@ -371,19 +437,39 @@ function recommendationMeta(ids: string[], fingerprint: string, mode: EventConsu
 }
 
 export type AutomaticRecommendationResult =
-  | { state: "not_applicable" | "already_generated" | "retry_limit" | "waiting_for_nursing" | "waiting_for_body" | "busy" | "input_changed" | "failed" }
+  | {
+      state:
+        | "not_applicable"
+        | "already_generated"
+        | "retry_limit"
+        | "waiting_for_nursing"
+        | "waiting_for_body"
+        | "busy"
+        | "input_changed"
+        | "failed";
+    }
   | { state: "generated"; mode: "automatic" };
 
 /** Produces only an allowlisted, source-backed automatic report after nursing. */
-export async function generateAutomaticRecommendationsForSession(sessionId: number): Promise<AutomaticRecommendationResult> {
+export async function generateAutomaticRecommendationsForSession(
+  sessionId: number
+): Promise<AutomaticRecommendationResult> {
   let context: Awaited<ReturnType<typeof buildMinimizedInput>>;
   try {
     context = await buildMinimizedInput(sessionId);
   } catch (error) {
-    return { state: error instanceof Error && error.message.includes("completed body-composition") ? "waiting_for_body" : "failed" };
+    return {
+      state:
+        error instanceof Error &&
+        error.message.includes("completed body-composition")
+          ? "waiting_for_body"
+          : "failed",
+    };
   }
-  if (context.care.consultationMode !== "automatic") return { state: "not_applicable" };
-  if (context.care.nursingEnabled && !context.care.nursingCompletedAt) return { state: "waiting_for_nursing" };
+  if (context.care.consultationMode !== "automatic")
+    return { state: "not_applicable" };
+  if (context.care.nursingEnabled && !context.care.nursingCompletedAt)
+    return { state: "waiting_for_nursing" };
   const claimed = await claimAutomaticRecommendationGeneration(sessionId, {
     fingerprint: context.fingerprint,
     inputRevision: context.care.revision,
@@ -398,37 +484,59 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
   };
   try {
     if (isUrgentBloodPressure(bloodPressureFromInput(context.input))) {
-      if (!(await inputStillMatches(sessionId, {
+      if (
+        !(await inputStillMatches(sessionId, {
+          recordNo: attempt.recordNo,
+          careRevision: claimed.care.revision,
+          fingerprint: attempt.fingerprint,
+        }))
+      )
+        return { state: "input_changed" };
+      const published = await completeAutomaticRecommendationGeneration(
+        sessionId,
+        attempt,
+        {
+          advice: urgentAdvice(),
+          recommendationMeta: {
+            promptVersion: EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION,
+            mode: "automatic",
+            deterministicSafetyRule: "SBP>180 OR DBP>120",
+            sourceIds: ["AHA_BP_180_120"],
+            suggestionIds: ["urgent-blood-pressure"],
+            inputFingerprint: context.fingerprint,
+          },
+          model: null,
+        }
+      );
+      return published
+        ? { state: "generated", mode: "automatic" }
+        : { state: "input_changed" };
+    }
+    const selected = await chooseSuggestionIds(context.input);
+    if (
+      !(await inputStillMatches(sessionId, {
         recordNo: attempt.recordNo,
         careRevision: claimed.care.revision,
         fingerprint: attempt.fingerprint,
-      }))) return { state: "input_changed" };
-      const published = await completeAutomaticRecommendationGeneration(sessionId, attempt, {
-        advice: urgentAdvice(),
-        recommendationMeta: {
-          promptVersion: EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION,
-          mode: "automatic",
-          deterministicSafetyRule: "SBP>180 OR DBP>120",
-          sourceIds: ["AHA_BP_180_120"],
-          suggestionIds: ["urgent-blood-pressure"],
-          inputFingerprint: context.fingerprint,
-        },
-        model: null,
-      });
-      return published ? { state: "generated", mode: "automatic" } : { state: "input_changed" };
-    }
-    const selected = await chooseSuggestionIds(context.input);
-    if (!(await inputStillMatches(sessionId, {
-      recordNo: attempt.recordNo,
-      careRevision: claimed.care.revision,
-      fingerprint: attempt.fingerprint,
-    }))) return { state: "input_changed" };
-    const published = await completeAutomaticRecommendationGeneration(sessionId, attempt, {
-      advice: composeEventLifestyleDraft(selected.ids),
-      recommendationMeta: recommendationMeta(selected.ids, context.fingerprint, "automatic"),
-      model: selected.model,
-    });
-    return published ? { state: "generated", mode: "automatic" } : { state: "input_changed" };
+      }))
+    )
+      return { state: "input_changed" };
+    const published = await completeAutomaticRecommendationGeneration(
+      sessionId,
+      attempt,
+      {
+        advice: composeEventLifestyleDraft(selected.ids),
+        recommendationMeta: recommendationMeta(
+          selected.ids,
+          context.fingerprint,
+          "automatic"
+        ),
+        model: selected.model,
+      }
+    );
+    return published
+      ? { state: "generated", mode: "automatic" }
+      : { state: "input_changed" };
   } catch {
     await failAutomaticRecommendationGeneration(
       sessionId,
@@ -453,7 +561,9 @@ export async function generatePhysicianRecommendationDraftForSession(input: {
   if (context.care.consultationMode !== "physician")
     throw new Error("Automatic visits do not permit physician drafts.");
   if (context.care.nursingEnabled && !context.care.nursingCompletedAt)
-    throw new Error("Nursing must be completed before generating a physician draft.");
+    throw new Error(
+      "Nursing must be completed before generating a physician draft."
+    );
   if (context.care.revision !== input.expectedRevision)
     throw new Error("Recommendation draft revision is stale.");
 
@@ -474,14 +584,23 @@ export async function generatePhysicianRecommendationDraftForSession(input: {
   } else {
     const selected = await chooseSuggestionIds(context.input);
     advice = composeEventLifestyleDraft(selected.ids);
-    metadata = recommendationMeta(selected.ids, context.fingerprint, "physician");
+    metadata = recommendationMeta(
+      selected.ids,
+      context.fingerprint,
+      "physician"
+    );
     model = selected.model;
   }
-  if (!(await inputStillMatches(input.sessionId, {
-    recordNo: context.session.latestRecordNo!,
-    careRevision: input.expectedRevision,
-    fingerprint: context.fingerprint,
-  }))) throw new Error("Recommendation draft input changed before it could be saved.");
+  if (
+    !(await inputStillMatches(input.sessionId, {
+      recordNo: context.session.latestRecordNo!,
+      careRevision: input.expectedRevision,
+      fingerprint: context.fingerprint,
+    }))
+  )
+    throw new Error(
+      "Recommendation draft input changed before it could be saved."
+    );
   const updated = await updateCare(
     input.sessionId,
     {
@@ -498,5 +617,10 @@ export async function generatePhysicianRecommendationDraftForSession(input: {
     input.trackId,
     input.expectedRevision
   );
-  return { advice, recommendationMeta: metadata, revision: updated.revision, model };
+  return {
+    advice,
+    recommendationMeta: metadata,
+    revision: updated.revision,
+    model,
+  };
 }

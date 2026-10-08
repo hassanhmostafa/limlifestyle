@@ -87,6 +87,7 @@ describe("automatic Events recommendations", () => {
     expect(result).toEqual({ state: "generated", mode: "automatic" });
     const request = invoke.mock.calls[0][0];
     expect(request.response_format.json_schema.strict).toBe(true);
+    expect(request.response_format.json_schema.schema.properties.suggestionIds).not.toHaveProperty("uniqueItems");
     expect(request.timeoutMs).toBeLessThan(90_000);
     expect(models).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: expect.any(Number) }));
     expect(JSON.stringify(request.messages)).not.toContain("DO NOT FORWARD");
