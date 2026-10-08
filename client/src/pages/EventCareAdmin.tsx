@@ -17,6 +17,7 @@ export default function EventCareAdmin() {
   });
   const [enabled, setEnabled] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
+  const [consultationMode, setConsultationMode] = useState<"physician" | "automatic">("physician");
   const [newTrack, setNewTrack] = useState("");
   const [secret, setSecret] = useState<{ code: string; name: string } | null>(
     null
@@ -27,6 +28,7 @@ export default function EventCareAdmin() {
     if (settings.data) {
       setEnabled(Boolean(settings.data.nursingEnabled));
       setIds(settings.data.testIds);
+      setConsultationMode(settings.data.consultationMode ?? "physician");
     }
   }, [settings.data]);
   const configure = trpc.eventTeam.configure.useMutation({
@@ -84,6 +86,12 @@ export default function EventCareAdmin() {
                 عند إخفائها ينتقل المستفيد من تحليل الجسم إلى الطبيب. الإعدادات
                 تُحفظ لكل زيارة؛ التعديل يسري على الزيارات الجديدة.
               </p>
+              <fieldset className="space-y-3 rounded-2xl bg-[#f3f8f6] p-4">
+                <legend className="font-bold">نوع الاستشارة للزيارات الجديدة</legend>
+                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "physician"} onChange={() => setConsultationMode("physician")} />مراجعة الطبيب: يكتب الطبيب ويعتمد توصياته باسم الطبيب.</label>
+                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "automatic"} onChange={() => { setConsultationMode("automatic"); setEnabled(true); }} />توصيات نمط الحياة للفعالية: تتطلب إكمال التمريض، ثم ينشئ النظام توصيات تثقيفية مقيدة بالمصادر المعتمدة دون اسم طبيب.</label>
+                {consultationMode === "automatic" && <p className="text-sm text-[#526f68]">لا يتاح هذا الوضع من دون محطة تمريض وفحص واحد على الأقل. يختار النظام من توصيات معتمدة مسبقًا فقط، وتبقى تفاصيل المصادر في مساحة الفريق والأدمن.</p>}
+              </fieldset>
               <label className="block">
                 إضافة فحص
                 <select
@@ -118,7 +126,7 @@ export default function EventCareAdmin() {
                 className={button}
                 disabled={configure.isPending || (enabled && !ids.length)}
                 onClick={() =>
-                  configure.mutate({ nursingEnabled: enabled, testIds: ids })
+                  configure.mutate({ nursingEnabled: enabled, testIds: ids, consultationMode })
                 }
               >
                 حفظ إعدادات التمريض

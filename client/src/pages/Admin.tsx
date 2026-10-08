@@ -54,13 +54,11 @@ import {
   ClipboardList,
   ShieldCheck,
   Cpu,
-  FlaskConical,
 } from "lucide-react";
 import { TimeSelect } from "@/components/TimeSelect";
 import { UserSearchCombobox } from "@/components/UserSearchCombobox";
 import { Link } from "wouter";
 import { KioskDevicesTab } from "@/components/KioskDevicesTab";
-import { KioskTestTab } from "@/components/KioskTestTab";
 
 interface HourEntry {
   day: string;
@@ -98,7 +96,7 @@ const emptyForm: KioskFormData = {
   services: [],
 };
 
-type Tab = "users" | "expert-requests" | "kiosk-devices" | "kiosk-test" | "admins";
+type Tab = "users" | "expert-requests" | "kiosk-devices" | "admins";
 
 export default function Admin() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -111,8 +109,8 @@ export default function Admin() {
   // Tabs each adminType is allowed to see.
   const allowedTabs = (adminType: string | null | undefined): Tab[] => {
     if (adminType === "expert") return ["expert-requests"];
-    if (adminType === "kiosk") return ["kiosk-devices", "kiosk-test"];
-    return ["users", "expert-requests", "kiosk-devices", "kiosk-test", "admins"]; // super
+    if (adminType === "kiosk") return ["kiosk-devices"];
+    return ["users", "expert-requests", "kiosk-devices", "admins"]; // super
   };
 
   // Restore the last visited tab from sessionStorage.
@@ -438,21 +436,6 @@ export default function Admin() {
               </button>
             )}
 
-            {/* Kiosk Test tab — kiosk + super admins */}
-            {(user?.adminType === "kiosk" || user?.adminType === "super") && (
-              <button
-                onClick={() => handleTabChange("kiosk-test")}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === "kiosk-test"
-                    ? "border-amber-500 text-amber-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <FlaskConical className="w-4 h-4" />
-                Kiosk Test
-              </button>
-            )}
-
             {/* Admins tab — super admin only */}
             {user?.adminType === "super" && (
               <button
@@ -622,9 +605,6 @@ export default function Admin() {
         )}
         {/* ── Kiosk Devices Tab ── */}
         {activeTab === "kiosk-devices" && <KioskDevicesTab />}
-
-        {/* ── Kiosk Test Tab ── */}
-        {activeTab === "kiosk-test" && <KioskTestTab />}
 
          {/* ── Admins Tab ── */}
         {activeTab === "admins" && (

@@ -19,7 +19,6 @@ import ExpertInbox from "./pages/ExpertInbox";
 import ExpertRegistration from "./pages/ExpertRegistration";
 import Login from "./pages/Login";
 import KioskLogin from "./pages/KioskLogin";
-import MachineSimulator from "./pages/MachineSimulator";
 import KioskQR from "./pages/KioskQR";
 import EventTeam from "./pages/EventTeam";
 import EventCareAdmin from "./pages/EventCareAdmin";
@@ -45,7 +44,6 @@ function Router() {
       <Route path={"/expert-registration"} component={ExpertRegistration} />
       <Route path={"/login"} component={Login} />
       <Route path={"/kiosk-login"} component={KioskLogin} />
-      <Route path={"/machine-simulator"} component={MachineSimulator} />
       <Route path={"/kiosk-qr"} component={KioskQR} />
       <Route path={"/events/research"} component={EventResearch} />
       <Route path={"/events/team"} component={EventTeam} />

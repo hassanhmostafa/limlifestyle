@@ -71,6 +71,7 @@ beforeEach(() => {
     sessionId: 1,
     nursingEnabled: 1,
     testIds: ["oxygen_saturation"],
+    consultationMode: "physician",
     measurements: {},
     nursingCompletedAt: null,
     approvedAt: null,
@@ -319,6 +320,19 @@ describe("event basic care cycle", () => {
     ).rejects.toThrow("للطبيب");
     expect(store.updateCare).not.toHaveBeenCalled();
   });
+  it("does not let a doctor edit a visit configured for automatic recommendations", async () => {
+    care.consultationMode = "automatic";
+    care.nursingCompletedAt = new Date();
+    await expect(
+      eventTeamRouter.createCaller(ctx(8)).saveAdvice({
+        sessionId: 1,
+        confirmed: true,
+        advice: "نص طبي غير مسموح في هذا الوضع",
+        finalize: true,
+      })
+    ).rejects.toThrow("تلقائية");
+    expect(store.updateCare).not.toHaveBeenCalled();
+  });
   it("normalizes Arabic phone input and reveals only identity before confirmation", async () => {
     const result = await eventTeamRouter
       .createCaller(ctx(7))
@@ -358,19 +372,29 @@ describe("event basic care cycle", () => {
     await expect(
       eventTeamRouter
         .createCaller(ctx(7))
-        .configure({ nursingEnabled: false, testIds: [] })
+        .configure({ nursingEnabled: false, testIds: [], consultationMode: "physician" })
     ).rejects.toThrow();
     await expect(
       eventTeamRouter
         .createCaller(ctx(2, true))
-        .configure({ nursingEnabled: true, testIds: [] })
+        .configure({ nursingEnabled: true, testIds: [], consultationMode: "physician" })
     ).rejects.toThrow("اختر");
     await eventTeamRouter
       .createCaller(ctx(2, true))
-      .configure({ nursingEnabled: true, testIds: ["oxygen_saturation"] });
+      .configure({ nursingEnabled: true, testIds: ["oxygen_saturation"], consultationMode: "automatic" });
     expect(store.writeSettings).toHaveBeenCalledWith(true, [
       "oxygen_saturation",
-    ]);
+    ], "automatic");
+    await expect(
+      eventTeamRouter
+        .createCaller(ctx(2, true))
+        .configure({ nursingEnabled: false, testIds: ["oxygen_saturation"], consultationMode: "automatic" })
+    ).rejects.toThrow("يتطلب");
+    await expect(
+      eventTeamRouter
+        .createCaller(ctx(2, true))
+        .configure({ nursingEnabled: true, testIds: [], consultationMode: "automatic" })
+    ).rejects.toThrow("يتطلب");
   });
 });
 describe("manual measurements", () => {

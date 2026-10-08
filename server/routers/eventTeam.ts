@@ -18,6 +18,7 @@ import { getEventReadingByRecordNo } from "../db";
 import { normalizeSaudiMobilePhone } from "../lib/phone";
 import { nursingCatalog } from "../../shared/eventNursing";
 import { validateMeasurements } from "../../shared/eventCare";
+import { generateAutomaticRecommendationsForSession } from "../eventRecommendationEngine";
 
 const staffProcedure = publicProcedure.use(async ({ ctx, next }) => {
   const token = readStaffToken(ctx.req);
@@ -61,9 +62,15 @@ export const eventTeamRouter = router({
       z.object({
         nursingEnabled: z.boolean(),
         testIds: z.array(z.string()).max(20),
+        consultationMode: z.enum(["physician", "automatic"]),
       })
     )
     .mutation(async ({ input }) => {
+      if (input.consultationMode === "automatic" && (!input.nursingEnabled || input.testIds.length === 0))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "الوضع التلقائي يتطلب تفعيل محطة التمريض واختيار فحص واحد على الأقل للزيارات الجديدة",
+        });
       if (
         new Set(input.testIds).size !== input.testIds.length ||
         input.testIds.some(id => !nursingCatalog.some(t => t.id === id)) ||
@@ -73,7 +80,7 @@ export const eventTeamRouter = router({
           code: "BAD_REQUEST",
           message: "اختر فحوصات صحيحة لمحطة التمريض",
         });
-      await store.writeSettings(input.nursingEnabled, input.testIds);
+      await store.writeSettings(input.nursingEnabled, input.testIds, input.consultationMode);
       return { success: true };
     }),
   createTrack: superAdminProcedure
@@ -261,7 +268,10 @@ export const eventTeamRouter = router({
         false,
         ctx.assignment.trackId
       );
-      return { success: true };
+      const automatic = input.finalize && care.consultationMode === "automatic"
+        ? await generateAutomaticRecommendationsForSession(session.id)
+        : null;
+      return { success: true, automatic };
     }),
   saveAdvice: staffProcedure
     .input(
@@ -285,6 +295,11 @@ export const eventTeamRouter = router({
           message: "بانتظار نتيجة جهاز تحليل الجسم",
         });
       const care = await store.readCare(session.id);
+      if (care.consultationMode === "automatic")
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "هذه الزيارة مضبوطة على توصيات نمط الحياة التلقائية بعد اعتماد التمريض",
+        });
       if (input.finalize && care.nursingEnabled && !care.nursingCompletedAt)
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -303,5 +318,16 @@ export const eventTeamRouter = router({
         ctx.assignment.trackId
       );
       return { success: true };
+    }),
+  retryAutomaticRecommendations: staffProcedure
+    .input(z.object({ sessionId: z.number().int().positive(), confirmed: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.assignment.duty !== "nurse")
+        throw new TRPCError({ code: "FORBIDDEN", message: "للفريق التمريضي فقط" });
+      const { session } = await sessionById(input.sessionId, ctx.assignment.trackId);
+      const care = await store.readCare(session.id);
+      if (care.consultationMode !== "automatic" || !care.nursingCompletedAt)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "لا توجد توصيات تلقائية جاهزة لإعادة المحاولة" });
+      return generateAutomaticRecommendationsForSession(session.id);
     }),
 });

@@ -24,6 +24,7 @@ export default function EventPrintReport({
   care: {
     advice: string | null;
     doctorName: string | null;
+    consultationMode?: "physician" | "automatic";
     nursingCompletedAt?: unknown;
     measurements: Measurements;
     nurseNotes?: string | null;
@@ -82,7 +83,7 @@ export default function EventPrintReport({
       </div>
       <section className="lim-print-panel lim-print-advice">
         <h2>
-          توصيات الطبيب <span>{care.doctorName}</span>
+          {care.consultationMode === "automatic" ? "توصيات نمط الحياة للفعالية" : <>توصيات الطبيب <span>{care.doctorName}</span></>}
         </h2>
         <div data-doctor-advice>
           {(care.advice || "لم تُضف توصيات.").split("\n").map((line, index) => (

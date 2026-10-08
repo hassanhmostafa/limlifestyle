@@ -123,7 +123,6 @@ export default function Events() {
     },
     onError: (eventError) => setError(eventError.message),
   });
-  const generateTestMeasurement = trpc.events.generateTestMeasurement.useMutation();
   const careQuery = trpc.events.care.useQuery({ accessToken: accessToken ?? "" }, {
     enabled: Boolean(accessToken), retry: false, refetchInterval: 10000,
   });
@@ -185,7 +184,7 @@ export default function Events() {
     ...(lifestyleEnabled ? [{ id: "lifestyle", label: "تقييم نمط الحياة", hint: "نحو 10 دقائق", icon: HeartPulse, target: "lifestyle" as Screen }] : []),
     { id: "device", label: "تحليل عناصر الجسم", hint: "امسح رمز جوالك قبل القياس", icon: QrCode, target: "device" },
     ...(care?.nursingEnabled ? [{ id: "nursing", label: "محطة التمريض", hint: care.nursingCompletedAt ? "تم اعتماد القياسات" : "توجّه لمحطة التمريض", icon: HeartPulse, target: "nursing" as Screen }] : []),
-    { id: "doctor", label: "الاستشارة الطبية", hint: hasResult ? "نتائجك جاهزة للاستشارة" : "يمكن المتابعة أثناء انتظار النتيجة", icon: Stethoscope, target: "queue" },
+    { id: "doctor", label: care?.consultationMode === "automatic" ? "توصيات نمط الحياة" : "الاستشارة الطبية", hint: care?.consultationMode === "automatic" ? "تظهر بعد اعتماد التمريض" : hasResult ? "نتائجك جاهزة للاستشارة" : "يمكن المتابعة أثناء انتظار النتيجة", icon: Stethoscope, target: "queue" },
     { id: "report", label: "التقرير النهائي", hint: care?.approvedAt ? "اعتمد الطبيب التقرير" : "يظهر بعد اعتماد الطبيب", icon: FileHeart, target: "report" },
   ];
 
@@ -228,29 +227,11 @@ export default function Events() {
         if (index <= completedSteps || (target === "queue" && completedSteps >= (lifestyleEnabled ? 2 : 1))) go(target);
       }} onReset={reset} />}
       {screen === "lifestyle" && session && <LifestyleView answers={answers} sectionIndex={lifestyleIndex} setSectionIndex={setLifestyleIndex} onBack={() => go("journey")} onSave={() => saveLifestyle.mutate({ accessToken: session.token, answers: { ...answers, _questionnaireVersion: EVENT_LIFESTYLE_VERSION } })} saving={saveLifestyle.isPending} />}
-      {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} testing={generateTestMeasurement.isPending} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onViewConsultation={() => go(care?.nursingEnabled && !care.nursingCompletedAt ? "nursing" : "queue")} onGenerateTest={async () => {
-        setError("");
-        try {
-          const testUpload = await generateTestMeasurement.mutateAsync({ accessToken: session.token });
-          const uploadResponse = await fetch(`/api/kiosk/data?apiKey=${encodeURIComponent(testUpload.apiKey)}`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(testUpload.payload),
-          });
-          const uploadBody = await uploadResponse.json() as { code?: string; msg?: string };
-          if (!uploadResponse.ok || uploadBody.code !== "1") {
-            throw new Error(uploadBody.msg || "تعذر رفع نتيجة الاختبار إلى رابط بيانات الجهاز.");
-          }
-          await Promise.all([sessionQuery.refetch(), resultQuery.refetch()]);
-          toast.success("تم إرسال التقرير التجريبي عبر رابط بيانات الجهاز");
-        } catch (eventError) {
-          setError(eventError instanceof Error ? eventError.message : "تعذر إنشاء نتيجة الاختبار.");
-        }
-      }} />}
-      {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { careQuery.refetch(); sessionQuery.refetch(); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>متابعة إلى الطبيب</PrimaryButton>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
+      {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onViewConsultation={() => go(care?.nursingEnabled && !care.nursingCompletedAt ? "nursing" : "queue")} />}
+      {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : care?.consultationMode === "automatic" ? "توصيات نمط الحياة" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? care.consultationMode === "automatic" ? "اكتملت توصيات نمط الحياة للفعالية؛ يمكنك الاطلاع على التقرير الآن." : "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? care.consultationMode === "automatic" ? "تم اعتماد قياساتك؛ يجري إعداد التوصيات التثقيفية." : "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : care?.consultationMode === "automatic" ? care?.autoGenerationError || "ينتظر التقرير اعتماد قياسات التمريض ثم إعداد توصيات نمط الحياة." : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { careQuery.refetch(); sessionQuery.refetch(); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>{care?.consultationMode === "automatic" ? "متابعة حالة التقرير" : "متابعة إلى الطبيب"}</PrimaryButton>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
       {screen === "report" && session && (care?.approvedAt ? <div data-final-report data-pdf-report>
         <EventPrintReport participant={session} readings={physicalReadings} answers={session.answers} lifestyleEnabled={lifestyleEnabled} care={care} />
-        <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">نصائح الطبيب</h2><div data-doctor-advice dir="rtl" lang="ar" className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-right leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]">{care.advice}</div><p className="text-sm">اعتمدها: {care.doctorName}</p>{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
+        <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">{care.consultationMode === "automatic" ? "توصيات نمط الحياة للفعالية" : "نصائح الطبيب"}</h2><div data-doctor-advice dir="rtl" lang="ar" className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-right leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]">{care.advice}</div>{care.consultationMode !== "automatic" && <p className="text-sm">اعتمدها: {care.doctorName}</p>}{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
         <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} />
       </div> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
@@ -312,13 +293,13 @@ function LifestyleView({ answers, sectionIndex, setSectionIndex, onBack, onSave,
   </section>;
 }
 
-function DeviceView({ session, readings, loading, testing, onBack, onRefresh, onViewConsultation, onGenerateTest }: { session: StoredSession; readings: DashboardReading[]; loading: boolean; testing: boolean; onBack: () => void; onRefresh: () => void; onViewConsultation: () => void; onGenerateTest: () => Promise<void> }) {
+function DeviceView({ session, readings, loading, onBack, onRefresh, onViewConsultation }: { session: StoredSession; readings: DashboardReading[]; loading: boolean; onBack: () => void; onRefresh: () => void; onViewConsultation: () => void }) {
   const hasResult = readings.length > 0;
   if (hasResult) return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><EventBodyResults readings={readings} participant={session} /><PrimaryButton onClick={onViewConsultation} className="mt-6"><Stethoscope className="ml-2 h-5 w-5" />متابعة الرحلة<ChevronLeft className="mr-2 h-5 w-5" /></PrimaryButton></section>;
   return <section className="px-5 pb-14 pt-6"><BackButton onClick={onBack} /><div className="mb-5 rounded-[28px] border border-[#dce9e5] bg-white p-5 shadow-[0_8px_25px_rgba(18,58,52,.05)]"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dff33d] text-[#123a34]"><QrCode className="h-6 w-6" /></span><div><h1 className="text-xl font-black">رمز جوالك للفحص</h1><p className="mt-1 text-sm leading-6 text-[#6c8882]">امسح الرمز بقارئ جهاز تحليل الجسم قبل بدء القياس.</p></div></div>
     {session.deviceUserId ? <><div className="my-5 rounded-2xl border border-[#dce9e5] bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={260} level="M" includeMargin className="mx-auto h-auto w-full max-w-[260px]" /></div><p className="rounded-xl bg-[#f3f8f6] p-3 text-center text-sm leading-6 text-[#45665f]">سيظهر الرقم نفسه في خانة <b dir="ltr">ID</b> على الجهاز: <b dir="ltr" className="text-[#123a34]">{session.deviceUserId}</b></p></> : <p role="alert" className="mt-4 rounded-xl bg-[#fff0ed] p-3 text-sm text-[#a43f30]">تعذر تجهيز رمز الجهاز لهذه الجلسة.</p>}
   </div>
-  <div className="rounded-[28px] bg-[#123f37] p-6 text-white"><Activity className="h-8 w-8 text-[#dff33d]" /><h2 className="mt-4 text-xl font-black">بانتظار نتيجة الجهاز</h2><p className="mt-2 leading-7 text-[#d2e1dd]">بعد القياس يرسل X18 النتيجة مباشرة إلى نظام LIM. ستظهر هنا تلقائيًا، ويمكنك المتابعة إلى الاستشارة أثناء الانتظار.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><Button variant="outline" onClick={onRefresh} disabled={loading || testing} className="border-white/30 text-white hover:bg-white/10">{loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}تحديث النتائج</Button><Button type="button" onClick={() => void onGenerateTest()} disabled={testing || loading} className="bg-[#dff33d] text-[#123a34] hover:bg-[#d3ea2d]">{testing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}إنشاء نتيجة اختبار</Button></div><p className="mt-4 text-xs leading-5 text-[#c8dcd7]">للاختبار فقط: ينشئ هذا الزر كل قيم X18 عشوائيًا ثم يرفعها إلى نفس رابط بيانات الجهاز مع مفتاح مؤقت لهذه الجلسة. تظهر في Events وMy Health مع وسم «بيانات اختبار».</p></div>
+  <div className="rounded-[28px] bg-[#123f37] p-6 text-white"><Activity className="h-8 w-8 text-[#dff33d]" /><h2 className="mt-4 text-xl font-black">بانتظار نتيجة الجهاز</h2><p className="mt-2 leading-7 text-[#d2e1dd]">بعد القياس يرسل X18 النتيجة مباشرة إلى نظام LIM. ستظهر هنا تلقائيًا، ويمكنك المتابعة إلى الاستشارة أثناء الانتظار.</p><div className="mt-5"><Button variant="outline" onClick={onRefresh} disabled={loading} className="w-full border-white/30 text-white hover:bg-white/10">{loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Activity className="ml-2 h-4 w-4" />}تحديث النتائج</Button></div></div>
   </section>;
 }
 

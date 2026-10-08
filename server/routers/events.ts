@@ -4,7 +4,7 @@ import { otpEnabled, sendEventOtp, verifyEventOtp, consumeEventOtp } from "../ev
 import { requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
 import { listTracks, requireTrack, selectRegistrationTrack } from "../eventTracksDb";
-import { readCare } from "../eventCareDb";
+import { createCareSnapshot, readCare } from "../eventCareDb";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
@@ -18,8 +18,6 @@ import {
   updateEventParticipantSession,
 } from "../db";
 import { hashApiKey } from "../lib/apiSecurity";
-import { createEventTestMeasurement } from "../lib/eventTestMeasurement";
-import { createEventTestUploadKey } from "../lib/eventTestUpload";
 import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
 
 const EVENT_CODE = "lim-events";
@@ -125,7 +123,9 @@ export const eventsRouter = router({
       });
       if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the event session." });
 
-      await readCare(session.id);
+      // Nursing/tests and consultation mode are frozen for this visit now—not
+      // lazily when staff first open it—so admin changes affect only new visits.
+      await createCareSnapshot(session.id);
       return {
         accessToken,
         session: {
@@ -186,8 +186,11 @@ export const eventsRouter = router({
     const care = await readCare(session.id);
     return {
       nursingEnabled: Boolean(care.nursingEnabled),
+      consultationMode: care.consultationMode,
       nursingCompletedAt: care.nursingCompletedAt,
       approvedAt: care.approvedAt,
+      autoGenerationState: care.autoGenerationState,
+      autoGenerationError: care.autoGenerationError,
       // Draft advice never leaves the staff workspace.
       advice: care.approvedAt ? care.advice : null,
       doctorName: care.approvedAt ? care.doctorName : null,
@@ -213,46 +216,6 @@ export const eventsRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to finish the report." });
       }
       return { success: true, reportCompletedAt: updated.reportCompletedAt };
-    }),
-
-  /**
-   * Builds a complete X18-like payload for the QR step. The browser posts this
-   * payload to the very same `/api/kiosk/data?apiKey=…` URL used by hardware,
-   * so test mode exercises the real HTTP parser, auth gate, identity resolution,
-   * merge/save logic, and event-result linkage.
-   */
-  generateTestMeasurement: publicProcedure
-    .input(eventTokenInput)
-    .mutation(async ({ input }) => {
-      const session = await requireEventSession(input.accessToken);
-      const user = await getUserById(session.userId);
-      if (!user?.phone) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "A valid participant phone number is required for the test upload." });
-      }
-      const generated = createEventTestMeasurement();
-      const deviceNo = "EVENTS_TEST";
-      const measureTime = new Date().toISOString();
-      const payload = {
-        deviceNo,
-        unitName: "LIM Events test sender",
-        deviceModel: "LIM-EVENTS-TEST",
-        datas: [{
-          userID: toMachineUserId(user.phone),
-          recordNo: generated.recordNo,
-          name: session.displayName ?? undefined,
-          age: session.age ? String(session.age) : undefined,
-          sex: session.sex === "male" ? "1" : session.sex === "female" ? "2" : undefined,
-          measureTime,
-          ...generated.machineMetrics,
-        }],
-      };
-      const apiKey = createEventTestUploadKey({
-        userId: user.id,
-        phone: user.phone,
-        recordNo: generated.recordNo,
-        deviceNo,
-      });
-      return { apiKey, payload, recordNo: generated.recordNo, expiresInSeconds: 300 };
     }),
 
   /**

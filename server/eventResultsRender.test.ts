@@ -47,7 +47,7 @@ describe("EventBodyResults", () => {
     expect(markup).toContain("34 سنة");
   });
 
-  it("visibly labels generated QR-step reports as test data", () => {
+  it("visibly labels retained legacy test rows without providing a generator", () => {
     const markup = renderToStaticMarkup(
       createElement(EventBodyResults, { readings: [{
         id: 72,

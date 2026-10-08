@@ -46,7 +46,6 @@ import {
 } from "../lib/x18Payload";
 import { extractX18ReportedIdentity } from "../lib/x18Identity";
 import { apiKeysMatch, createDeviceApiKey, hashApiKey, readDeviceApiKey } from "../lib/apiSecurity";
-import { verifyEventTestUploadKey } from "../lib/eventTestUpload";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -283,13 +282,12 @@ async function saveX18MachinePayload(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   providedApiKey: string | undefined
 ): Promise<{ success: boolean; userId?: number; message?: string }> {
-  const isEventsTestDevice = payload.deviceNo === "EVENTS_TEST";
   const [device] = await db
     .select()
     .from(kioskDevices)
     .where(and(eq(kioskDevices.deviceId, payload.deviceNo), eq(kioskDevices.isActive, "true")));
 
-  if (!device && !isEventsTestDevice) {
+  if (!device) {
     return { success: false, message: "Device not registered or inactive." };
   }
 
@@ -344,23 +342,12 @@ async function saveX18MachinePayload(
     const incoming = extractX18Metrics(item);
     const incomingIdentity = extractX18ReportedIdentity(item);
     const recordNo = item.recordNo ?? `${payload.deviceNo}:${item.measureTime ?? Date.now()}`;
-    if (isEventsTestDevice) {
-      if (!user.phone || !verifyEventTestUploadKey(providedApiKey, {
-        userId: user.id,
-        phone: user.phone,
-        recordNo,
-        deviceNo: payload.deviceNo,
-      })) {
-        return { success: false, message: "Invalid or expired LIM Events test upload credential." };
-      }
-    } else {
-      const [settings] = await db.select().from(kioskIntegrationSettings).where(eq(kioskIntegrationSettings.id, 1));
-      if (!settings?.apiKeyHash) {
-        return { success: false, message: "Shared LIM upload credential is not configured." };
-      }
-      if (!apiKeysMatch(providedApiKey, settings.apiKeyHash)) {
-        return { success: false, message: "Invalid device upload credential." };
-      }
+    const [settings] = await db.select().from(kioskIntegrationSettings).where(eq(kioskIntegrationSettings.id, 1));
+    if (!settings?.apiKeyHash) {
+      return { success: false, message: "Shared LIM upload credential is not configured." };
+    }
+    if (!apiKeysMatch(providedApiKey, settings.apiKeyHash)) {
+      return { success: false, message: "Invalid device upload credential." };
     }
     const [existing] = await db
       .select()
@@ -381,10 +368,9 @@ async function saveX18MachinePayload(
       raw: existing?.machineMetrics ?? {},
     };
     const metrics = mergeX18Metrics(current, incoming);
-    const measurementSource: "x18" | "x18_test" = isEventsTestDevice ? "x18_test" : "x18";
     const values = {
       kioskId: device?.kioskId ?? payload.deviceNo,
-      source: measurementSource,
+      source: "x18" as const,
       sbp: parseIntOrNull(metrics.sbp) ?? null,
       dbp: parseIntOrNull(metrics.dbp) ?? null,
       hr: parseIntOrNull(metrics.hr) ?? null,
@@ -399,7 +385,7 @@ async function saveX18MachinePayload(
       patientSex: incomingIdentity.patientSex ?? existing?.patientSex ?? null,
       recordNo,
       deviceNo: payload.deviceNo,
-      notes: `${isEventsTestDevice ? "LIM Events test upload via /api/kiosk/data" : "X18_5 measurement"}${payload.deviceModel ? ` (${payload.deviceModel})` : ""}`,
+      notes: `X18_5 measurement${payload.deviceModel ? ` (${payload.deviceModel})` : ""}`,
       recordedAt: parseX18MeasurementTime(item.measureTime),
     };
 
@@ -446,42 +432,6 @@ export const kioskIntegrationRouter = router({
         });
       }
       return { machineUserId };
-    }),
-
-  /**
-   * Simulator compatibility: accepts either the retired opaque QR token or the
-   * current mobile-number QR and creates a short simulator session.
-   * The physical X18 does not call this procedure; it uploads the scanned phone
-   * in userID directly to /api/kiosk/data.
-   */
-  claimUserQR: publicProcedure
-    .input(z.object({ token: z.string().min(1), deviceId: z.string().optional() }))
-    .mutation(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const qrValue = input.token.trim();
-      if (isLIMPhoneQrToken(qrValue)) {
-        const [session] = await db.select().from(kioskSessions).where(and(eq(kioskSessions.token, qrValue), eq(kioskSessions.status, "active"), gt(kioskSessions.expiresAt, new Date())));
-        if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Token not found or expired." });
-        if (input.deviceId) await db.update(kioskSessions).set({ deviceId: input.deviceId }).where(eq(kioskSessions.id, session.id));
-        const [user] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.id, session.userId));
-        return { success: true, user: user ?? null, sessionToken: session.token };
-      }
-
-      const phone = normalizeSaudiMobilePhone(qrValue);
-      if (!phone.ok) throw new TRPCError({ code: "BAD_REQUEST", message: "QR must contain a valid Saudi mobile number." });
-      const [user] = await db.select({ id: users.id, name: users.name, phone: users.phone }).from(users).where(eq(users.phone, phone.e164));
-      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "No LIM account matches this mobile number." });
-
-      const sessionToken = crypto.randomBytes(16).toString("hex");
-      await db.insert(kioskSessions).values({
-        token: sessionToken,
-        deviceId: input.deviceId ?? "SIMULATOR",
-        userId: user.id,
-        status: "active",
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-      });
-      return { success: true, user, sessionToken };
     }),
 
   /**
@@ -539,159 +489,6 @@ export const kioskIntegrationRouter = router({
     }),
 
   /**
-   * Create a test session token for development/demo purposes.
-   * Allows testing the full kiosk login flow without a physical machine.
-   * Returns a token and the full URL to open the KioskLogin confirmation page.
-   */
-  createTestSession: protectedProcedure
-    .mutation(async ({ ctx }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-
-      const token = crypto.randomBytes(16).toString("hex");
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 min
-
-      // Insert a pending session — simulates what the machine would create
-      await db.insert(kioskSessions).values({
-        token,
-        deviceId: "TEST_DEVICE",
-        userId: ctx.user.id,
-        status: "active",
-        expiresAt,
-      });
-
-      return { token, expiresAt };
-    }),
-
-  /**
-   * Send a simulated machine measurement for the current user.
-   * Generates realistic fake health data and posts it directly to the data-upload handler,
-   * exactly as a real TRIPLEBIGHT machine would. Useful for testing the full flow without hardware.
-   */
-  sendTestMeasurement: protectedProcedure
-    .input(z.object({
-      /** Optional: provide a confirmed session token to use. If omitted, a fresh one is created. */
-      sessionToken: z.string().optional(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-
-      // If no token provided, create a fresh active session for this user
-      let token = input.sessionToken;
-      if (!token) {
-        token = crypto.randomBytes(16).toString("hex");
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-        await db.insert(kioskSessions).values({
-          token,
-          deviceId: "TEST_DEVICE",
-          userId: ctx.user.id,
-          status: "active",
-          expiresAt,
-        });
-      }
-
-      // Generate realistic randomised health metrics within normal ranges
-      const systolic  = Math.floor(Math.random() * 30 + 110);  // 110–140 mmHg
-      const diastolic = Math.floor(Math.random() * 20 + 65);   // 65–85 mmHg
-      const heartRate = Math.floor(Math.random() * 30 + 60);   // 60–90 bpm
-      const weight    = (Math.random() * 40 + 55).toFixed(1);  // 55–95 kg
-      const height    = (Math.random() * 30 + 155).toFixed(1); // 155–185 cm
-      const bmi       = (parseFloat(weight) / Math.pow(parseFloat(height) / 100, 2)).toFixed(1);
-      const temp      = (Math.random() * 1.5 + 36.0).toFixed(1); // 36.0–37.5 °C
-      const spO2      = Math.floor(Math.random() * 4 + 96);    // 96–100%
-      const bodyFat   = (Math.random() * 15 + 15).toFixed(1);  // 15–30%
-      const muscle    = (Math.random() * 15 + 35).toFixed(1);  // 35–50%
-      const bloodSugar = (Math.random() * 2.5 + 4.0).toFixed(1); // 4.0–6.5 mmol/L
-
-      // Build the exact payload the machine would send
-      const machinePayload = {
-        sessionToken: token,
-        deviceID: "TEST_DEVICE",
-        examNo: `TEST-${Date.now()}`,
-        hw: {
-          height: String(height),
-          weight: String(weight),
-          bmi: String(bmi),
-        },
-        blood: {
-          high: String(systolic),
-          low: String(diastolic),
-          rate: String(heartRate),
-        },
-        spo2: { sp: String(spO2) },
-        tiwen: String(temp),
-        fat: {
-          zflv: String(bodyFat),
-          jrlv: String(muscle),
-          nzzf: String(Math.floor(Math.random() * 5 + 5)),
-          jcdx: String(Math.floor(Math.random() * 400 + 1400)),
-          tsflv: String((Math.random() * 10 + 50).toFixed(1)),
-          dbzlv: String((Math.random() * 5 + 15).toFixed(1)),
-          gl: String((Math.random() * 1 + 2.5).toFixed(1)),
-        },
-        xt: { value: String(bloodSugar) },
-        ytb: {
-          waist: String((Math.random() * 20 + 70).toFixed(1)),
-          hip: String((Math.random() * 15 + 85).toFixed(1)),
-          whr: String((Math.random() * 0.15 + 0.75).toFixed(2)),
-        },
-      };
-
-      // Persist one clearly labeled simulator record. The second machine-to-phone
-      // QR transfer has been removed from the production workflow.
-      const [session] = await db.select().from(kioskSessions).where(and(
-        eq(kioskSessions.token, token),
-        gt(kioskSessions.expiresAt, new Date())
-      ));
-      if (!session || session.userId !== ctx.user.id) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Session not found or expired.",
-        });
-      }
-
-      await db.insert(healthReadings).values({
-        userId: session.userId,
-        kioskId: "SIMULATOR",
-        source: "simulator",
-        sbp: systolic,
-        dbp: diastolic,
-        hr: heartRate,
-        weight,
-        height,
-        bmi,
-        temperature: temp,
-        machineMetrics: {
-          spO2: String(spO2),
-          fatRate: String(bodyFat),
-          muscleRate: String(muscle),
-          bloodSugar: String(bloodSugar),
-        },
-        notes: "Simulator measurement — excluded from the physical X18 health history.",
-        recordedAt: new Date(),
-      });
-      await db.update(kioskSessions).set({ status: "used" }).where(eq(kioskSessions.id, session.id));
-
-      return {
-        success: true,
-        metrics: {
-          height: parseFloat(height),
-          weight: parseFloat(weight),
-          bmi: parseFloat(bmi),
-          systolic,
-          diastolic,
-          heartRate,
-          temperature: parseFloat(temp),
-          spO2,
-          bodyFatRate: parseFloat(bodyFat),
-          muscleRate: parseFloat(muscle),
-          bloodSugar: parseFloat(bloodSugar),
-        },
-      };
-    }),
-
-  /**
    * Create a kiosk session manually (used by admin test panel or direct device pairing).
    */
   createSession: protectedProcedure
@@ -729,93 +526,6 @@ export const kioskIntegrationRouter = router({
       });
 
       return { token, expiresAt };
-    }),
-
-  /**
-   * Machine Simulator: Generate a fresh pending session token (simulates what the machine does
-   * when the user touches the screen). Returns the token and the QR URL to display.
-   * The token starts as "pending" — it becomes "active" once the user scans and confirms.
-   */
-  generateMachineToken: protectedProcedure
-    .input(z.object({
-      deviceId: z.string().optional(),
-    }))
-    .mutation(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-
-      const token = crypto.randomBytes(8).toString("hex"); // short, like the protocol example
-      const expiresAt = new Date(Date.now() + 60 * 1000); // 60 seconds, as per protocol
-
-      await db.insert(kioskSessions).values({
-        token,
-        deviceId: input.deviceId ?? "SIMULATOR",
-        userId: 0, // placeholder — will be set when user confirms
-        status: "pending",
-        expiresAt,
-      });
-
-      return { token, expiresAt };
-    }),
-
-  /**
-   * Machine Simulator: Poll whether a token has been claimed by a user.
-   * Mirrors what the machine does by calling GET /weixin/login/xcx?token=...
-   * Returns the user info if confirmed, or null if still pending/expired.
-   */
-  pollSessionStatus: protectedProcedure
-    .input(z.object({ token: z.string() }))
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { confirmed: false, user: null };
-
-      const [session] = await db
-        .select()
-        .from(kioskSessions)
-        .where(eq(kioskSessions.token, input.token));
-
-      if (!session) return { confirmed: false, user: null, expired: true };
-      if (new Date() > session.expiresAt) return { confirmed: false, user: null, expired: true };
-      if (session.status !== "active" || !session.userId || session.userId === 0) {
-        return { confirmed: false, user: null, expired: false };
-      }
-
-      const [user] = await db
-        .select({ id: users.id, name: users.name, phone: users.phone })
-        .from(users)
-        .where(eq(users.id, session.userId));
-
-      return {
-        confirmed: true,
-        expired: false,
-        user: user ?? null,
-      };
-    }),
-
-  /**
-   * Guest Mode: Generate realistic health metrics without saving to the database.
-   * Used by the machine simulator when a user chooses to measure without an account.
-   * Results are only shown on-screen and can be printed — never persisted.
-   */
-  guestMeasurement: protectedProcedure
-    .mutation(async () => {
-      // Generate realistic randomised health metrics — same ranges as sendTestMeasurement
-      const systolic  = Math.floor(Math.random() * 30 + 110);
-      const diastolic = Math.floor(Math.random() * 20 + 65);
-      const heartRate = Math.floor(Math.random() * 30 + 60);
-      const weight    = parseFloat((Math.random() * 40 + 55).toFixed(1));
-      const height    = parseFloat((Math.random() * 30 + 155).toFixed(1));
-      const bmi       = parseFloat((weight / Math.pow(height / 100, 2)).toFixed(1));
-      const temp      = parseFloat((Math.random() * 1.5 + 36.0).toFixed(1));
-      const spO2      = Math.floor(Math.random() * 4 + 96);
-      const bodyFat   = parseFloat((Math.random() * 15 + 15).toFixed(1));
-      const muscle    = parseFloat((Math.random() * 15 + 35).toFixed(1));
-      const bloodSugar = parseFloat((Math.random() * 2.5 + 4.0).toFixed(1));
-
-      // Nothing is saved to the database — caller is responsible for display/print only
-      return {
-        metrics: { height, weight, bmi, systolic, diastolic, heartRate, temperature: temp, spO2, bodyFatRate: bodyFat, muscleRate: muscle, bloodSugar },
-      };
     }),
 
   /**

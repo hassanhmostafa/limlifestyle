@@ -1,4 +1,5 @@
 import * as otp from "./eventOtp";
+import { readFileSync } from "node:fs";
 vi.mock("./eventOtp", async importOriginal => ({ ...await importOriginal<typeof import("./eventOtp")>(), consumeEventOtp: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
@@ -8,8 +9,8 @@ import { requireOpenEvent } from "./eventAdminDb";
 vi.mock("./eventAdminDb", () => ({ requireOpenEvent: vi.fn() }));
 import * as tracks from "./eventTracksDb";
 vi.mock("./eventTracksDb", () => ({ selectRegistrationTrack: vi.fn(), requireTrack: vi.fn(), listTracks: vi.fn() }));
-import { readCare } from "./eventCareDb";
-vi.mock("./eventCareDb", () => ({ readCare: vi.fn() }));
+import { createCareSnapshot, readCare } from "./eventCareDb";
+vi.mock("./eventCareDb", () => ({ readCare: vi.fn(), createCareSnapshot: vi.fn() }));
 
 vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
@@ -59,7 +60,8 @@ beforeEach(() => {
   vi.mocked(otp.consumeEventOtp).mockResolvedValue(undefined);
   vi.mocked(requireOpenEvent).mockResolvedValue({questionnaireIds:["lifestyle"],closed:0} as never);
   vi.mocked(tracks.selectRegistrationTrack).mockResolvedValue({ id: 1, name: "المسار 1", eventCode: "lim-events", active: 1 });
-  vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, approvedAt: null } as never);
+  vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: null } as never);
+  vi.mocked(createCareSnapshot).mockResolvedValue({ nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: null } as never);
   mockedDb.getUserByPhone.mockResolvedValue({
     id: 42, openId: "phone:+966501234567", name: "Event Participant", phone: "+966501234567", email: null,
     loginMethod: "machine_phone_pending", passwordHash: null, role: "user", adminType: null, specialty: null, bio: null,
@@ -103,6 +105,7 @@ describe("standalone events.createSession", () => {
       consentVersion: "events-service-2026-10-05",
       consentedAt: expect.any(Date),
     }));
+    expect(createCareSnapshot).toHaveBeenCalledWith(eventSession.id);
   });
 
   it("rejects a stale consent text version instead of recording ambiguous consent", async () => {
@@ -165,27 +168,10 @@ describe("standalone events results", () => {
     expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(42, "EVENT-RECORD-1");
   });
 
-  it("builds a short-lived key and complete X18 payload for the real upload URL", async () => {
-    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
-
-    const caller = appRouter.createCaller(anonymousContext);
-    const result = await caller.events.generateTestMeasurement({ accessToken: "z".repeat(43) });
-
-    expect(result.recordNo).toMatch(/^EVENT-TEST-/);
-    expect(result.expiresInSeconds).toBe(300);
-    expect(result.apiKey).toMatch(/^lim_event_test\./);
-    expect(result.payload).toMatchObject({
-      deviceNo: "EVENTS_TEST",
-      deviceModel: "LIM-EVENTS-TEST",
-      datas: [expect.objectContaining({
-        userID: "0501234567",
-        recordNo: result.recordNo,
-        fatRate: expect.any(String),
-        muscleRightArm: expect.any(String),
-        waterICW: expect.any(String),
-        sbp: expect.any(String),
-      })],
-    });
+  it("does not expose a synthetic Events measurement generation procedure", () => {
+    const source = readFileSync(new URL("./routers/events.ts", import.meta.url), "utf8");
+    expect(source).not.toContain("generateTestMeasurement");
+    expect(source).not.toContain("EVENTS_TEST");
   });
 
   it("rejects a missing or unknown event token", async () => {

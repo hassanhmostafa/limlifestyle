@@ -120,6 +120,13 @@
       "when": 1791163200000,
       "tag": "0016_event_consent_version",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1791733200000,
+      "tag": "0017_events_auto_recommendations",
+      "breakpoints": true
     }
   ]
 }

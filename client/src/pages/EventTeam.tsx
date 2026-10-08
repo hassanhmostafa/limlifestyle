@@ -55,6 +55,10 @@ export default function EventTeam() {
     onSuccess: saved,
     onError: e => setMessage(e.message),
   });
+  const retryAutomatic = trpc.eventTeam.retryAutomaticRecommendations.useMutation({
+    onSuccess: saved,
+    onError: e => setMessage(e.message),
+  });
   const care = record.data?.care;
   const lastLoaded = useRef<{ sessionId: number | undefined; care: typeof care } | null>(null);
   useEffect(() => {
@@ -66,7 +70,7 @@ export default function EventTeam() {
     setAdvice(current => changedParticipant || current === (previous?.care?.advice ?? "") ? care?.advice ?? "" : current);
     lastLoaded.current = { sessionId: participant?.id, care };
   }, [care, participant?.id]);
-  const pending = nursing.isPending || doctor.isPending;
+  const pending = nursing.isPending || doctor.isPending || retryAutomatic.isPending;
   return (
     <main dir="rtl" className="min-h-screen bg-[#f3f8f6] p-5 text-[#123a34]">
       <div className="mx-auto max-w-3xl space-y-5">
@@ -379,8 +383,20 @@ export default function EventTeam() {
                             </button>
                           </div>
                         )}
+                        {care.consultationMode === "automatic" && Boolean(care.nursingCompletedAt) && (
+                          <section className="rounded-2xl bg-[#f3f8f6] p-4">
+                            <h2 className="font-bold">توصيات نمط الحياة للفعالية</h2>
+                            {care.autoGenerationState === "generated" ? <><p className="mt-2 text-sm">تم إنشاء التقرير وإتاحته للمستفيد. لا توجد توصيات طبية أو اسم طبيب في هذا الوضع.</p>{Array.isArray(care.recommendationMeta?.sourceIds) && <p className="mt-2 text-xs text-slate-600">مصادر المراجعة الداخلية: {(care.recommendationMeta.sourceIds as string[]).join("، ")}</p>}</> : <><p className="mt-2 text-sm">{care.autoGenerationError || "يجري إعداد توصيات نمط الحياة المسموح بها لهذه الزيارة."}</p><button className={`${buttonClass} mt-3`} disabled={pending || care.autoGenerationState === "generating" || (care.autoGenerationAttempts ?? 0) >= 2} onClick={() => retryAutomatic.mutate({ sessionId: participant.id, confirmed: true })}>{retryAutomatic.isPending ? "جارٍ إعادة المحاولة…" : "إعادة محاولة إنشاء التوصيات"}</button></>}
+                          </section>
+                        )}
                       </>
                     )}
+                  </section>
+                ) : care.consultationMode === "automatic" ? (
+                  <section className="rounded-2xl bg-white p-5">
+                    <h2 className="font-bold">زيارة بتوصيات نمط حياة تلقائية</h2>
+                    <p className="mt-2 leading-7">تحتاج هذه الزيارة إلى اعتماد التمريض أولًا. بعد ذلك تظهر للمستفيد توصيات تثقيفية مقيدة بالمصادر المعتمدة، ولا تتطلب اعتماد طبيب أو اسم طبيب.</p>
+                    {care.autoGenerationState === "generated" && <p className="mt-3 rounded-xl bg-lime-50 p-3">تم إنشاء التقرير وإتاحته للمستفيد.</p>}
                   </section>
                 ) : (
                   <>
