@@ -47,6 +47,21 @@ const baseCare = {
 describe("Events automatic recommendation lease", () => {
   beforeEach(() => vi.resetAllMocks());
 
+  it("allows body-only automatic reports when nursing is disabled", async () => {
+    const { db, updates } = fakeDatabase([session, { ...baseCare, nursingEnabled: 0, nursingCompletedAt: null }]);
+    getDb.mockResolvedValue(db);
+    const result = await claimAutomaticRecommendationGeneration(9, { fingerprint: "same", inputRevision: 4, recordNo: "R1" });
+    expect(result.state).toBe("claimed");
+    expect(updates).toHaveLength(1);
+  });
+
+  it("waits for nursing when that station is enabled", async () => {
+    const { db, updates } = fakeDatabase([session, { ...baseCare, nursingCompletedAt: null }]);
+    getDb.mockResolvedValue(db);
+    expect(await claimAutomaticRecommendationGeneration(9, { fingerprint: "same", inputRevision: 4, recordNo: "R1" })).toEqual({ state: "waiting_for_nursing" });
+    expect(updates).toHaveLength(0);
+  });
+
   it("reclaims an expired crash lease and marks a fresh attempt token", async () => {
     const { db, updates } = fakeDatabase([
       session,

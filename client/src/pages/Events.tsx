@@ -127,6 +127,19 @@ export default function Events() {
     enabled: Boolean(accessToken), retry: false, refetchInterval: 10000,
   });
   const care = careQuery.data;
+  const recommendations = trpc.events.ensureRecommendations.useMutation({
+    onSuccess: () => { careQuery.refetch(); sessionQuery.refetch(); },
+    onError: eventError => setError(eventError.message),
+  });
+  useEffect(() => {
+    if (accessToken && care?.consultationMode === "automatic" && !care.approvedAt
+      && (!care.nursingEnabled || care.nursingCompletedAt)
+      && resultQuery.data?.readings.length && care.autoGenerationState === "not_requested"
+      && !recommendations.isPending && !recommendations.isError) {
+      recommendations.mutate({ accessToken });
+    }
+  }, [accessToken, care, resultQuery.data, recommendations.isPending, recommendations.isError]);
+
   const completeReport = trpc.events.completeReport.useMutation({
     onSuccess: async () => {
       await sessionQuery.refetch();
@@ -184,7 +197,7 @@ export default function Events() {
     ...(lifestyleEnabled ? [{ id: "lifestyle", label: "تقييم نمط الحياة", hint: "نحو 10 دقائق", icon: HeartPulse, target: "lifestyle" as Screen }] : []),
     { id: "device", label: "تحليل عناصر الجسم", hint: "امسح رمز جوالك قبل القياس", icon: QrCode, target: "device" },
     ...(care?.nursingEnabled ? [{ id: "nursing", label: "محطة التمريض", hint: care.nursingCompletedAt ? "تم اعتماد القياسات" : "توجّه لمحطة التمريض", icon: HeartPulse, target: "nursing" as Screen }] : []),
-    { id: "doctor", label: care?.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "الاستشارة الطبية", hint: care?.consultationMode === "automatic" ? "تظهر بعد اعتماد التمريض" : hasResult ? "نتائجك جاهزة للاستشارة" : "يمكن المتابعة أثناء انتظار النتيجة", icon: Stethoscope, target: "queue" },
+    { id: "doctor", label: care?.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "الاستشارة الطبية", hint: care?.consultationMode === "automatic" ? care.nursingEnabled ? "تظهر بعد اعتماد التمريض" : "تظهر بعد تحليل الجسم" : hasResult ? "نتائجك جاهزة للاستشارة" : "يمكن المتابعة أثناء انتظار النتيجة", icon: Stethoscope, target: "queue" },
     { id: "report", label: "التقرير النهائي", hint: care?.approvedAt ? care.consultationMode === "automatic" ? "التوصيات جاهزة" : "اعتمد الطبيب التقرير" : care?.consultationMode === "automatic" ? "يظهر بعد اكتمال التوصيات" : "يظهر بعد اعتماد الطبيب", icon: FileHeart, target: "report" },
   ];
 
@@ -228,7 +241,7 @@ export default function Events() {
       }} onReset={reset} />}
       {screen === "lifestyle" && session && <LifestyleView answers={answers} sectionIndex={lifestyleIndex} setSectionIndex={setLifestyleIndex} onBack={() => go("journey")} onSave={() => saveLifestyle.mutate({ accessToken: session.token, answers: { ...answers, _questionnaireVersion: EVENT_LIFESTYLE_VERSION } })} saving={saveLifestyle.isPending} />}
       {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onViewConsultation={() => go(care?.nursingEnabled && !care.nursingCompletedAt ? "nursing" : "queue")} />}
-      {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : care?.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? care.consultationMode === "automatic" ? "اكتملت التوصيات التثقيفية؛ يمكنك الاطلاع على التقرير الآن." : "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? care.consultationMode === "automatic" ? "تم اعتماد قياساتك؛ يجري إعداد التوصيات التثقيفية." : "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : care?.consultationMode === "automatic" ? care?.autoGenerationError || "ينتظر التقرير اعتماد قياسات التمريض ثم إعداد توصيات نمط حياة صحي." : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { careQuery.refetch(); sessionQuery.refetch(); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>{care?.consultationMode === "automatic" ? "متابعة حالة التقرير" : "متابعة إلى الطبيب"}</PrimaryButton>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
+      {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : care?.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? care.consultationMode === "automatic" ? "اكتملت التوصيات التثقيفية؛ يمكنك الاطلاع على التقرير الآن." : "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? care.consultationMode === "automatic" ? "تم اعتماد قياساتك؛ يجري إعداد التوصيات التثقيفية." : "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : care?.consultationMode === "automatic" ? care?.autoGenerationError || care.nursingEnabled && !care.nursingCompletedAt ? "ينتظر التقرير اعتماد قياسات التمريض." : "يجري إعداد توصيات نمط حياة صحي للتقرير." : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { careQuery.refetch(); sessionQuery.refetch(); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>{care?.consultationMode === "automatic" ? "متابعة حالة التقرير" : "متابعة إلى الطبيب"}</PrimaryButton>}{care?.consultationMode === "automatic" && !care.approvedAt && (!care.nursingEnabled || care.nursingCompletedAt) && <Button disabled={recommendations.isPending} onClick={() => recommendations.mutate({ accessToken: session.token })}>إعداد التوصيات وإعادة المحاولة</Button>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
       {screen === "report" && session && (care?.approvedAt ? <div data-final-report data-pdf-report>
         <EventPrintReport participant={session} readings={physicalReadings} answers={session.answers} lifestyleEnabled={lifestyleEnabled} care={care} />
         <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">{care.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "نصائح الطبيب"}</h2><div data-doctor-advice dir="rtl" lang="ar" className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-right leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]">{care.advice}</div>{care.consultationMode !== "automatic" && <p className="text-sm">اعتمدها: {care.doctorName}</p>}{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
@@ -316,7 +329,7 @@ function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, on
         It prevents the report's extra padded card from reflowing the anatomy stage. */}
     {readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}
     <p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p>
-    <div className="mt-5"><EventPdfButton filename={`lim-final-${session.code}.pdf`} className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white" /></div>
+    <div className="mt-5"><EventPdfButton filename={`lim-final-${session.code}.pdf`} shareable className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white" /></div>
     <PrimaryButton disabled={finishing || Boolean(session.reportCompletedAt)} onClick={onFinish} className="mt-4 print:hidden">{finishing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />}{session.reportCompletedAt ? "اكتملت الرحلة" : "إنهاء الرحلة"}</PrimaryButton>
   </section>;
 }

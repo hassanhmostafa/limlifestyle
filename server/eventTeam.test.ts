@@ -353,7 +353,7 @@ describe("event basic care cycle", () => {
         finalize: true,
       expectedRevision: 1,
       })
-    ).rejects.toThrow("تلقائية");
+    ).rejects.toThrow("دون محطة طبيب");
     expect(store.updateCare).not.toHaveBeenCalled();
   });
   it("rejects two stale staff editors and retains the first saved draft", async () => {
@@ -450,16 +450,14 @@ describe("event basic care cycle", () => {
     expect(store.writeSettings).toHaveBeenCalledWith(true, [
       "oxygen_saturation",
     ], "automatic");
-    await expect(
-      eventTeamRouter
-        .createCaller(ctx(2, true))
-        .configure({ nursingEnabled: false, testIds: ["oxygen_saturation"], consultationMode: "automatic" })
-    ).rejects.toThrow("يتطلب");
+    await eventTeamRouter.createCaller(ctx(2, true))
+      .configure({ nursingEnabled: false, testIds: [], consultationMode: "automatic" });
+    expect(store.writeSettings).toHaveBeenCalledWith(false, [], "automatic");
     await expect(
       eventTeamRouter
         .createCaller(ctx(2, true))
         .configure({ nursingEnabled: true, testIds: [], consultationMode: "automatic" })
-    ).rejects.toThrow("يتطلب");
+    ).rejects.toThrow("اختر");
   });
 });
 describe("manual measurements", () => {

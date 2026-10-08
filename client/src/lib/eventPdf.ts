@@ -43,7 +43,7 @@ export function appendTextLineRectangles(
   keepTogether.push(...Array.from(renderedLines.values()));
 }
 
-export async function downloadEventPdf(element: HTMLElement, filename: string) {
+export async function createEventPdf(element: HTMLElement) {
   const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
     import("html2canvas"),
     import("jspdf"),
@@ -297,5 +297,10 @@ export async function downloadEventPdf(element: HTMLElement, filename: string) {
     top = bottom;
   }
   canvas.width = canvas.height = 0;
+  return pdf;
+}
+
+export async function downloadEventPdf(element: HTMLElement, filename: string) {
+  const pdf = await createEventPdf(element);
   pdf.save(filename);
 }

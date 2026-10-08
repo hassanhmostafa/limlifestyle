@@ -52,9 +52,9 @@ export default function EventAdminPanel(){
       <label className="block">الجهة المنظمة<input required maxLength={255} className={input} value={form.organizer} onChange={e=>setForm({...form,organizer:e.target.value})}/></label>
       <h2 className="flex items-center gap-2 pt-4 text-xl font-bold"><ClipboardList/>الاستبيانات</h2>
       <div className="rounded-2xl border border-emerald-100 bg-[#f8fbfa] p-4">
-        <p className="font-bold">بدون استبيان</p>
+        <label className="flex items-center gap-3 font-bold"><input type="checkbox" checked={form.questionnaireIds.length > 0} onChange={e=>setForm({...form,questionnaireIds:e.target.checked?['lifestyle']:[]})}/>تفعيل الاستبيانات</label>
         <p className="mt-1 text-sm text-slate-600">تبدأ الزيارات الجديدة بتحليل الجسم بعد التسجيل، ولن تظهر أسئلة أو إجابات الاستبيان للطبيب لهذه الزيارات.</p>
-        <button type="button" className="mt-3 rounded-xl border border-[#123f37] px-4 py-2 font-bold text-[#123f37] disabled:opacity-40" disabled={!form.questionnaireIds.length} onClick={()=>setForm({...form,questionnaireIds:[]})}>تفعيل بدون استبيان</button>
+        <button type="button" className="mt-3 rounded-xl border border-[#123f37] px-4 py-2 font-bold text-[#123f37] disabled:opacity-40" disabled={!form.questionnaireIds.length} onClick={()=>setForm({...form,questionnaireIds:[]})}>إيقاف جميع الاستبيانات</button>
       </div>
       <label className="block">إضافة استبيان<select className={input} value="" onChange={e=>{if(e.target.value==='lifestyle')setForm({...form,questionnaireIds:['lifestyle']});}}><option value="">اختر الاستبيان</option>{catalog.map(q=><option key={q.id} value={q.id} disabled={!q.ready||form.questionnaireIds.includes(q.id as 'lifestyle')}>{q.name}{!q.ready?' — بانتظار اعتماد النموذج':''}</option>)}</select></label>
       <div className="flex flex-wrap gap-2">{form.questionnaireIds.length ? form.questionnaireIds.map(id=><span key={id} className="rounded-full bg-emerald-50 px-4 py-2">استبيان نمط الحياة مفعّل</span>) : <span className="rounded-full bg-amber-50 px-4 py-2">لا يوجد استبيان للزيارات الجديدة</span>}</div>

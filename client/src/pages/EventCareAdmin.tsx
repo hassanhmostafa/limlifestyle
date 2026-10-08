@@ -74,6 +74,13 @@ export default function EventCareAdmin() {
             <EventAdminPanel />
             <EventResearchAdmin />
             <section className="space-y-4 rounded-3xl bg-white p-6">
+              <fieldset className="space-y-3 rounded-2xl bg-[#f3f8f6] p-4">
+                <legend className="font-bold">هل يوجد طبيب؟</legend>
+                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "physician"} onChange={() => setConsultationMode("physician")} /><span><strong>نعم</strong> — يراجع الطبيب النتيجة، ويمكنه إعداد مسودة خاصة ثم تعديلها واعتمادها صراحةً باسم الطبيب.</span></label>
+                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "automatic"} onChange={() => setConsultationMode("automatic")} /><span><strong>لا</strong> — بعد تحليل الجسم وإكمال المحطات المفعّلة، ينشئ النظام توصيات تثقيفية مقيدة بالمصادر دون اسم طبيب.</span></label>
+                {consultationMode === "automatic" && <p className="text-sm text-[#526f68]">وجود الطبيب مستقل عن محطة التمريض. يختار النظام من توصيات معتمدة مسبقًا فقط، وتبقى تفاصيل المصادر في مساحة الفريق والأدمن.</p>}
+              </fieldset>
+              <h2 className="text-xl font-bold">محطة التمريض</h2>
               <label className="flex gap-3 text-lg font-bold">
                 <input
                   type="checkbox"
@@ -83,15 +90,10 @@ export default function EventCareAdmin() {
                 إظهار محطة التمريض ضمن رحلة المستفيد
               </label>
               <p>
-                عند إخفائها ينتقل المستفيد من تحليل الجسم إلى الطبيب. الإعدادات
+                عند إخفائها ينتقل المستفيد من تحليل الجسم إلى الطبيب أو التقرير بحسب خيار وجود الطبيب. الإعدادات
                 تُحفظ لكل زيارة؛ التعديل يسري على الزيارات الجديدة.
               </p>
-              <fieldset className="space-y-3 rounded-2xl bg-[#f3f8f6] p-4">
-                <legend className="font-bold">هل يوجد طبيب؟</legend>
-                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "physician"} onChange={() => setConsultationMode("physician")} /><span><strong>نعم</strong> — يراجع الطبيب النتيجة، ويمكنه إعداد مسودة خاصة ثم تعديلها واعتمادها صراحةً باسم الطبيب.</span></label>
-                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "automatic"} onChange={() => { setConsultationMode("automatic"); setEnabled(true); }} /><span><strong>لا</strong> — بعد تحليل الجسم وإكمال التمريض، ينشئ النظام توصيات تثقيفية مقيدة بالمصادر دون اسم طبيب.</span></label>
-                {consultationMode === "automatic" && <p className="text-sm text-[#526f68]">لا يتاح هذا الوضع من دون محطة تمريض وفحص واحد على الأقل. يختار النظام من توصيات معتمدة مسبقًا فقط، وتبقى تفاصيل المصادر في مساحة الفريق والأدمن.</p>}
-              </fieldset>
+
               <label className="block">
                 إضافة فحص
                 <select
@@ -129,7 +131,7 @@ export default function EventCareAdmin() {
                   configure.mutate({ nursingEnabled: enabled, testIds: ids, consultationMode })
                 }
               >
-                حفظ إعدادات التمريض
+                حفظ إعدادات الطبيب والتمريض
               </button>
             </section>
             <section className="space-y-4 rounded-3xl bg-white p-6">

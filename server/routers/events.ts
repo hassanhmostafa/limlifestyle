@@ -1,3 +1,4 @@
+import { generateAutomaticRecommendationsForSession } from "../eventRecommendationEngine";
 import { EVENT_LIFESTYLE_VERSION, revisedLifestyleComplete } from "../../shared/eventLifestyle";
 import { EVENT_CONSENT_VERSION } from "../../shared/eventConsent";
 import { otpEnabled, sendEventOtp, verifyEventOtp, consumeEventOtp } from "../eventOtp";
@@ -190,6 +191,10 @@ export const eventsRouter = router({
   // Retained for old clients; only the assigned doctor may approve via eventTeam.
   completeConsultation: publicProcedure.input(eventTokenInput).mutation(() => {
     throw new TRPCError({ code: "FORBIDDEN", message: "يعتمد الطبيب الاستشارة من صفحة الفريق" });
+  }),
+  ensureRecommendations: publicProcedure.input(eventTokenInput).mutation(async ({ input }) => {
+    const session = await requireEventSession(input.accessToken);
+    return generateAutomaticRecommendationsForSession(session.id);
   }),
   care: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);

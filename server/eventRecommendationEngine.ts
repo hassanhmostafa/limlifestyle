@@ -383,7 +383,7 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
     return { state: error instanceof Error && error.message.includes("completed body-composition") ? "waiting_for_body" : "failed" };
   }
   if (context.care.consultationMode !== "automatic") return { state: "not_applicable" };
-  if (!context.care.nursingCompletedAt) return { state: "waiting_for_nursing" };
+  if (context.care.nursingEnabled && !context.care.nursingCompletedAt) return { state: "waiting_for_nursing" };
   const claimed = await claimAutomaticRecommendationGeneration(sessionId, {
     fingerprint: context.fingerprint,
     inputRevision: context.care.revision,
@@ -433,7 +433,7 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
     await failAutomaticRecommendationGeneration(
       sessionId,
       claimed.attemptToken,
-      "تعذر إعداد توصيات نمط الحياة. يمكن للفريق إعادة المحاولة من صفحة التمريض."
+      "تعذر إعداد توصيات نمط الحياة. أعد المحاولة من صفحة التقرير."
     );
     return { state: "failed" };
   }

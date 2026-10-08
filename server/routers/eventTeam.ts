@@ -69,11 +69,6 @@ export const eventTeamRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      if (input.consultationMode === "automatic" && (!input.nursingEnabled || input.testIds.length === 0))
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "الوضع التلقائي يتطلب تفعيل محطة التمريض واختيار فحص واحد على الأقل للزيارات الجديدة",
-        });
       if (
         new Set(input.testIds).size !== input.testIds.length ||
         input.testIds.some(id => !nursingCatalog.some(t => t.id === id)) ||
@@ -305,7 +300,7 @@ export const eventTeamRouter = router({
       if (care.consultationMode === "automatic")
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "هذه الزيارة مضبوطة على توصيات نمط الحياة التلقائية بعد اعتماد التمريض",
+          message: "هذه الزيارة مضبوطة على توصيات نمط الحياة دون محطة طبيب",
         });
       if (input.finalize && care.nursingEnabled && !care.nursingCompletedAt)
         throw new TRPCError({

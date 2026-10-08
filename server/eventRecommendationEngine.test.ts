@@ -65,6 +65,21 @@ describe("automatic Events recommendations", () => {
     invoke.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ suggestionIds: ["measurement-followup", "small-goal"] }) } }] });
   });
 
+  it("generates without nursing when nursing is disabled", async () => {
+    readCare.mockReset();
+    readCare.mockResolvedValueOnce({ ...care, nursingEnabled: 0, nursingCompletedAt: null })
+      .mockResolvedValue({ ...care, nursingEnabled: 0, nursingCompletedAt: null, revision: 5 });
+    expect(await generateAutomaticRecommendationsForSession(1)).toEqual({ state: "generated", mode: "automatic" });
+    expect(complete).toHaveBeenCalled();
+  });
+
+  it("keeps enabled nursing mandatory before automatic publication", async () => {
+    readCare.mockReset();
+    readCare.mockResolvedValue({ ...care, nursingCompletedAt: null });
+    expect(await generateAutomaticRecommendationsForSession(1)).toEqual({ state: "waiting_for_nursing" });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it("uses only the structured allowlist and never forwards free-text nursing notes", async () => {
     readCare.mockReset();
     readCare.mockResolvedValue({ ...care, revision: 5, autoGenerationState: "generating", measurements: { blood_pressure: { systolic: "130", diastolic: "80" }, notes: { notes: "DO NOT FORWARD" }, bone_screening: { device: "DO NOT FORWARD" } } });

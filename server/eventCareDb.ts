@@ -233,7 +233,7 @@ export async function claimAutomaticRecommendationGeneration(
       .for("update");
     if (!session || !care || care.consultationMode !== "automatic")
       return { state: "not_applicable" };
-    if (!session.latestRecordNo || !care.nursingEnabled || !care.nursingCompletedAt)
+    if (!session.latestRecordNo || (care.nursingEnabled && !care.nursingCompletedAt))
       return { state: "waiting_for_nursing" };
     if (care.approvedAt || care.autoGenerationState === "generated")
       return { state: "already_generated" };

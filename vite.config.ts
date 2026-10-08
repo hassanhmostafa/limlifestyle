@@ -152,6 +152,16 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
+function resolveBuildId() {
+  if (process.env.GIT_COMMIT) return process.env.GIT_COMMIT;
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    // Production build containers may intentionally omit git metadata.
+    return process.env.BUILD_ID ?? "unknown";
+  }
+}
+
 const plugins = [
   react(),
   tailwindcss(),
@@ -205,9 +215,7 @@ const plugins = [
 
 export default defineConfig({
   define: {
-    __LIM_BUILD_ID__: JSON.stringify(
-      process.env.GIT_COMMIT ?? execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim()
-    ),
+    __LIM_BUILD_ID__: JSON.stringify(resolveBuildId()),
   },
   plugins,
   resolve: {
