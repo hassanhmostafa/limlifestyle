@@ -92,17 +92,28 @@ export default function EventPdfButton({
       return;
     }
     setError("");
-    if (navigator.canShare?.({ files: [report.file] })) {
+    let canShareFiles = false;
+    try {
+      canShareFiles = Boolean(navigator.canShare?.({ files: [report.file] }));
+    } catch {
+      canShareFiles = false;
+    }
+    if (!canShareFiles) {
+      saveFile(report.file);
+      setError("تم تنزيل التقرير. أرفقه في محادثة واتساب التي تختارها.");
+      return;
+    }
+    try {
       // Invoke directly during the click: iOS requires transient user activation.
       const sharing = navigator.share({ files: [report.file], title: "تقرير ليم الصحي" });
       setBusy(true);
-      sharing.catch(reason => {
+      Promise.resolve(sharing).catch(reason => {
         if (!(reason instanceof Error && reason.name === "AbortError"))
           setError("تعذرت المشاركة. حمّل التقرير وأرسله كمرفق في واتساب.");
       }).finally(() => setBusy(false));
-    } else {
+    } catch {
       saveFile(report.file);
-      setError("تم تنزيل التقرير. أرفقه في محادثة واتساب التي تختارها.");
+      setError("تعذرت المشاركة. تم تنزيل التقرير لإرساله كمرفق في واتساب.");
     }
   };
   return <div ref={wrapper} data-pdf-hide className="print:hidden">

@@ -1,6 +1,50 @@
 /** Export the visible report as paginated A4 PDF; does not depend on window.print. */
 type PdfKeepTogether = { top: number; bottom: number };
 
+/** Keep a rendered line safely clear of a raster PDF page boundary. */
+export function adjustPdfSliceBottom(
+  top: number,
+  bottom: number,
+  pixelScale: number,
+  keepTogether: PdfKeepTogether[]
+) {
+  const tolerance = pixelScale * 2;
+  const crossing = keepTogether.filter(block => {
+    const blockTop = block.top * pixelScale;
+    const blockBottom = block.bottom * pixelScale;
+    // Include lines that begin within antialiasing distance of the boundary.
+    return (
+      blockTop > top + 1 &&
+      blockTop <= bottom + tolerance &&
+      blockBottom > bottom - tolerance
+    );
+  });
+  if (!crossing.length) return bottom;
+  return Math.floor(
+    Math.max(
+      top + 1,
+      Math.min(...crossing.map(block => block.top * pixelScale)) -
+        pixelScale * 18
+    )
+  );
+}
+
+/** Avoid emitting an A4 page when the captured tail contains only white space. */
+export function hasPdfSliceInk(data: Uint8ClampedArray) {
+  let coloredPixels = 0;
+  for (let index = 0; index < data.length; index += 4) {
+    const red = data[index] ?? 255;
+    const green = data[index + 1] ?? 255;
+    const blue = data[index + 2] ?? 255;
+    const alpha = data[index + 3] ?? 0;
+    if (alpha > 8 && (red < 248 || green < 248 || blue < 248)) {
+      coloredPixels++;
+      if (coloredPixels >= 12) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * A tall advice or nursing block must still be splittable across pages, but each
  * rendered line is kept whole. Range rectangles give one box per wrapped line.
@@ -338,29 +382,16 @@ async function captureEventPdf(element: HTMLElement) {
   // Keep generous side margins for labels, but use the printable A4 height
   // efficiently so the ordinary report is not split by a tiny trailing slice.
   const marginX = 10,
-    marginY = 8,
+    marginY = 5,
     width = 190,
-    height = 281;
+    height = 287;
   const sliceHeight = Math.floor((canvas.width * height) / width);
   const pixelScale = canvas.width / captureWidth;
-  for (let top = 0, index = 0; top < canvas.height; index++) {
+  let addedPages = 0;
+  for (let top = 0; top < canvas.height;) {
     let bottom = Math.min(top + sliceHeight, canvas.height);
-    if (bottom < canvas.height) {
-      const crossing = keepTogether.filter(
-        block =>
-          block.top * pixelScale > top + 1 &&
-          block.top * pixelScale < bottom &&
-          block.bottom * pixelScale > bottom
-      );
-      if (crossing.length)
-        bottom = Math.floor(
-          Math.max(
-            top + 1,
-            Math.min(...crossing.map(block => block.top * pixelScale)) -
-              pixelScale * 12
-          )
-        );
-    }
+    if (bottom < canvas.height)
+      bottom = adjustPdfSliceBottom(top, bottom, pixelScale, keepTogether);
     const slice = document.createElement("canvas");
     slice.width = canvas.width;
     slice.height = bottom - top;
@@ -377,15 +408,19 @@ async function captureEventPdf(element: HTMLElement) {
         canvas.width,
         slice.height
       );
-    if (index) pdf.addPage();
-    pdf.addImage(
-      slice.toDataURL("image/png"),
-      "PNG",
-      marginX,
-      marginY,
-      width,
-      (slice.height * width) / canvas.width
-    );
+    const context = slice.getContext("2d")!;
+    if (hasPdfSliceInk(context.getImageData(0, 0, slice.width, slice.height).data)) {
+      if (addedPages) pdf.addPage();
+      pdf.addImage(
+        slice.toDataURL("image/png"),
+        "PNG",
+        marginX,
+        marginY,
+        width,
+        (slice.height * width) / canvas.width
+      );
+      addedPages++;
+    }
     slice.width = slice.height = 0;
     top = bottom;
   }

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { appendTextLineRectangles } from "../client/src/lib/eventPdf";
+import { adjustPdfSliceBottom, appendTextLineRectangles, hasPdfSliceInk } from "../client/src/lib/eventPdf";
 
 it("keeps every rendered advice and nursing line together without treating a long block as one page", () => {
   const advice = { textContent: "سطر طويل" } as unknown as Node;
@@ -53,4 +53,21 @@ it("keeps every rendered advice and nursing line together without treating a lon
     { top: 24, bottom: 36 },
     { top: 50, bottom: 62 },
   ]);
+});
+
+it("moves a page boundary clear of a line that starts at antialiasing distance", () => {
+  const bottom = adjustPdfSliceBottom(0, 100, 2, [
+    { top: 49.6, bottom: 58 },
+  ]);
+
+  expect(bottom).toBe(63);
+});
+
+it("does not create a terminal PDF page for an all-white raster slice", () => {
+  const white = new Uint8ClampedArray(4 * 20).fill(255);
+  expect(hasPdfSliceInk(white)).toBe(false);
+
+  const text = new Uint8ClampedArray(4 * 20).fill(255);
+  for (let pixel = 0; pixel < 12; pixel++) text[pixel * 4] = 20;
+  expect(hasPdfSliceInk(text)).toBe(true);
 });
