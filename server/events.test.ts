@@ -168,6 +168,18 @@ describe("standalone events results", () => {
     expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(42, "EVENT-RECORD-1");
   });
 
+  it("uses the exact approved reading rather than a newer session record", async () => {
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
+      ...eventSession, status: "measured", latestRecordNo: "NEWER-X18-2",
+    });
+    vi.mocked(readCare).mockResolvedValue({
+      nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: new Date(), approvedRecordNo: "REVIEWED-X18-1",
+    } as never);
+    mockedDb.getEventReadingByRecordNo.mockResolvedValue([{ id: 1, userId: 42, recordNo: "REVIEWED-X18-1" }] as never);
+    await appRouter.createCaller(anonymousContext).events.results({ accessToken: "z".repeat(43) });
+    expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(42, "REVIEWED-X18-1");
+  });
+
   it("does not expose a synthetic Events measurement generation procedure", () => {
     const source = readFileSync(new URL("./routers/events.ts", import.meta.url), "utf8");
     expect(source).not.toContain("generateTestMeasurement");

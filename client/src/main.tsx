@@ -5,6 +5,7 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
+import PwaUpdateNotice from "./components/PwaUpdateNotice";
 import { getLoginUrl } from "./const";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import "./index.css";
@@ -58,6 +59,7 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <App />
+        <PwaUpdateNotice />
       </LanguageProvider>
     </QueryClientProvider>
   </trpc.Provider>

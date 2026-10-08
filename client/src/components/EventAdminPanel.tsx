@@ -51,8 +51,13 @@ export default function EventAdminPanel(){
       <label className="block">موقع الفعالية<input required maxLength={500} className={input} value={form.location} onChange={e=>setForm({...form,location:e.target.value})}/></label>
       <label className="block">الجهة المنظمة<input required maxLength={255} className={input} value={form.organizer} onChange={e=>setForm({...form,organizer:e.target.value})}/></label>
       <h2 className="flex items-center gap-2 pt-4 text-xl font-bold"><ClipboardList/>الاستبيانات</h2>
+      <div className="rounded-2xl border border-emerald-100 bg-[#f8fbfa] p-4">
+        <p className="font-bold">بدون استبيان</p>
+        <p className="mt-1 text-sm text-slate-600">تبدأ الزيارات الجديدة بتحليل الجسم بعد التسجيل، ولن تظهر أسئلة أو إجابات الاستبيان للطبيب لهذه الزيارات.</p>
+        <button type="button" className="mt-3 rounded-xl border border-[#123f37] px-4 py-2 font-bold text-[#123f37] disabled:opacity-40" disabled={!form.questionnaireIds.length} onClick={()=>setForm({...form,questionnaireIds:[]})}>تفعيل بدون استبيان</button>
+      </div>
       <label className="block">إضافة استبيان<select className={input} value="" onChange={e=>{if(e.target.value==='lifestyle')setForm({...form,questionnaireIds:['lifestyle']});}}><option value="">اختر الاستبيان</option>{catalog.map(q=><option key={q.id} value={q.id} disabled={!q.ready||form.questionnaireIds.includes(q.id as 'lifestyle')}>{q.name}{!q.ready?' — بانتظار اعتماد النموذج':''}</option>)}</select></label>
-      <div className="flex flex-wrap gap-2">{form.questionnaireIds.map(id=><button key={id} type="button" className="rounded-full bg-emerald-50 px-4 py-2" onClick={()=>setForm({...form,questionnaireIds:[]})}>استبيان نمط الحياة ×</button>)}</div>
+      <div className="flex flex-wrap gap-2">{form.questionnaireIds.length ? form.questionnaireIds.map(id=><span key={id} className="rounded-full bg-emerald-50 px-4 py-2">استبيان نمط الحياة مفعّل</span>) : <span className="rounded-full bg-amber-50 px-4 py-2">لا يوجد استبيان للزيارات الجديدة</span>}</div>
       <p className="text-sm text-slate-600">بدون استبيانات تبدأ الزيارة بتحليل الجسم بعد التسجيل. التغيير للزيارات الجديدة فقط. استبيانا السكري والقلب يحتاجان اعتماد الأسئلة والتقييم قبل التفعيل.</p>
       <button className={button} disabled={save.isPending}>حفظ بيانات الفعالية</button>
     </form>

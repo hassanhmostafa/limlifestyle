@@ -18,7 +18,10 @@ import { getEventReadingByRecordNo } from "../db";
 import { normalizeSaudiMobilePhone } from "../lib/phone";
 import { nursingCatalog } from "../../shared/eventNursing";
 import { validateMeasurements } from "../../shared/eventCare";
-import { generateAutomaticRecommendationsForSession } from "../eventRecommendationEngine";
+import {
+  generateAutomaticRecommendationsForSession,
+  generatePhysicianRecommendationDraftForSession,
+} from "../eventRecommendationEngine";
 
 const staffProcedure = publicProcedure.use(async ({ ctx, next }) => {
   const token = readStaffToken(ctx.req);
@@ -211,6 +214,7 @@ export const eventTeamRouter = router({
       return {
         care,
         answers: session.answers,
+        lifestyleEnabled: (session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle"),
         readings: session.latestRecordNo
           ? await getEventReadingByRecordNo(
               session.userId,
@@ -230,6 +234,7 @@ export const eventTeamRouter = router({
         ),
         notes: z.string().trim().max(3000),
         finalize: z.boolean(),
+        expectedRevision: z.number().int().positive(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -266,7 +271,8 @@ export const eventTeamRouter = router({
           nursingCompletedAt: input.finalize ? new Date() : null,
         },
         false,
-        ctx.assignment.trackId
+        ctx.assignment.trackId,
+        input.expectedRevision
       );
       const automatic = input.finalize && care.consultationMode === "automatic"
         ? await generateAutomaticRecommendationsForSession(session.id)
@@ -280,6 +286,7 @@ export const eventTeamRouter = router({
         confirmed: z.literal(true),
         advice: z.string().trim().min(1).max(10000),
         finalize: z.boolean(),
+        expectedRevision: z.number().int().positive(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -313,11 +320,50 @@ export const eventTeamRouter = router({
           doctorStaffId: ctx.assignment.id,
           doctorName: ctx.assignment.name ?? "الطبيب",
           approvedAt: input.finalize ? new Date() : null,
+          approvedRecordNo: input.finalize ? session.latestRecordNo : null,
         },
         input.finalize,
-        ctx.assignment.trackId
+        ctx.assignment.trackId,
+        input.expectedRevision
       );
       return { success: true };
+    }),
+  generateDraft: staffProcedure
+    .input(z.object({
+      sessionId: z.number().int().positive(),
+      confirmed: z.literal(true),
+      expectedRevision: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.assignment.duty !== "doctor")
+        throw new TRPCError({ code: "FORBIDDEN", message: "للطبيب فقط" });
+      const { session } = await sessionById(input.sessionId, ctx.assignment.trackId);
+      if (!session.latestRecordNo)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "بانتظار نتيجة جهاز تحليل الجسم" });
+      const care = await store.readCare(session.id);
+      if (care.consultationMode === "automatic")
+        throw new TRPCError({ code: "FORBIDDEN", message: "هذه الزيارة مضبوطة على توصيات تلقائية" });
+      if (care.nursingEnabled && !care.nursingCompletedAt)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "أكمل محطة التمريض أولًا" });
+      if (care.revision !== input.expectedRevision)
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "تم تعديل الزيارة بواسطة عضو آخر. حدّث الصفحة؛ تم الاحتفاظ بتعديلاتك المحلية.",
+        });
+      try {
+        return await generatePhysicianRecommendationDraftForSession({
+          sessionId: session.id,
+          trackId: ctx.assignment.trackId,
+          expectedRevision: input.expectedRevision,
+          doctor: { userId: ctx.assignment.userId, staffId: ctx.assignment.id, name: ctx.assignment.name },
+        });
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "تعذر إعداد المسودة المقيدة بالمصادر. لا تُنشر أي مسودة قبل مراجعتك واعتمادك.",
+        });
+      }
     }),
   retryAutomaticRecommendations: staffProcedure
     .input(z.object({ sessionId: z.number().int().positive(), confirmed: z.literal(true) }))

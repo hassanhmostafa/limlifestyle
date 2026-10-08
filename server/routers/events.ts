@@ -225,7 +225,13 @@ export const eventsRouter = router({
    */
   results: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
-    if (!session.latestRecordNo) {
+    const care = await readCare(session.id);
+    // A final report is tied to the exact X18 record reviewed at approval.
+    // Newer device uploads invalidate approval in markEventParticipantMeasured.
+    const recordNo = care.approvedAt
+      ? care.approvedRecordNo ?? session.latestRecordNo
+      : session.latestRecordNo;
+    if (!recordNo) {
       return {
         session: {
           code: session.code,
@@ -235,12 +241,12 @@ export const eventsRouter = router({
         readings: [],
       };
     }
-    const readings = await getEventReadingByRecordNo(session.userId, session.latestRecordNo);
+    const readings = await getEventReadingByRecordNo(session.userId, recordNo);
     return {
       session: {
         code: session.code,
         status: session.status,
-        latestRecordNo: session.latestRecordNo,
+        latestRecordNo: recordNo,
       },
       readings,
     };

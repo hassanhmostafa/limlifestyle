@@ -127,6 +127,13 @@
       "when": 1791733200000,
       "tag": "0017_events_auto_recommendations",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1791736800000,
+      "tag": "0018_events_care_concurrency",
+      "breakpoints": true
     }
   ]
 }

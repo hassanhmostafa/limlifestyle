@@ -5,6 +5,15 @@ import * as store from "./eventCareDb";
 import * as db from "./db";
 import * as tracks from "./eventTracksDb";
 import { hashApiKey } from "./lib/apiSecurity";
+import { TRPCError } from "@trpc/server";
+const { automaticGeneration, physicianDraftGeneration } = vi.hoisted(() => ({
+  automaticGeneration: vi.fn(),
+  physicianDraftGeneration: vi.fn(),
+}));
+vi.mock("./eventRecommendationEngine", () => ({
+  generateAutomaticRecommendationsForSession: automaticGeneration,
+  generatePhysicianRecommendationDraftForSession: physicianDraftGeneration,
+}));
 vi.mock("./eventTracksDb", () => ({
   staffBySessionHash: vi.fn(),
   staffByCodeHash: vi.fn(),
@@ -76,6 +85,7 @@ beforeEach(() => {
     nursingCompletedAt: null,
     approvedAt: null,
     advice: null,
+    revision: 1,
   };
   vi.mocked(tracks.staffBySessionHash).mockImplementation(async hash => {
     const id =
@@ -106,6 +116,7 @@ beforeEach(() => {
   vi.mocked(store.readCare).mockImplementation(async () => ({ ...care }));
   vi.mocked(store.updateCare).mockImplementation(async (_id, patch) => {
     Object.assign(care, patch);
+    return { ...care };
   });
   vi.mocked(db.getEventParticipantSessionByTokenHash).mockResolvedValue(
     session as never
@@ -115,6 +126,8 @@ beforeEach(() => {
     ...session,
     reportCompletedAt: new Date(),
   } as never);
+  automaticGeneration.mockResolvedValue({ state: "generated", mode: "automatic" });
+  physicianDraftGeneration.mockResolvedValue({ advice: "مسودة مقيدة", revision: 2, recommendationMeta: {}, model: "gpt-5-mini" });
 });
 describe("event basic care cycle", () => {
   it("blocks record reads and both writes for a visit in another track even with a known ID", async () => {
@@ -137,6 +150,7 @@ describe("event basic care cycle", () => {
         measurements: {},
         notes: "",
         finalize: false,
+      expectedRevision: 1,
       })
     ).rejects.toThrow("غير متاحة");
     await expect(
@@ -145,6 +159,7 @@ describe("event basic care cycle", () => {
         confirmed: true,
         advice: "اختبار",
         finalize: false,
+      expectedRevision: 1,
       })
     ).rejects.toThrow("غير متاحة");
     expect(store.readCare).not.toHaveBeenCalled();
@@ -247,6 +262,7 @@ describe("event basic care cycle", () => {
         confirmed: true,
         advice: "نص تجريبي",
         finalize: true,
+      expectedRevision: 1,
       })
     ).rejects.toThrow("التمريض");
     await nurse.saveNursing({
@@ -255,12 +271,14 @@ describe("event basic care cycle", () => {
       measurements: { oxygen_saturation: { value: "98" } },
       notes: "قياس تجريبي",
       finalize: true,
+    expectedRevision: 1,
     });
     await doctor.saveAdvice({
       sessionId: 1,
       confirmed: true,
       advice: "نص تجريبي",
       finalize: false,
+    expectedRevision: 1,
     });
     expect((await participant.care({ accessToken: token })).advice).toBeNull();
     await expect(
@@ -271,6 +289,7 @@ describe("event basic care cycle", () => {
       confirmed: true,
       advice: "نص تجريبي معتمد",
       finalize: true,
+    expectedRevision: 1,
     });
     const result = await participant.care({ accessToken: token });
     expect(result.advice).toBe("نص تجريبي معتمد");
@@ -288,6 +307,7 @@ describe("event basic care cycle", () => {
         measurements: {},
         notes: "",
         finalize: false,
+      expectedRevision: 1,
       })
     ).rejects.toThrow("غير مفعلة");
     await eventTeamRouter.createCaller(ctx(8)).saveAdvice({
@@ -295,6 +315,7 @@ describe("event basic care cycle", () => {
       confirmed: true,
       advice: "نص تجريبي",
       finalize: true,
+    expectedRevision: 1,
     });
     expect(care.approvedAt).toBeInstanceOf(Date);
   });
@@ -316,6 +337,7 @@ describe("event basic care cycle", () => {
         confirmed: true,
         advice: "اختبار",
         finalize: false,
+      expectedRevision: 1,
       })
     ).rejects.toThrow("للطبيب");
     expect(store.updateCare).not.toHaveBeenCalled();
@@ -329,9 +351,35 @@ describe("event basic care cycle", () => {
         confirmed: true,
         advice: "نص طبي غير مسموح في هذا الوضع",
         finalize: true,
+      expectedRevision: 1,
       })
     ).rejects.toThrow("تلقائية");
     expect(store.updateCare).not.toHaveBeenCalled();
+  });
+  it("rejects two stale staff editors and retains the first saved draft", async () => {
+    care.nursingEnabled = 0;
+    vi.mocked(store.updateCare).mockImplementation(async (_id, patch, _approve, _trackId, expectedRevision) => {
+      if (expectedRevision !== care.revision) {
+        throw new TRPCError({ code: "CONFLICT", message: "تم تعديل الزيارة بواسطة عضو آخر. حدّث الصفحة؛ تم الاحتفاظ بتعديلاتك المحلية." });
+      }
+      Object.assign(care, patch, { revision: care.revision + 1 });
+      return { ...care };
+    });
+    const firstDoctor = eventTeamRouter.createCaller(ctx(8));
+    const staleDoctor = eventTeamRouter.createCaller(ctx(8));
+    await firstDoctor.saveAdvice({ sessionId: 1, confirmed: true, advice: "مسودة الطبيب الأول", finalize: false, expectedRevision: 1 });
+    await expect(staleDoctor.saveAdvice({ sessionId: 1, confirmed: true, advice: "نص محلي للطبيب الثاني", finalize: false, expectedRevision: 1 }))
+      .rejects.toThrow("تم تعديل الزيارة");
+    expect(care.advice).toBe("مسودة الطبيب الأول");
+  });
+  it("keeps physician-generated drafts private until explicit approval", async () => {
+    care.nursingEnabled = 0;
+    const doctor = eventTeamRouter.createCaller(ctx(8));
+    const result = await doctor.generateDraft({ sessionId: 1, confirmed: true, expectedRevision: 1 });
+    expect(result.advice).toBe("مسودة مقيدة");
+    expect(physicianDraftGeneration).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 1, expectedRevision: 1 }));
+    expect(care.approvedAt).toBeNull();
+    expect((await eventsRouter.createCaller(ctx(null)).care({ accessToken: token })).advice).toBeNull();
   });
   it("normalizes Arabic phone input and reveals only identity before confirmation", async () => {
     const result = await eventTeamRouter
@@ -364,6 +412,7 @@ describe("event basic care cycle", () => {
         confirmed: true,
         advice: "اختبار",
         finalize: true,
+      expectedRevision: 1,
       })
     ).rejects.toThrow("بانتظار");
     expect(store.updateCare).not.toHaveBeenCalled();

@@ -1,0 +1,23 @@
+import { describe, expect, it } from "vitest";
+import { eventReadingCareInvalidationPatch } from "./db";
+
+describe("Events reading/advice consistency", () => {
+  it("turns a physician approval into a private re-review draft when a newer X18 result arrives", () => {
+    const patch = eventReadingCareInvalidationPatch({ revision: 8, consultationMode: "physician", advice: "نصيحة معتمدة سابقًا" });
+    expect(patch).toMatchObject({ revision: 9, advice: "نصيحة معتمدة سابقًا", approvedAt: null, approvedRecordNo: null });
+  });
+
+  it("removes automatic output and generation claims when a newer X18 result arrives", () => {
+    const patch = eventReadingCareInvalidationPatch({ revision: 4, consultationMode: "automatic", advice: "توصيات قديمة" });
+    expect(patch).toMatchObject({
+      revision: 5,
+      advice: null,
+      approvedAt: null,
+      approvedRecordNo: null,
+      autoGenerationState: "not_requested",
+      autoGenerationAttemptToken: null,
+      autoGenerationFingerprint: null,
+      autoGenerationRecordNo: null,
+    });
+  });
+});

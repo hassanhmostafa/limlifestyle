@@ -42,21 +42,43 @@ export default function EventTeam() {
   const [measurements, setMeasurements] = useState<Measurements>({});
   const [notes, setNotes] = useState("");
   const [advice, setAdvice] = useState("");
+  const [adviceDirty, setAdviceDirty] = useState(false);
+  const [nursingDirty, setNursingDirty] = useState(false);
   const [message, setMessage] = useState("");
   const saved = async () => {
     await record.refetch();
     setMessage("تم الحفظ بنجاح");
   };
   const nursing = trpc.eventTeam.saveNursing.useMutation({
-    onSuccess: saved,
+    onSuccess: async result => {
+      setNursingDirty(false);
+      await record.refetch();
+      setMessage(result.automatic?.state === "waiting_for_body" ? "وصلت قراءة جزئية فقط. انتظر تقرير تحليل عناصر الجسم الكامل قبل إنشاء التوصيات." : "تم الحفظ بنجاح");
+    },
     onError: e => setMessage(e.message),
   });
   const doctor = trpc.eventTeam.saveAdvice.useMutation({
-    onSuccess: saved,
+    onSuccess: async () => { setAdviceDirty(false); await saved(); },
+    onError: e => setMessage(e.message),
+  });
+  const generateDraft = trpc.eventTeam.generateDraft.useMutation({
+    onSuccess: async draft => {
+      if (adviceDirty) {
+        setMessage("تم إنشاء المسودة الخاصة، لكن لم نستبدل نصك الذي تعدله. حدّث الزيارة لمراجعة المسودة المحفوظة.");
+      } else {
+        setAdvice(draft.advice);
+        setAdviceDirty(false);
+        setMessage("تم إنشاء مسودة خاصة مقيدة بالمصادر. راجعها وعدّلها ثم اعتمدها صراحةً.");
+      }
+      await record.refetch();
+    },
     onError: e => setMessage(e.message),
   });
   const retryAutomatic = trpc.eventTeam.retryAutomaticRecommendations.useMutation({
-    onSuccess: saved,
+    onSuccess: async result => {
+      await record.refetch();
+      setMessage(result.state === "waiting_for_body" ? "لا يمكن إنشاء التوصيات من قراءة جزئية؛ انتظر تقرير تحليل عناصر الجسم الكامل." : "تم تحديث حالة التوصيات");
+    },
     onError: e => setMessage(e.message),
   });
   const care = record.data?.care;
@@ -68,9 +90,14 @@ export default function EventTeam() {
     setMeasurements(current => changedParticipant || JSON.stringify(current) === JSON.stringify(previous?.care?.measurements ?? {}) ? care?.measurements ?? {} : current);
     setNotes(current => changedParticipant || current === (previous?.care?.nurseNotes ?? "") ? care?.nurseNotes ?? "" : current);
     setAdvice(current => changedParticipant || current === (previous?.care?.advice ?? "") ? care?.advice ?? "" : current);
+    if (changedParticipant) { setAdviceDirty(false); setNursingDirty(false); }
     lastLoaded.current = { sessionId: participant?.id, care };
   }, [care, participant?.id]);
-  const pending = nursing.isPending || doctor.isPending || retryAutomatic.isPending;
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("lim:dirty-edits", { detail: { dirty: adviceDirty || nursingDirty } }));
+    return () => { window.dispatchEvent(new CustomEvent("lim:dirty-edits", { detail: { dirty: false } })); };
+  }, [adviceDirty, nursingDirty]);
+  const pending = nursing.isPending || doctor.isPending || generateDraft.isPending || retryAutomatic.isPending;
   return (
     <main dir="rtl" className="min-h-screen bg-[#f3f8f6] p-5 text-[#123a34]">
       <div className="mx-auto max-w-3xl space-y-5">
@@ -278,15 +305,16 @@ export default function EventTeam() {
                                               measurements[id]?.[field.key] ??
                                               ""
                                             }
-                                            onChange={e =>
+                                            onChange={e => {
+                                              setNursingDirty(true);
                                               setMeasurements(m => ({
                                                 ...m,
                                                 [id]: {
                                                   ...m[id],
                                                   [field.key]: e.target.value,
                                                 },
-                                              }))
-                                            }
+                                              }));
+                                            }}
                                           >
                                             <option value="">اختر</option>
                                             {field.options.map(option => (
@@ -307,15 +335,16 @@ export default function EventTeam() {
                                               measurements[id]?.[field.key] ??
                                               ""
                                             }
-                                            onChange={e =>
+                                            onChange={e => {
+                                              setNursingDirty(true);
                                               setMeasurements(m => ({
                                                 ...m,
                                                 [id]: {
                                                   ...m[id],
                                                   [field.key]: e.target.value,
                                                 },
-                                              }))
-                                            }
+                                              }));
+                                            }}
                                           />
                                         )}
                                       </label>
@@ -336,7 +365,7 @@ export default function EventTeam() {
                               className={inputClass}
                               maxLength={3000}
                               value={notes}
-                              onChange={e => setNotes(e.target.value)}
+                              onChange={e => { setNotes(e.target.value); setNursingDirty(true); }}
                             />
                           </label>
                         </fieldset>
@@ -354,6 +383,7 @@ export default function EventTeam() {
                                   measurements,
                                   notes,
                                   finalize: false,
+                                  expectedRevision: care.revision,
                                 })
                               }
                             >
@@ -376,6 +406,7 @@ export default function EventTeam() {
                                     measurements,
                                     notes,
                                     finalize: true,
+                                    expectedRevision: care.revision,
                                   });
                               }}
                             >
@@ -385,7 +416,7 @@ export default function EventTeam() {
                         )}
                         {care.consultationMode === "automatic" && Boolean(care.nursingCompletedAt) && (
                           <section className="rounded-2xl bg-[#f3f8f6] p-4">
-                            <h2 className="font-bold">توصيات نمط الحياة للفعالية</h2>
+                            <h2 className="font-bold">توصيات لنمط حياة صحي</h2>
                             {care.autoGenerationState === "generated" ? <><p className="mt-2 text-sm">تم إنشاء التقرير وإتاحته للمستفيد. لا توجد توصيات طبية أو اسم طبيب في هذا الوضع.</p>{Array.isArray(care.recommendationMeta?.sourceIds) && <p className="mt-2 text-xs text-slate-600">مصادر المراجعة الداخلية: {(care.recommendationMeta.sourceIds as string[]).join("، ")}</p>}</> : <><p className="mt-2 text-sm">{care.autoGenerationError || "يجري إعداد توصيات نمط الحياة المسموح بها لهذه الزيارة."}</p><button className={`${buttonClass} mt-3`} disabled={pending || care.autoGenerationState === "generating" || (care.autoGenerationAttempts ?? 0) >= 2} onClick={() => retryAutomatic.mutate({ sessionId: participant.id, confirmed: true })}>{retryAutomatic.isPending ? "جارٍ إعادة المحاولة…" : "إعادة محاولة إنشاء التوصيات"}</button></>}
                           </section>
                         )}
@@ -410,13 +441,15 @@ export default function EventTeam() {
                         }}
                       />
                     )}
-                    <EventLifestyleCharts answers={record.data?.answers ?? {}} />
-                    <details className="rounded-2xl bg-white p-5">
-                      <summary className="font-bold">
-                        إجابات استبيان نمط الحياة
-                      </summary>
-                      <LifestyleAnswers answers={record.data?.answers ?? {}} />
-                    </details>
+                    {record.data?.lifestyleEnabled && <>
+                      <EventLifestyleCharts answers={record.data?.answers ?? {}} />
+                      <details className="rounded-2xl bg-white p-5">
+                        <summary className="font-bold">
+                          إجابات استبيان نمط الحياة
+                        </summary>
+                        <LifestyleAnswers answers={record.data?.answers ?? {}} />
+                      </details>
+                    </>}
                     <section className="rounded-2xl bg-white p-5">
                       <h2 className="mb-3 font-bold">قياسات التمريض</h2>
                       {care.nursingEnabled ? (
@@ -455,11 +488,18 @@ export default function EventTeam() {
                         value={advice}
                         maxLength={10000}
                         disabled={Boolean(care.approvedAt) || pending}
-                        onChange={e => setAdvice(e.target.value)}
+                        onChange={e => { setAdvice(e.target.value); setAdviceDirty(true); }}
                       />
                     </label>
                     {!care.approvedAt && (
                       <div className="flex gap-3">
+                        <button
+                          className={buttonClass}
+                          disabled={pending || !record.data?.readings.length || Boolean(care.nursingEnabled && !care.nursingCompletedAt)}
+                          onClick={() => generateDraft.mutate({ sessionId: participant.id, confirmed: true, expectedRevision: care.revision })}
+                        >
+                          {generateDraft.isPending ? "جارٍ إعداد مسودة خاصة…" : "إنشاء مسودة مقيدة بالمصادر"}
+                        </button>
                         <button
                           className={buttonClass}
                           disabled={
@@ -473,6 +513,7 @@ export default function EventTeam() {
                               confirmed: true,
                               advice,
                               finalize: false,
+                              expectedRevision: care.revision,
                             })
                           }
                         >
@@ -499,6 +540,7 @@ export default function EventTeam() {
                                 confirmed: true,
                                 advice,
                                 finalize: true,
+                                expectedRevision: care.revision,
                               });
                           }}
                         >

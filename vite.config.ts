@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import { VitePWA } from "vite-plugin-pwa";
@@ -158,7 +159,7 @@ const plugins = [
   vitePluginManusRuntime(),
   vitePluginManusDebugCollector(),
   VitePWA({
-    registerType: "autoUpdate",
+    registerType: "prompt",
     includeAssets: ["favicon.ico"],
     manifest: {
       name: "LIM",
@@ -203,6 +204,11 @@ const plugins = [
 ];
 
 export default defineConfig({
+  define: {
+    __LIM_BUILD_ID__: JSON.stringify(
+      process.env.GIT_COMMIT ?? execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim()
+    ),
+  },
   plugins,
   resolve: {
     alias: {
