@@ -276,9 +276,6 @@ const RETRY_MAX_DELAY_MS = 30_000;
 
 type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
 
-const sleep = (ms: number) =>
-  new Promise<void>(resolve => setTimeout(resolve, ms));
-
 const deadlineExceeded = () => new Error("LLM request deadline exceeded");
 
 const sleepWithSignal = (ms: number, signal?: AbortSignal) =>
@@ -318,9 +315,23 @@ const computeBackoffDelay = (
   return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
 };
 
-// Retries non-2xx responses and network errors with exponential backoff, then
-// returns the final Response so callers keep their existing error handling.
-const fetchWithBackoff = async (
+/**
+ * Buffers the body while the request deadline is still armed. Returning a fresh
+ * Response retains the existing caller contract without allowing a server that
+ * sent headers but never a body to outlive the automatic-generation lease.
+ */
+const bufferedResponse = async (response: Response) => {
+  const body = await response.arrayBuffer();
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+};
+
+// Retries non-2xx responses and network errors with exponential backoff. The
+// final response is fully buffered before the deadline timer is cleared.
+export const fetchWithBackoff = async (
   url: string,
   init: FetchInit,
   timeoutMs?: number
@@ -337,7 +348,7 @@ const fetchWithBackoff = async (
       try {
         const response = await fetch(url, requestInit);
         if (response.ok || attempt === RETRY_MAX_RETRIES) {
-          return response;
+          return await bufferedResponse(response);
         }
 
         const retryAfterMs = parseRetryAfter(

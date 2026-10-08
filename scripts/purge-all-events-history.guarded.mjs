@@ -60,6 +60,22 @@ function connectionOptions(databaseUrl) {
 
 const baseWhere = "s.eventCode = ? AND s.createdAt < ?";
 const baseParams = [EVENT_CODE, cutoff];
+// A reading is proven only when an in-scope visit references the exact
+// userId+recordNo and no Events session outside this cutoff/event scope does.
+// This exact predicate is shared by counts, identifier hashing, and DELETE.
+const provenReadingPredicate = `
+  EXISTS (
+    SELECT 1 FROM event_participant_sessions scoped
+    WHERE scoped.eventCode = ? AND scoped.createdAt < ?
+      AND scoped.userId = h.userId AND scoped.latestRecordNo = h.recordNo
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM event_participant_sessions outside_scope
+    WHERE outside_scope.userId = h.userId
+      AND outside_scope.latestRecordNo = h.recordNo
+      AND NOT (outside_scope.eventCode = ? AND outside_scope.createdAt < ?)
+  )`;
+const provenReadingParams = [EVENT_CODE, cutoff, EVENT_CODE, cutoff];
 
 async function scalar(connection, sql, params = []) {
   const [rows] = await connection.query(sql, params);
@@ -76,11 +92,11 @@ async function plan(connection) {
   const visits = await scalar(connection, `SELECT COUNT(*) AS total FROM event_participant_sessions s WHERE ${baseWhere}`, baseParams);
   const care = await scalar(connection, `SELECT COUNT(*) AS total FROM event_care c INNER JOIN event_participant_sessions s ON s.id = c.sessionId WHERE ${baseWhere}`, baseParams);
   const answerVisits = await scalar(connection, `SELECT COUNT(*) AS total FROM event_participant_sessions s WHERE ${baseWhere} AND s.answers IS NOT NULL AND JSON_LENGTH(s.answers) > 0`, baseParams);
-  const provenReadings = await scalar(connection, `SELECT COUNT(DISTINCT h.id) AS total FROM health_readings h INNER JOIN event_participant_sessions s ON s.userId = h.userId AND s.latestRecordNo = h.recordNo WHERE ${baseWhere}`, baseParams);
-  const ambiguousSharedReadings = await scalar(connection, `SELECT COUNT(DISTINCT h.id) AS total FROM health_readings h INNER JOIN (SELECT DISTINCT s.userId FROM event_participant_sessions s WHERE ${baseWhere}) e ON e.userId = h.userId WHERE NOT EXISTS (SELECT 1 FROM event_participant_sessions s2 WHERE s2.eventCode = ? AND s2.createdAt < ? AND s2.userId = h.userId AND s2.latestRecordNo = h.recordNo)`, [...baseParams, EVENT_CODE, cutoff]);
+  const provenReadings = await scalar(connection, `SELECT COUNT(*) AS total FROM health_readings h WHERE ${provenReadingPredicate}`, provenReadingParams);
+  const ambiguousSharedReadings = await scalar(connection, `SELECT COUNT(DISTINCT h.id) AS total FROM health_readings h WHERE EXISTS (SELECT 1 FROM event_participant_sessions s WHERE ${baseWhere} AND s.userId = h.userId) AND NOT (${provenReadingPredicate})`, [...baseParams, ...provenReadingParams]);
   const visitScopeHash = await identifierHash(connection, `SELECT s.id FROM event_participant_sessions s WHERE ${baseWhere}`, baseParams);
   const careScopeHash = await identifierHash(connection, `SELECT c.sessionId AS id FROM event_care c INNER JOIN event_participant_sessions s ON s.id = c.sessionId WHERE ${baseWhere}`, baseParams);
-  const provenReadingScopeHash = await identifierHash(connection, `SELECT DISTINCT h.id FROM health_readings h INNER JOIN event_participant_sessions s ON s.userId = h.userId AND s.latestRecordNo = h.recordNo WHERE ${baseWhere}`, baseParams);
+  const provenReadingScopeHash = await identifierHash(connection, `SELECT h.id FROM health_readings h WHERE ${provenReadingPredicate}`, provenReadingParams);
   const manifest = {
     eventCode: EVENT_CODE,
     cutoff: cutoff.toISOString(),
@@ -157,8 +173,8 @@ try {
         baseParams
       );
       const [readingResult] = await connection.query(
-        `DELETE h FROM health_readings h INNER JOIN event_participant_sessions s ON s.userId = h.userId AND s.latestRecordNo = h.recordNo WHERE ${baseWhere}`,
-        baseParams
+        `DELETE h FROM health_readings h WHERE ${provenReadingPredicate}`,
+        provenReadingParams
       );
       const [visitResult] = await connection.query(
         `DELETE FROM event_participant_sessions WHERE eventCode = ? AND createdAt < ?`,
