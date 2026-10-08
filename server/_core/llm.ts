@@ -69,6 +69,8 @@ export type InvokeParams = {
   model?: string;
   thinking?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;
+  /** Absolute request budget across retries; callers may keep it below a work lease. */
+  timeoutMs?: number;
 };
 
 export type ToolCall = {
@@ -277,6 +279,25 @@ type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
 const sleep = (ms: number) =>
   new Promise<void>(resolve => setTimeout(resolve, ms));
 
+const deadlineExceeded = () => new Error("LLM request deadline exceeded");
+
+const sleepWithSignal = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(deadlineExceeded());
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(deadlineExceeded());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
 const parseRetryAfter = (value: string | null): number | undefined => {
   if (!value) return undefined;
   const seconds = Number(value);
@@ -301,37 +322,48 @@ const computeBackoffDelay = (
 // returns the final Response so callers keep their existing error handling.
 const fetchWithBackoff = async (
   url: string,
-  init: FetchInit
+  init: FetchInit,
+  timeoutMs?: number
 ): Promise<Response> => {
   let lastError: unknown;
+  const controller = timeoutMs && timeoutMs > 0 ? new AbortController() : undefined;
+  const deadline = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : undefined;
+  const requestInit = controller ? { ...init, signal: controller.signal } : init;
 
-  for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(url, init);
-      if (response.ok || attempt === RETRY_MAX_RETRIES) {
-        return response;
-      }
-
-      const retryAfterMs = parseRetryAfter(
-        response.headers.get("retry-after")
-      );
+  try {
+    for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
       try {
-        await response.body?.cancel();
-      } catch {
-        // Body already settled; nothing to clean up.
+        const response = await fetch(url, requestInit);
+        if (response.ok || attempt === RETRY_MAX_RETRIES) {
+          return response;
+        }
+
+        const retryAfterMs = parseRetryAfter(
+          response.headers.get("retry-after")
+        );
+        try {
+          await response.body?.cancel();
+        } catch {
+          // Body already settled; nothing to clean up.
+        }
+        console.warn(
+          `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after status ${response.status}`
+        );
+        await sleepWithSignal(computeBackoffDelay(attempt, retryAfterMs), controller?.signal);
+      } catch (error) {
+        if (controller?.signal.aborted) throw deadlineExceeded();
+        lastError = error;
+        if (attempt === RETRY_MAX_RETRIES) throw error;
+        console.warn(
+          `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after network error`
+        );
+        await sleepWithSignal(computeBackoffDelay(attempt), controller?.signal);
       }
-      console.warn(
-        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after status ${response.status}`
-      );
-      await sleep(computeBackoffDelay(attempt, retryAfterMs));
-    } catch (error) {
-      lastError = error;
-      if (attempt === RETRY_MAX_RETRIES) throw error;
-      console.warn(
-        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after network error`
-      );
-      await sleep(computeBackoffDelay(attempt));
     }
+  } finally {
+    if (deadline) clearTimeout(deadline);
   }
 
   throw lastError instanceof Error
@@ -356,6 +388,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     reasoning,
     maxTokens,
     max_tokens,
+    timeoutMs,
   } = params;
 
   const payload: Record<string, unknown> = {
@@ -408,7 +441,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       authorization: `Bearer ${ENV.forgeApiKey}`,
     },
     body: JSON.stringify(payload),
-  });
+  }, timeoutMs);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -432,7 +465,7 @@ export type ModelsResponse = {
   data: ModelInfo[];
 };
 
-export async function listLLMModels(): Promise<ModelsResponse> {
+export async function listLLMModels(options?: { timeoutMs?: number }): Promise<ModelsResponse> {
   assertApiKey();
 
   const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
@@ -441,7 +474,7 @@ export async function listLLMModels(): Promise<ModelsResponse> {
 
   const response = await fetchWithBackoff(url, {
     headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
-  });
+  }, options?.timeoutMs);
 
   if (!response.ok) {
     const errorText = await response.text();

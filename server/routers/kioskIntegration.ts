@@ -32,7 +32,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
-import { createMachinePhoneUser, getDb, markEventParticipantMeasured } from "../db";
+import { createMachinePhoneUser, eventReadingMaterialFingerprint, getDb, markEventParticipantMeasured } from "../db";
 import { kioskDevices, kioskIntegrationSettings, kioskSessions, healthReadings, users } from "../../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import crypto from "crypto";
@@ -402,7 +402,18 @@ async function saveX18MachinePayload(
     // An event check-in is only a form/session record. The physical result is
     // still saved once in health_readings; this just lets /events show that the
     // same participant's X18 report has arrived.
-    await markEventParticipantMeasured(user.id, recordNo);
+    await markEventParticipantMeasured(
+      user.id,
+      recordNo,
+      eventReadingMaterialFingerprint({
+        height: values.height,
+        weight: values.weight,
+        bmi: values.bmi,
+        sbp: values.sbp,
+        dbp: values.dbp,
+        machineMetrics: values.machineMetrics,
+      })
+    );
 
     savedUserId = user.id;
   }

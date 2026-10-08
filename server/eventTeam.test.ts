@@ -372,6 +372,22 @@ describe("event basic care cycle", () => {
       .rejects.toThrow("تم تعديل الزيارة");
     expect(care.advice).toBe("مسودة الطبيب الأول");
   });
+  it("rejects the second stale nursing editor without replacing the first local save", async () => {
+    vi.mocked(store.updateCare).mockImplementation(async (_id, patch, _approve, _trackId, expectedRevision) => {
+      if (expectedRevision !== care.revision) {
+        throw new TRPCError({ code: "CONFLICT", message: "تم تعديل الزيارة بواسطة عضو آخر. حدّث الصفحة؛ تم الاحتفاظ بتعديلاتك المحلية." });
+      }
+      Object.assign(care, patch, { revision: care.revision + 1 });
+      return { ...care };
+    });
+    const firstNurse = eventTeamRouter.createCaller(ctx(7));
+    const staleNurse = eventTeamRouter.createCaller(ctx(7));
+    await firstNurse.saveNursing({ sessionId: 1, confirmed: true, measurements: { oxygen_saturation: { value: "97" } }, notes: "ملاحظة أولى", finalize: false, expectedRevision: 1 });
+    await expect(staleNurse.saveNursing({ sessionId: 1, confirmed: true, measurements: { oxygen_saturation: { value: "95" } }, notes: "ملاحظة محلية ثانية", finalize: false, expectedRevision: 1 }))
+      .rejects.toThrow("تم تعديل الزيارة");
+    expect(care.measurements).toEqual({ oxygen_saturation: { value: "97" } });
+    expect(care.nurseNotes).toBe("ملاحظة أولى");
+  });
   it("keeps physician-generated drafts private until explicit approval", async () => {
     care.nursingEnabled = 0;
     const doctor = eventTeamRouter.createCaller(ctx(8));

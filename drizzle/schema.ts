@@ -236,6 +236,8 @@ export const eventParticipantSessions = mysqlTable("event_participant_sessions",
   answers: json("answers").$type<Record<string, string | number | string[]>>(),
   status: mysqlEnum("status", ["checked_in", "measured"]).default("checked_in").notNull(),
   latestRecordNo: varchar("latestRecordNo", { length: 64 }),
+  /** Hash of material X18 fields for latestRecordNo; avoids duplicating raw data. */
+  latestReadingFingerprint: varchar("latestReadingFingerprint", { length: 64 }),
   /** Explicit participant actions after an associated X18 measurement arrives. */
   consultationCompletedAt: timestamp("consultationCompletedAt"),
   reportCompletedAt: timestamp("reportCompletedAt"),

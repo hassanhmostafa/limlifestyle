@@ -87,9 +87,9 @@ export default function EventCareAdmin() {
                 تُحفظ لكل زيارة؛ التعديل يسري على الزيارات الجديدة.
               </p>
               <fieldset className="space-y-3 rounded-2xl bg-[#f3f8f6] p-4">
-                <legend className="font-bold">نوع الاستشارة للزيارات الجديدة</legend>
-                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "physician"} onChange={() => setConsultationMode("physician")} />مراجعة الطبيب: يكتب الطبيب ويعتمد توصياته باسم الطبيب.</label>
-                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "automatic"} onChange={() => { setConsultationMode("automatic"); setEnabled(true); }} />توصيات نمط الحياة للفعالية: تتطلب إكمال التمريض، ثم ينشئ النظام توصيات تثقيفية مقيدة بالمصادر المعتمدة دون اسم طبيب.</label>
+                <legend className="font-bold">هل يوجد طبيب؟</legend>
+                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "physician"} onChange={() => setConsultationMode("physician")} /><span><strong>نعم</strong> — يراجع الطبيب النتيجة، ويمكنه إعداد مسودة خاصة ثم تعديلها واعتمادها صراحةً باسم الطبيب.</span></label>
+                <label className="flex gap-3"><input type="radio" name="consultation-mode" checked={consultationMode === "automatic"} onChange={() => { setConsultationMode("automatic"); setEnabled(true); }} /><span><strong>لا</strong> — بعد تحليل الجسم وإكمال التمريض، ينشئ النظام توصيات تثقيفية مقيدة بالمصادر دون اسم طبيب.</span></label>
                 {consultationMode === "automatic" && <p className="text-sm text-[#526f68]">لا يتاح هذا الوضع من دون محطة تمريض وفحص واحد على الأقل. يختار النظام من توصيات معتمدة مسبقًا فقط، وتبقى تفاصيل المصادر في مساحة الفريق والأدمن.</p>}
               </fieldset>
               <label className="block">

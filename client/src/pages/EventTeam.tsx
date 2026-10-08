@@ -44,7 +44,10 @@ export default function EventTeam() {
   const [advice, setAdvice] = useState("");
   const [adviceDirty, setAdviceDirty] = useState(false);
   const [nursingDirty, setNursingDirty] = useState(false);
+  const [baseRevision, setBaseRevision] = useState<number | null>(null);
+  const [hasConflict, setHasConflict] = useState(false);
   const [message, setMessage] = useState("");
+  const adviceDirtyRef = useRef(false);
   const saved = async () => {
     await record.refetch();
     setMessage("تم الحفظ بنجاح");
@@ -52,18 +55,31 @@ export default function EventTeam() {
   const nursing = trpc.eventTeam.saveNursing.useMutation({
     onSuccess: async result => {
       setNursingDirty(false);
+      setHasConflict(false);
       await record.refetch();
       setMessage(result.automatic?.state === "waiting_for_body" ? "وصلت قراءة جزئية فقط. انتظر تقرير تحليل عناصر الجسم الكامل قبل إنشاء التوصيات." : "تم الحفظ بنجاح");
     },
-    onError: e => setMessage(e.message),
+    onError: async e => {
+      if (e.data?.code === "CONFLICT") {
+        setHasConflict(true);
+        await record.refetch();
+      }
+      setMessage(e.message);
+    },
   });
   const doctor = trpc.eventTeam.saveAdvice.useMutation({
-    onSuccess: async () => { setAdviceDirty(false); await saved(); },
-    onError: e => setMessage(e.message),
+    onSuccess: async () => { setAdviceDirty(false); setHasConflict(false); await saved(); },
+    onError: async e => {
+      if (e.data?.code === "CONFLICT") {
+        setHasConflict(true);
+        await record.refetch();
+      }
+      setMessage(e.message);
+    },
   });
   const generateDraft = trpc.eventTeam.generateDraft.useMutation({
     onSuccess: async draft => {
-      if (adviceDirty) {
+      if (adviceDirtyRef.current) {
         setMessage("تم إنشاء المسودة الخاصة، لكن لم نستبدل نصك الذي تعدله. حدّث الزيارة لمراجعة المسودة المحفوظة.");
       } else {
         setAdvice(draft.advice);
@@ -72,7 +88,13 @@ export default function EventTeam() {
       }
       await record.refetch();
     },
-    onError: e => setMessage(e.message),
+    onError: async e => {
+      if (e.data?.code === "CONFLICT") {
+        setHasConflict(true);
+        await record.refetch();
+      }
+      setMessage(e.message);
+    },
   });
   const retryAutomatic = trpc.eventTeam.retryAutomaticRecommendations.useMutation({
     onSuccess: async result => {
@@ -90,14 +112,34 @@ export default function EventTeam() {
     setMeasurements(current => changedParticipant || JSON.stringify(current) === JSON.stringify(previous?.care?.measurements ?? {}) ? care?.measurements ?? {} : current);
     setNotes(current => changedParticipant || current === (previous?.care?.nurseNotes ?? "") ? care?.nurseNotes ?? "" : current);
     setAdvice(current => changedParticipant || current === (previous?.care?.advice ?? "") ? care?.advice ?? "" : current);
-    if (changedParticipant) { setAdviceDirty(false); setNursingDirty(false); }
+    if (changedParticipant) {
+      setAdviceDirty(false);
+      setNursingDirty(false);
+      setBaseRevision(care?.revision ?? null);
+      setHasConflict(false);
+    } else if (!adviceDirty && !nursingDirty) {
+      setBaseRevision(care?.revision ?? null);
+    }
     lastLoaded.current = { sessionId: participant?.id, care };
-  }, [care, participant?.id]);
+  }, [care, participant?.id, adviceDirty, nursingDirty]);
+  useEffect(() => {
+    adviceDirtyRef.current = adviceDirty;
+  }, [adviceDirty]);
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("lim:dirty-edits", { detail: { dirty: adviceDirty || nursingDirty } }));
-    return () => { window.dispatchEvent(new CustomEvent("lim:dirty-edits", { detail: { dirty: false } })); };
   }, [adviceDirty, nursingDirty]);
+  useEffect(() => () => {
+    window.dispatchEvent(new CustomEvent("lim:dirty-edits", { detail: { dirty: false } }));
+  }, []);
   const pending = nursing.isPending || doctor.isPending || generateDraft.isPending || retryAutomatic.isPending;
+  const activeRevision = baseRevision ?? care?.revision ?? 0;
+  const generationLeaseExpired = Boolean(
+    care?.autoGenerationLeaseExpiresAt &&
+    new Date(care.autoGenerationLeaseExpiresAt).getTime() <= Date.now()
+  );
+  const automaticRetryBlocked =
+    (care?.autoGenerationAttempts ?? 0) >= 2 ||
+    (care?.autoGenerationState === "generating" && !generationLeaseExpired);
   return (
     <main dir="rtl" className="min-h-screen bg-[#f3f8f6] p-5 text-[#123a34]">
       <div className="mx-auto max-w-3xl space-y-5">
@@ -250,6 +292,17 @@ export default function EventTeam() {
                       ? "بانتظار إكمال قياسات التمريض"
                       : "جاهز لاستشارة الطبيب"}
                 </p>
+                {hasConflict && (
+                  <section role="alert" className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                    <p className="font-bold">تم حفظ تعديل أحدث بواسطة عضو آخر. احتفظنا بنصك وقياساتك المحلية ولم نستبدلها.</p>
+                    <p className="text-sm">راجِع النسخة الحالية من الخادم أدناه، وادمج ما يلزم قبل اختيار المتابعة أو استبدال تعديلاتك.</p>
+                    {me.data.duty === "doctor" ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-white p-3 text-sm">{care.advice || "لا توجد نصائح محفوظة في الخادم."}</pre> : <EventCareSummary measurements={care.measurements} notes={care.nurseNotes} />}
+                    <div className="flex flex-wrap gap-3">
+                      <button className={buttonClass} onClick={() => { setBaseRevision(care.revision); setHasConflict(false); setMessage("تم اعتماد النسخة الأحدث كأساس بعد مراجعتك. راجع دمج تعديلاتك المحلية قبل الحفظ."); }}>أكملت مراجعة ودمج التعديلات</button>
+                      <button className="rounded-xl border border-[#123f37] px-5 py-3 font-bold text-[#123f37]" onClick={() => { setAdvice(care.advice ?? ""); setMeasurements(care.measurements ?? {}); setNotes(care.nurseNotes ?? ""); setAdviceDirty(false); setNursingDirty(false); setBaseRevision(care.revision); setHasConflict(false); setMessage("تم استبدال التعديلات المحلية بالنسخة الحالية من الخادم."); }}>استخدام نسخة الخادم</button>
+                    </div>
+                  </section>
+                )}
                 {!record.data?.readings.length && (
                   <p>
                     لم تصل نتيجة الجهاز لهذه الزيارة بعد.{" "}
@@ -383,7 +436,7 @@ export default function EventTeam() {
                                   measurements,
                                   notes,
                                   finalize: false,
-                                  expectedRevision: care.revision,
+                                  expectedRevision: activeRevision,
                                 })
                               }
                             >
@@ -406,7 +459,7 @@ export default function EventTeam() {
                                     measurements,
                                     notes,
                                     finalize: true,
-                                    expectedRevision: care.revision,
+                                    expectedRevision: activeRevision,
                                   });
                               }}
                             >
@@ -417,7 +470,7 @@ export default function EventTeam() {
                         {care.consultationMode === "automatic" && Boolean(care.nursingCompletedAt) && (
                           <section className="rounded-2xl bg-[#f3f8f6] p-4">
                             <h2 className="font-bold">توصيات لنمط حياة صحي</h2>
-                            {care.autoGenerationState === "generated" ? <><p className="mt-2 text-sm">تم إنشاء التقرير وإتاحته للمستفيد. لا توجد توصيات طبية أو اسم طبيب في هذا الوضع.</p>{Array.isArray(care.recommendationMeta?.sourceIds) && <p className="mt-2 text-xs text-slate-600">مصادر المراجعة الداخلية: {(care.recommendationMeta.sourceIds as string[]).join("، ")}</p>}</> : <><p className="mt-2 text-sm">{care.autoGenerationError || "يجري إعداد توصيات نمط الحياة المسموح بها لهذه الزيارة."}</p><button className={`${buttonClass} mt-3`} disabled={pending || care.autoGenerationState === "generating" || (care.autoGenerationAttempts ?? 0) >= 2} onClick={() => retryAutomatic.mutate({ sessionId: participant.id, confirmed: true })}>{retryAutomatic.isPending ? "جارٍ إعادة المحاولة…" : "إعادة محاولة إنشاء التوصيات"}</button></>}
+                            {care.autoGenerationState === "generated" ? <><p className="mt-2 text-sm">تم إنشاء التقرير وإتاحته للمستفيد. لا توجد توصيات طبية أو اسم طبيب في هذا الوضع.</p>{Array.isArray(care.recommendationMeta?.sourceIds) && <p className="mt-2 text-xs text-slate-600">مصادر المراجعة الداخلية: {(care.recommendationMeta.sourceIds as string[]).join("، ")}</p>}</> : <><p className="mt-2 text-sm">{care.autoGenerationError || (care.autoGenerationState === "generating" && !generationLeaseExpired ? "يجري إعداد توصيات نمط الحياة المسموح بها لهذه الزيارة." : "يمكن إعادة محاولة إنشاء التوصيات.")}</p>{generationLeaseExpired && care.autoGenerationState === "generating" && <p className="mt-2 text-sm text-amber-800">انتهت مهلة المحاولة السابقة دون إتمامها؛ يمكنك إعادة المحاولة الآن.</p>}{(care.autoGenerationAttempts ?? 0) >= 2 && <p className="mt-2 text-sm text-amber-800">وصلت المحاولات لهذا الإدخال إلى الحد الآمن. لن تتاح محاولة أخرى إلا بعد تغيير مادي في نتيجة الجسم أو بيانات الزيارة، أو مراجعة الفريق.</p>}<button className={`${buttonClass} mt-3`} disabled={pending || automaticRetryBlocked} onClick={() => retryAutomatic.mutate({ sessionId: participant.id, confirmed: true })}>{retryAutomatic.isPending ? "جارٍ إعادة المحاولة…" : "إعادة محاولة إنشاء التوصيات"}</button></>}
                           </section>
                         )}
                       </>
@@ -495,11 +548,12 @@ export default function EventTeam() {
                       <div className="flex gap-3">
                         <button
                           className={buttonClass}
-                          disabled={pending || !record.data?.readings.length || Boolean(care.nursingEnabled && !care.nursingCompletedAt)}
-                          onClick={() => generateDraft.mutate({ sessionId: participant.id, confirmed: true, expectedRevision: care.revision })}
+                          disabled={pending || adviceDirty || !record.data?.readings.length || Boolean(care.nursingEnabled && !care.nursingCompletedAt)}
+                          onClick={() => generateDraft.mutate({ sessionId: participant.id, confirmed: true, expectedRevision: activeRevision })}
                         >
                           {generateDraft.isPending ? "جارٍ إعداد مسودة خاصة…" : "إنشاء مسودة مقيدة بالمصادر"}
                         </button>
+                        {adviceDirty && <p className="self-center text-sm text-amber-800">احفظ تعديلاتك أو استخدم نسخة الخادم قبل إنشاء مسودة جديدة.</p>}
                         <button
                           className={buttonClass}
                           disabled={
@@ -513,7 +567,7 @@ export default function EventTeam() {
                               confirmed: true,
                               advice,
                               finalize: false,
-                              expectedRevision: care.revision,
+                              expectedRevision: activeRevision,
                             })
                           }
                         >
@@ -540,7 +594,7 @@ export default function EventTeam() {
                                 confirmed: true,
                                 advice,
                                 finalize: true,
-                                expectedRevision: care.revision,
+                                expectedRevision: activeRevision,
                               });
                           }}
                         >

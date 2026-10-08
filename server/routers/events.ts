@@ -15,6 +15,7 @@ import {
   getEventParticipantSessionByTokenHash,
   getUserById,
   getUserByPhone,
+  saveEventLifestyleAnswers,
   updateEventParticipantSession,
 } from "../db";
 import { hashApiKey } from "../lib/apiSecurity";
@@ -172,7 +173,16 @@ export const eventsRouter = router({
       if (!(session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle")) throw new TRPCError({code:"BAD_REQUEST", message:"الاستبيان غير مفعّل لهذه الزيارة"});
       if (input.answers._questionnaireVersion !== undefined && (input.answers._questionnaireVersion !== EVENT_LIFESTYLE_VERSION || !revisedLifestyleComplete(input.answers)))
         throw new TRPCError({code:"BAD_REQUEST",message:"أكمل أسئلة الاستبيان بقيم صحيحة وأولويات مختلفة قبل الحفظ"});
-      const updated = await updateEventParticipantSession(tokenHash(input.accessToken), { answers: input.answers });
+      const care = await readCare(session.id);
+      if (care.approvedAt) throw new TRPCError({ code: "CONFLICT", message: "اكتمل التقرير؛ لا يمكن تعديل الاستبيان لهذه الزيارة" });
+      let updated;
+      try {
+        updated = await saveEventLifestyleAnswers(tokenHash(input.accessToken), input.answers);
+      } catch (error) {
+        if (error instanceof Error && error.message === "APPROVED_EVENT_QUESTIONNAIRE_FROZEN")
+          throw new TRPCError({ code: "CONFLICT", message: "اكتمل التقرير؛ لا يمكن تعديل الاستبيان لهذه الزيارة" });
+        throw error;
+      }
       if (!updated || updated.id !== session.id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save lifestyle answers." });
       return { success: true, answers: updated.answers ?? {} };
     }),

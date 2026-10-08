@@ -13,7 +13,8 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:check-events": "node scripts/check-events-db.mjs",
     "db:dry-run-events-test-cleanup": "node scripts/dry-run-delete-scoped-events-test-results.mjs",
-    "db:dry-run-delete-all-events-history": "node scripts/dry-run-delete-all-events-history.mjs"
+    "db:dry-run-delete-all-events-history": "node scripts/dry-run-delete-all-events-history.mjs",
+    "db:plan-purge-events-history": "node scripts/purge-all-events-history.guarded.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

@@ -22,6 +22,7 @@ vi.mock("./db", async (importOriginal) => {
     getEventParticipantSessionByTokenHash: vi.fn(),
     getUserById: vi.fn(),
     getUserByPhone: vi.fn(),
+    saveEventLifestyleAnswers: vi.fn(),
     updateEventParticipantSession: vi.fn(),
   };
 });
@@ -138,6 +139,23 @@ describe("standalone events.createSession", () => {
     await expect(caller.events.createSession({
       age: 30, sex: "male", phone: "0123456789", consent: true, consentVersion: "events-service-2026-10-05",
     })).rejects.toThrow("valid Saudi mobile");
+  });
+});
+
+describe("standalone Events questionnaire safeguards", () => {
+  it("rejects answers for a visit snapshot configured without a questionnaire", async () => {
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({ ...eventSession, questionnaireIds: [] });
+    await expect(appRouter.createCaller(anonymousContext).events.saveLifestyle({ accessToken: "z".repeat(43), answers: {} }))
+      .rejects.toThrow("الاستبيان غير مفعّل");
+    expect(mockedDb.saveEventLifestyleAnswers).not.toHaveBeenCalled();
+  });
+
+  it("freezes questionnaire changes after a completed report", async () => {
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
+    vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: new Date() } as never);
+    await expect(appRouter.createCaller(anonymousContext).events.saveLifestyle({ accessToken: "z".repeat(43), answers: {} }))
+      .rejects.toThrow("لا يمكن تعديل الاستبيان");
+    expect(mockedDb.saveEventLifestyleAnswers).not.toHaveBeenCalled();
   });
 });
 

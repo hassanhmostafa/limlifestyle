@@ -56,6 +56,7 @@ Implementation wording is original Arabic education, **not** a quotation, treatm
 
 - `pnpm db:dry-run-delete-events-test-results` remains the narrow, separately guarded audit for proven test uploads.
 - `pnpm db:dry-run-delete-all-events-history` is the authorized **all historical `lim-events`** dry-run audit. It counts visits, care rows, answer-bearing visits, proven readings, and ambiguous/shared readings. It has **no apply path**.
+- `pnpm db:plan-purge-events-history -- --cutoff=<UTC ISO>` prepares the concrete transactional purge manifest but defaults to dry-run. Its guarded apply path is deliberately unavailable without a separately approved cutoff, exact fresh manifest hash, exact count flags, and the literal final confirmation token. It rechecks the exact visit/care/reading identifier hashes inside a serializable transaction before deleting only proven rows.
 - The all-history audit treats exact `userId + latestRecordNo` associations as unambiguous. Readings for an Event participant without that exact current association are reported as ambiguous/shared and remain untouched until a separately reviewed transactional deletion plan is authorized.
 - Accounts, profiles/settings, staff/staff sessions, tracks, research accounts/grants/audit, OTP tables, and ambiguous/shared readings are preserved.
 

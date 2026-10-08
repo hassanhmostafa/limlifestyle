@@ -33,7 +33,7 @@ try {
     'SELECT tokenHash, researcherId, credentialVersion, expiresAt FROM event_research_sessions LIMIT 0',
     'SELECT actorId, action, eventCode, rowCount FROM event_research_audit LIMIT 0',
     'SELECT eventCode, name, startsOn, endsOn, location, organizer, poster, questionnaireIds, closed FROM event_profiles LIMIT 0',
-    'SELECT questionnaireIds, consentVersion, consentedAt FROM event_participant_sessions LIMIT 0',
+    'SELECT questionnaireIds, consentVersion, consentedAt, latestReadingFingerprint FROM event_participant_sessions LIMIT 0',
     'SELECT id, eventCode, name, active FROM event_tracks LIMIT 0',
     'SELECT eventCode, nursingEnabled, testIds FROM event_settings LIMIT 0',
     'SELECT trackId FROM event_participant_sessions LIMIT 0',

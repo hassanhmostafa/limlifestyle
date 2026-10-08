@@ -24,6 +24,9 @@ import { getDb } from "./db";
 import { and, eq } from "drizzle-orm";
 
 const MAX_NUMERIC_NURSING_VALUE = 10_000;
+/** Keep all provider work below the 90-second automatic-generation lease. */
+const MODEL_CATALOG_DEADLINE_MS = 8_000;
+const MODEL_SELECTION_DEADLINE_MS = 58_000;
 const frequencyValues = new Set(["0", "0.5", "2", "5", "10.5", "21"]);
 const sleepValues = new Set(["0", "1", "2", "3", "3.1", "2.1", "0.1"]);
 const recentFrequencyValues = new Set(["0", "1", "2", "3"]);
@@ -44,7 +47,11 @@ export type MinimizedRecommendationInput = {
 };
 
 function numeric(value: unknown) {
-  const parsed = typeof value === "number" ? value : Number(value);
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
@@ -164,7 +171,15 @@ function knownNumber(answers: Record<string, string | number | string[]>, id: st
 }
 
 export function candidateSuggestionIds(answers: Record<string, string | number | string[]>) {
-  const ids = new Set<string>(["measurement-followup", "small-goal"]);
+  // Unknown answers must not be treated as a deficiency. These neutral cards are
+  // nevertheless appropriate for any adult completing a body-composition visit.
+  const ids = new Set<string>([
+    "measurement-followup",
+    "small-goal",
+    "activity-gradual",
+    "nutrition-plants",
+    "sleep-routine",
+  ]);
   const activityDays = knownNumber(answers, "activeDays");
   const activityMinutes = knownNumber(answers, "activeMinutes");
   const strengthDays = knownNumber(answers, "strengthDays");
@@ -232,11 +247,12 @@ async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
       sourceSummary: entry.sourceSummary,
     };
   });
-  const models = await listLLMModels();
+  const models = await listLLMModels({ timeoutMs: MODEL_CATALOG_DEADLINE_MS });
   const model = models.data.find(item => item.id === "gpt-5-mini")?.id;
   if (!model) throw new Error("Configured structured recommendation model is unavailable.");
   const response = await invokeLLM({
     model,
+    timeoutMs: MODEL_SELECTION_DEADLINE_MS,
     messages: [
       {
         role: "system",
@@ -326,6 +342,22 @@ async function buildMinimizedInput(sessionId: number) {
   return { session, care, input, fingerprint: stableFingerprint(input) };
 }
 
+async function inputStillMatches(
+  sessionId: number,
+  expected: { recordNo: string; careRevision: number; fingerprint: string }
+) {
+  try {
+    const fresh = await buildMinimizedInput(sessionId);
+    return (
+      fresh.session.latestRecordNo === expected.recordNo &&
+      fresh.care.revision === expected.careRevision &&
+      fresh.fingerprint === expected.fingerprint
+    );
+  } catch {
+    return false;
+  }
+}
+
 function recommendationMeta(ids: string[], fingerprint: string, mode: EventConsultationMode) {
   const chosen = ids.map(id => eventRecommendationById.get(id)!).filter(Boolean);
   return {
@@ -366,6 +398,11 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
   };
   try {
     if (isUrgentBloodPressure(bloodPressureFromInput(context.input))) {
+      if (!(await inputStillMatches(sessionId, {
+        recordNo: attempt.recordNo,
+        careRevision: claimed.care.revision,
+        fingerprint: attempt.fingerprint,
+      }))) return { state: "input_changed" };
       const published = await completeAutomaticRecommendationGeneration(sessionId, attempt, {
         advice: urgentAdvice(),
         recommendationMeta: {
@@ -381,6 +418,11 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
       return published ? { state: "generated", mode: "automatic" } : { state: "input_changed" };
     }
     const selected = await chooseSuggestionIds(context.input);
+    if (!(await inputStillMatches(sessionId, {
+      recordNo: attempt.recordNo,
+      careRevision: claimed.care.revision,
+      fingerprint: attempt.fingerprint,
+    }))) return { state: "input_changed" };
     const published = await completeAutomaticRecommendationGeneration(sessionId, attempt, {
       advice: composeEventLifestyleDraft(selected.ids),
       recommendationMeta: recommendationMeta(selected.ids, context.fingerprint, "automatic"),
@@ -435,6 +477,11 @@ export async function generatePhysicianRecommendationDraftForSession(input: {
     metadata = recommendationMeta(selected.ids, context.fingerprint, "physician");
     model = selected.model;
   }
+  if (!(await inputStillMatches(input.sessionId, {
+    recordNo: context.session.latestRecordNo!,
+    careRevision: input.expectedRevision,
+    fingerprint: context.fingerprint,
+  }))) throw new Error("Recommendation draft input changed before it could be saved.");
   const updated = await updateCare(
     input.sessionId,
     {

@@ -37,7 +37,7 @@ export default function EventAdminPanel(){
     setExporting(true);setMessage('جارٍ إعداد التقرير…');
     try {const records:Record<string,unknown>[]=[];let after=0;do{const page=await utils.eventAdmin.report.fetch({after,limit:50});records.push(...page.records);if(page.nextCursor===null)break;after=page.nextCursor;}while(true);
       if (format==='csv') download('lim-event-report.csv',eventReportCsv(records),'text/csv;charset=utf-8');
-      else download('lim-event-report.json',JSON.stringify({event:profile.data,summary:summary.data,exportedAt:new Date().toISOString(),records},null,2),'application/json');setMessage(`تم تنزيل تقرير ${records.length} زيارة شاملاً نتائج الجهاز والتمريض وملاحظات الطبيب المعتمدة`);
+      else download('lim-event-report.json',JSON.stringify({event:profile.data,summary:summary.data,exportedAt:new Date().toISOString(),records},null,2),'application/json');setMessage(`تم تنزيل تقرير ${records.length} زيارة شاملاً نتائج الجهاز والتمريض والتقارير المكتملة`);
     }catch(e){setMessage('تعذر تنزيل التقرير كاملًا. أعد المحاولة.');}finally{setExporting(false);}
   }
   if(profile.isLoading)return <section className={card}>جارٍ تحميل بيانات الفعالية…</section>;
@@ -94,7 +94,7 @@ export default function EventAdminPanel(){
       <style>{`@media print { body * { visibility: hidden; } #event-print-report, #event-print-report * { visibility: visible; } #event-print-report { position:absolute; inset:0; margin:0; } #event-print-report button { display:none; } }`}</style>
       <h2 className="flex items-center gap-2 text-xl font-bold"><FileDown/>تقرير الفعالية</h2>
       <p className="text-lg font-bold">{profile.data?.name}</p><p>{profile.data?.startsOn} — {profile.data?.endsOn}</p><p>{profile.data?.organizer} · {profile.data?.location}</p>
-      {summary.error?<p role="alert">تعذر تحميل الإحصاءات</p>:<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{([['participants','المشاركون الفريدون'],['visits','الزيارات'],['measured','نتائج الجهاز'],['nursing','اكتمل التمريض'],['approved','تقارير اعتمدها الطبيب'],['finished','رحلات مكتملة']] as const).map(([key,title])=><div key={key} className="rounded-2xl bg-[#f3f8f6] p-4"><p className="text-sm">{title}</p><strong className="text-3xl">{summary.data?.[key]??'—'}</strong></div>)}</div>}
+      {summary.error?<p role="alert">تعذر تحميل الإحصاءات</p>:<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{([['participants','المشاركون الفريدون'],['visits','الزيارات'],['measured','نتائج الجهاز'],['nursing','اكتمل التمريض'],['approved','تقارير مكتملة'],['finished','رحلات مكتملة']] as const).map(([key,title])=><div key={key} className="rounded-2xl bg-[#f3f8f6] p-4"><p className="text-sm">{title}</p><strong className="text-3xl">{summary.data?.[key]??'—'}</strong></div>)}</div>}
       <p className="text-sm text-slate-600">الملف التفصيلي مخصص للأدمن ويحتوي بيانات المشاركين واستبياناتهم ونتائج الجهاز والقياسات والنصائح المعتمدة.</p>
       <div data-pdf-hide className="flex flex-wrap gap-3"><button type="button" className={button} onClick={()=>summary.refetch()}>تحديث الإحصاءات</button><button type="button" className={button} disabled={exporting||!summary.data} onClick={()=>void exportReport("json")}>{exporting?'جارٍ التنزيل…':'تنزيل التقرير التفصيلي JSON'}</button><EventPdfButton className={button} label="تحميل الملخص للطباعة PDF" filename="lim-event-summary.pdf" /><button type="button" className={button} disabled={exporting||!summary.data} onClick={()=>void exportReport("csv")}>تنزيل جدول المشاركين CSV</button></div>
     </section>

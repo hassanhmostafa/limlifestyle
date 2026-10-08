@@ -134,6 +134,13 @@
       "when": 1791736800000,
       "tag": "0018_events_care_concurrency",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1791736800001,
+      "tag": "0019_events_reading_fingerprint",
+      "breakpoints": true
     }
   ]
 }
