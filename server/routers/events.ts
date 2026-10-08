@@ -1,22 +1,10 @@
 import { generateAutomaticRecommendationsForSession } from "../eventRecommendationEngine";
-import {
-  EVENT_LIFESTYLE_VERSION,
-  revisedLifestyleComplete,
-} from "../../shared/eventLifestyle";
+import { EVENT_LIFESTYLE_VERSION, revisedLifestyleComplete } from "../../shared/eventLifestyle";
 import { EVENT_CONSENT_VERSION } from "../../shared/eventConsent";
-import {
-  otpEnabled,
-  sendEventOtp,
-  verifyEventOtp,
-  consumeEventOtp,
-} from "../eventOtp";
+import { otpEnabled, sendEventOtp, verifyEventOtp, consumeEventOtp } from "../eventOtp";
 import { requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
-import {
-  listTracks,
-  requireTrack,
-  selectRegistrationTrack,
-} from "../eventTracksDb";
+import { listTracks, requireTrack, selectRegistrationTrack } from "../eventTracksDb";
 import { createCareSnapshot, readCare } from "../eventCareDb";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -56,9 +44,7 @@ function createEventCode() {
 }
 
 async function requireEventSession(accessToken: string) {
-  const session = await getEventParticipantSessionByTokenHash(
-    tokenHash(accessToken)
-  );
+  const session = await getEventParticipantSessionByTokenHash(tokenHash(accessToken));
   if (!session) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
@@ -76,53 +62,33 @@ async function requireEventSession(accessToken: string) {
  */
 export const eventsRouter = router({
   otpStatus: publicProcedure.query(() => ({ enabled: otpEnabled() })),
-  sendOtp: publicProcedure
-    .input(z.object({ phone: z.string().min(8).max(32) }))
-    .mutation(async ({ input, ctx }) => {
-      await requireOpenEvent();
-      return sendEventOtp(
-        input.phone,
-        ctx.req.ip || ctx.req.socket?.remoteAddress || "unknown"
-      );
-    }),
-  verifyOtp: publicProcedure
-    .input(
-      z.object({
-        phone: z.string().min(8).max(32),
-        challengeToken: z.string().min(32).max(128),
-        code: z.string().regex(/^\d{4}$/),
-      })
-    )
-    .mutation(async ({ input }) => {
-      await requireOpenEvent();
-      return verifyEventOtp(input.phone, input.challengeToken, input.code);
-    }),
-  tracks: publicProcedure.query(async () =>
-    (await listTracks(true)).map(t => ({ id: t.id, name: t.name }))
-  ),
+  sendOtp: publicProcedure.input(z.object({ phone: z.string().min(8).max(32) })).mutation(async ({ input, ctx }) => {
+    await requireOpenEvent();
+    return sendEventOtp(input.phone, ctx.req.ip || ctx.req.socket?.remoteAddress || "unknown");
+  }),
+  verifyOtp: publicProcedure.input(z.object({ phone: z.string().min(8).max(32), challengeToken: z.string().min(32).max(128), code: z.string().regex(/^\d{4}$/) })).mutation(async ({ input }) => {
+    await requireOpenEvent();
+    return verifyEventOtp(input.phone, input.challengeToken, input.code);
+  }),
+  tracks: publicProcedure.query(async () => (await listTracks(true)).map(t => ({ id: t.id, name: t.name }))),
   createSession: publicProcedure
-    .input(
-      z.object({
-        firstName: z.string().trim().max(255).optional(),
-        age: z.number().int().min(18).max(120),
-        sex: z.enum(["male", "female"]),
-        phone: z.string().trim().min(8).max(32),
-        city: z.string().trim().max(128).optional(),
-        consent: z.literal(true),
-        consentVersion: z.literal(EVENT_CONSENT_VERSION),
-        otpChallengeToken: z.string().min(32).max(128).optional(),
-        trackId: z.number().int().positive().optional(),
-      })
-    )
+    .input(z.object({
+      firstName: z.string().trim().max(255).optional(),
+      age: z.number().int().min(18).max(120),
+      sex: z.enum(["male", "female"]),
+      phone: z.string().trim().min(8).max(32),
+      city: z.string().trim().max(128).optional(),
+      consent: z.literal(true),
+      consentVersion: z.literal(EVENT_CONSENT_VERSION),
+      otpChallengeToken: z.string().min(32).max(128).optional(),
+      trackId: z.number().int().positive().optional(),
+    }))
     .mutation(async ({ input }) => {
       const profile = await requireOpenEvent();
       const track = await selectRegistrationTrack(input.trackId);
       const normalizedPhone = normalizeSaudiMobilePhone(input.phone);
       if (!normalizedPhone.ok) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Enter a valid Saudi mobile number.",
-        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a valid Saudi mobile number." });
       }
 
       await consumeEventOtp(normalizedPhone.e164, input.otpChallengeToken);
@@ -137,11 +103,7 @@ export const eventsRouter = router({
           name: input.firstName || null,
         });
       }
-      if (!user)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Unable to create the event participant.",
-        });
+      if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create the event participant." });
 
       const accessToken = createPublicEventToken();
       const session = await createEventParticipantSession({
@@ -161,11 +123,7 @@ export const eventsRouter = router({
         answers: {},
         status: "checked_in",
       });
-      if (!session)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Unable to save the event session.",
-        });
+      if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the event session." });
 
       // Nursing/tests and consultation mode are frozen for this visit now—not
       // lazily when staff first open it—so admin changes affect only new visits.
@@ -187,94 +145,57 @@ export const eventsRouter = router({
       };
     }),
 
-  getSession: publicProcedure
-    .input(eventTokenInput)
-    .query(async ({ input }) => {
-      const session = await requireEventSession(input.accessToken);
-      const user = await getUserById(session.userId);
-      const track = session.trackId
-        ? await requireTrack(session.trackId, false)
-        : null;
-      return {
-        code: session.code,
-        trackId: session.trackId,
-        questionnaireIds: session.questionnaireIds ?? ["lifestyle"],
-        trackName: track?.name ?? null,
-        firstName: session.displayName,
-        age: session.age,
-        sex: session.sex,
-        city: session.city,
-        status: session.status,
-        answers: session.answers ?? {},
-        latestRecordNo: session.latestRecordNo,
-        consultationCompletedAt: session.consultationCompletedAt,
-        reportCompletedAt: session.reportCompletedAt,
-        deviceUserId: user?.phone ? toMachineUserId(user.phone) : null,
-      };
-    }),
+  getSession: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
+    const session = await requireEventSession(input.accessToken);
+    const user = await getUserById(session.userId);
+    const track = session.trackId ? await requireTrack(session.trackId, false) : null;
+    return {
+      code: session.code,
+      trackId: session.trackId,
+      questionnaireIds: session.questionnaireIds ?? ["lifestyle"],
+      trackName: track?.name ?? null,
+      firstName: session.displayName,
+      age: session.age,
+      sex: session.sex,
+      city: session.city,
+      status: session.status,
+      answers: session.answers ?? {},
+      latestRecordNo: session.latestRecordNo,
+      consultationCompletedAt: session.consultationCompletedAt,
+      reportCompletedAt: session.reportCompletedAt,
+      deviceUserId: user?.phone ? toMachineUserId(user.phone) : null,
+    };
+  }),
 
   saveLifestyle: publicProcedure
     .input(eventTokenInput.extend({ answers: answersSchema }))
     .mutation(async ({ input }) => {
       const session = await requireEventSession(input.accessToken);
-      if (!(session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle"))
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "الاستبيان غير مفعّل لهذه الزيارة",
-        });
-      if (
-        input.answers._questionnaireVersion !== undefined &&
-        (input.answers._questionnaireVersion !== EVENT_LIFESTYLE_VERSION ||
-          !revisedLifestyleComplete(input.answers))
-      )
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "أكمل أسئلة الاستبيان بقيم صحيحة وأولويات مختلفة قبل الحفظ",
-        });
+      if (!(session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle")) throw new TRPCError({code:"BAD_REQUEST", message:"الاستبيان غير مفعّل لهذه الزيارة"});
+      if (input.answers._questionnaireVersion !== undefined && (input.answers._questionnaireVersion !== EVENT_LIFESTYLE_VERSION || !revisedLifestyleComplete(input.answers)))
+        throw new TRPCError({code:"BAD_REQUEST",message:"أكمل أسئلة الاستبيان بقيم صحيحة وأولويات مختلفة قبل الحفظ"});
       const care = await readCare(session.id);
-      if (care.approvedAt)
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "اكتمل التقرير؛ لا يمكن تعديل الاستبيان لهذه الزيارة",
-        });
+      if (care.approvedAt) throw new TRPCError({ code: "CONFLICT", message: "اكتمل التقرير؛ لا يمكن تعديل الاستبيان لهذه الزيارة" });
       let updated;
       try {
-        updated = await saveEventLifestyleAnswers(
-          tokenHash(input.accessToken),
-          input.answers
-        );
+        updated = await saveEventLifestyleAnswers(tokenHash(input.accessToken), input.answers);
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message === "APPROVED_EVENT_QUESTIONNAIRE_FROZEN"
-        )
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "اكتمل التقرير؛ لا يمكن تعديل الاستبيان لهذه الزيارة",
-          });
+        if (error instanceof Error && error.message === "APPROVED_EVENT_QUESTIONNAIRE_FROZEN")
+          throw new TRPCError({ code: "CONFLICT", message: "اكتمل التقرير؛ لا يمكن تعديل الاستبيان لهذه الزيارة" });
         throw error;
       }
-      if (!updated || updated.id !== session.id)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Unable to save lifestyle answers.",
-        });
+      if (!updated || updated.id !== session.id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save lifestyle answers." });
       return { success: true, answers: updated.answers ?? {} };
     }),
 
   // Retained for old clients; only the assigned doctor may approve via eventTeam.
   completeConsultation: publicProcedure.input(eventTokenInput).mutation(() => {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "يعتمد الطبيب الاستشارة من صفحة الفريق",
-    });
+    throw new TRPCError({ code: "FORBIDDEN", message: "يعتمد الطبيب الاستشارة من صفحة الفريق" });
   }),
-  ensureRecommendations: publicProcedure
-    .input(eventTokenInput)
-    .mutation(async ({ input }) => {
-      const session = await requireEventSession(input.accessToken);
-      return generateAutomaticRecommendationsForSession(session.id);
-    }),
+  ensureRecommendations: publicProcedure.input(eventTokenInput).mutation(async ({ input }) => {
+    const session = await requireEventSession(input.accessToken);
+    return generateAutomaticRecommendationsForSession(session.id);
+  }),
   care: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
     const care = await readCare(session.id);
@@ -301,23 +222,14 @@ export const eventsRouter = router({
       const session = await requireEventSession(input.accessToken);
       const care = await readCare(session.id);
       if (!session.latestRecordNo || !care.approvedAt) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Complete the consultation before finishing the report.",
-        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Complete the consultation before finishing the report." });
       }
       const completedAt = session.reportCompletedAt ?? new Date();
-      const updated = await updateEventParticipantSession(
-        tokenHash(input.accessToken),
-        {
-          reportCompletedAt: completedAt,
-        }
-      );
+      const updated = await updateEventParticipantSession(tokenHash(input.accessToken), {
+        reportCompletedAt: completedAt,
+      });
       if (!updated || updated.id !== session.id) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Unable to finish the report.",
-        });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to finish the report." });
       }
       return { success: true, reportCompletedAt: updated.reportCompletedAt };
     }),
@@ -333,7 +245,7 @@ export const eventsRouter = router({
     // A final report is tied to the exact X18 record reviewed at approval.
     // Newer device uploads invalidate approval in markEventParticipantMeasured.
     const recordNo = care.approvedAt
-      ? (care.approvedRecordNo ?? session.latestRecordNo)
+      ? care.approvedRecordNo ?? session.latestRecordNo
       : session.latestRecordNo;
     if (!recordNo) {
       return {
