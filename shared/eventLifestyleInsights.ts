@@ -145,9 +145,11 @@ function nutritionInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "
   const lowFruit = (finite(answers.fruit) ?? 0) < 5;
   const lowVegetables = (finite(answers.vegetables) ?? 0) < 5;
   const lowWholeGrains = (finite(answers.wholeGrains) ?? 0) < 5;
+  const highRefinedGrains = (finite(answers.refinedGrains) ?? 0) >= 5;
   const highFried = (finite(answers.fried) ?? 0) >= 5;
   const highPrepared = (finite(answers.preparedFood) ?? 0) >= 5;
   const highSugary = (finite(answers.sugary) ?? 0) >= 5;
+  const highSalty = (finite(answers.salty) ?? 0) >= 5;
   const proteins = Array.isArray(answers.proteins) ? answers.proteins : [];
   const bullets: string[] = [];
 
@@ -155,6 +157,12 @@ function nutritionInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "
   else if (lowFruit) bullets.push("تناول الفواكه أقل تكرارًا.");
   else if (lowVegetables) bullets.push("تناول الخضراوات أقل تكرارًا.");
   if (lowWholeGrains && bullets.length < 3) bullets.push("تناول الحبوب الكاملة غير منتظم.");
+  if (highRefinedGrains && highSalty && bullets.length < 3)
+    bullets.push("تكرار الحبوب المكررة والأطعمة المالحة مرتفع.");
+  else if (highRefinedGrains && bullets.length < 3)
+    bullets.push("تكرار الحبوب المكررة مرتفع.");
+  else if (highSalty && bullets.length < 3)
+    bullets.push("تكرار الأطعمة المالحة مرتفع.");
   if (highFried && bullets.length < 3) bullets.push("توجد فرصة لتقليل الأطعمة المقلية.");
   if (highPrepared && bullets.length < 3) bullets.push("تكرار الوجبات الجاهزة أو من المطاعم مرتفع.");
   if (highSugary && bullets.length < 3) bullets.push("تكرار الأطعمة أو المشروبات المحلاة مرتفع.");
@@ -312,6 +320,17 @@ export function lifestyleNextSteps(
       nutrition.push({ key: "whole-grains", text: "استبدل خيارًا واحدًا من الحبوب المكررة بخيار كامل هذا الأسبوع.", source: "catalog" });
     else if ((finite(answers.fried) ?? 0) >= 5)
       nutrition.push({ key: "fried", text: "اختر وجبة غير مقلية في مرتين هذا الأسبوع.", source: "catalog" });
+    if ((finite(answers.refinedGrains) ?? 0) >= 5)
+      nutrition.push({ key: "refined-grains", text: "استبدل خيارًا واحدًا من الحبوب المكررة بخيار كامل هذا الأسبوع.", source: "catalog" });
+    if ((finite(answers.salty) ?? 0) >= 5)
+      nutrition.push({ key: "salty", text: "اختر وجبة أقل ملوحة في مرتين هذا الأسبوع.", source: "catalog" });
+    if ((finite(answers.preparedFood) ?? 0) >= 5)
+      nutrition.push({ key: "prepared-food", text: "حضّر أو اختر وجبة منزلية بدل وجبة جاهزة مرة واحدة هذا الأسبوع.", source: "catalog" });
+    if ((finite(answers.sugary) ?? 0) >= 5)
+      nutrition.push({ key: "sugary", text: "استبدل مشروبًا أو وجبة خفيفة محلاة بخيار أقل تحلية مرتين هذا الأسبوع.", source: "catalog" });
+    const proteins = Array.isArray(answers.proteins) ? answers.proteins : [];
+    if (!proteins.includes("legumes") && !proteins.includes("nuts"))
+      nutrition.push({ key: "plant-protein", text: "أضف البقوليات أو المكسرات والبذور إلى وجبة واحدة هذا الأسبوع.", source: "catalog" });
     if (nutrition.length) candidates.nutrition = nutrition;
   }
 

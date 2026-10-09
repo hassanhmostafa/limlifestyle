@@ -93,13 +93,12 @@ export default function EventPrintReport({
   care: Care;
 }) {
   return (
-    <article data-print-report className="lim-print-report" dir="rtl" aria-hidden="true">
+    <article data-print-report data-lifestyle-enabled={lifestyleEnabled ? "true" : "false"} className="lim-print-report" dir="rtl" aria-hidden="true">
       {lifestyleEnabled && (
         <section className="lim-print-logical-page lim-print-questionnaire-page" data-pdf-logical-page="questionnaire">
           <PrintHeading participant={participant} />
           <AdvicePanel care={care} />
           <EventLifestyleCharts answers={answers} compact />
-          <Disclaimer />
         </section>
       )}
       <section className="lim-print-logical-page lim-print-body-page" data-pdf-logical-page="body">

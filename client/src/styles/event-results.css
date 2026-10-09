@@ -214,15 +214,15 @@
 .lim-print-heading .lim-approved-logo { width: 84px; height: 60px; }
 .lim-print-heading .lim-approved-logo img { width: 123px; left: -20px; top: -27px; }
 .lim-print-report :is(h1, h2, h3, h4, p, dl, dd) { margin: 0; }
-.lim-print-report .lim-results-page { gap: 7px; font-size: 12px; }
+.lim-print-report .lim-results-page { gap: 5px; font-size: 12px; }
 .lim-print-report .lim-results-header { display: block; padding: 0; }
 .lim-print-report .lim-results-header > .lim-approved-logo { display: none; }
 .lim-print-report .lim-results-title { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; }
 .lim-print-report .lim-results-title h2 { font-size: 15px; order: -1; margin: 0; }
 .lim-print-report .lim-results-title > span { font-size: 10px; padding: 2px 6px; }
 .lim-print-report .lim-results-title p { font-size: 11px; margin: 0; }
-.lim-print-report .lim-top-metrics { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; }
-.lim-print-report .lim-result-metric { min-height: 139px; padding: 7px 6px 8px; border-radius: 10px; box-shadow: none; }
+.lim-print-report .lim-top-metrics { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 4px; }
+.lim-print-report .lim-result-metric { min-height: 128px; padding: 6px 6px 7px; border-radius: 10px; box-shadow: none; }
 .lim-print-report .lim-metric-icon { width: 20px; height: 20px; margin-bottom: 3px; }
 .lim-print-report .lim-result-metric > p { min-height: 2.4em; font-size: 12px; line-height: 1.3; }
 .lim-print-report .lim-result-value { min-height: 30px; margin-top: 4px; }
@@ -230,17 +230,17 @@
 .lim-print-report .lim-result-value small { font-size: 10px; }
 .lim-print-report .lim-result-status, .lim-print-report .lim-result-unavailable { display: inline-flex; align-items: center; min-height: 21px; font-size: 11px; line-height: 1.3; margin-top: 5px; padding: 2px 7px; }
 .lim-print-report .lim-result-reference { min-height: 2.6em; margin-top: 4px; font-size: 10px; line-height: 1.3; }
-.lim-print-report .lim-distributions { grid-template-columns: 1fr 1fr; gap: 8px; }
-.lim-print-report .lim-results-card { border-radius: 12px; padding: 5px 8px; box-shadow: none; }
+.lim-print-report .lim-distributions { grid-template-columns: 1fr 1fr; gap: 6px; }
+.lim-print-report .lim-results-card { border-radius: 12px; padding: 4px 7px; box-shadow: none; }
 .lim-print-report .lim-distributions h3 { font-size: 13px; margin: 0; }
-.lim-print-report .lim-anatomy-stage { width: 210px; margin: 0 auto; }
-.lim-print-report .lim-segment-card { display: grid; align-content: center; min-height: 38px; padding: 4px 2px 5px; border-radius: 6px; box-shadow: none; }
-.lim-print-report .lim-segment-card span { font-size: 10px; line-height: 1.3; }
-.lim-print-report .lim-segment-card strong { margin-top: 2px; font-size: 11px; line-height: 1.3; }
+.lim-print-report .lim-anatomy-stage { width: 195px; margin: 0 auto; }
+.lim-print-report .lim-segment-card { display: grid; align-content: center; min-height: 44px; padding: 5px 3px 9px; border-radius: 6px; box-shadow: none; }
+.lim-print-report .lim-segment-card span { font-size: 10px; line-height: 1.4; }
+.lim-print-report .lim-segment-card strong { margin-top: 3px; font-size: 11px; line-height: 1.4; }
 .lim-print-report .lim-anatomy-figure img { filter: none; }
 .lim-print-report .lim-results-footer { font-size: 10px; padding: 0; gap: 1px; }
 .lim-print-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 8px; margin-top: 6px; }
-.lim-print-panel { border: 1px solid #dce7e1; border-radius: 12px; padding: 9px 11px; }
+.lim-print-panel { border: 1px solid #dce7e1; border-radius: 12px; padding: 7px 10px; }
 .lim-print-panel h2 { font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; gap: 8px; }
 .lim-print-panel h2 span { font-size: 11px; font-weight: 400; }
 .lim-print-panel p { margin-top: 3px; font-size: 11px; }
@@ -251,11 +251,11 @@
 .lim-print-track i { display: block; height: 100%; }
 .lim-print-panel small { font-size: 9px; color: #5c7168; }
 .lim-print-nursing { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 8px; }
-.lim-print-nursing > div { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid #edf1ee; font-size: 11px; }
+.lim-print-nursing > div { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid #edf1ee; font-size: 11px; }
 .lim-print-nursing dd { font-weight: bold; }
 .lim-print-notes, .lim-print-advice [data-doctor-advice] { white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: plaintext; text-align: right; }
 .lim-print-advice { margin-top: 6px; }
-.lim-print-advice [data-doctor-advice] { font-size: 12px; line-height: 1.6; margin-top: 5px; }
+.lim-print-advice [data-doctor-advice] { font-size: 12px; line-height: 1.5; margin-top: 4px; }
 .lim-print-advice-line { display: block; }
 .lim-print-disclaimer { font-size: 10px; text-align: center; margin-top: 5px; color: #5c7168; }
 @media print {
@@ -271,36 +271,53 @@
 
 /* The PDF capture engine reads these as deliberate A4 logical pages. The
    questionnaire page never shares a canvas page with body composition. */
-.lim-print-logical-page { box-sizing: border-box; width: 760px; padding: 8px 0 5px; background: #fff; }
+.lim-print-logical-page { box-sizing: border-box; width: 760px; padding: 6px 0 3px; background: #fff; }
 .lim-print-logical-page + .lim-print-logical-page { border-top: 1px solid transparent; }
-.lim-print-questionnaire-page { display: grid; gap: 7px; }
-.lim-print-body-page { display: grid; gap: 6px; }
+.lim-print-questionnaire-page { display: grid; gap: 4px; }
+.lim-print-body-page { position: relative; z-index: 1; display: grid; gap: 6px; background: #fff; }
 .lim-print-questionnaire-page .lim-print-advice { margin-top: 0; }
 .lim-print-questionnaire-page .lim-print-lifestyle { margin-top: 0; }
 .lim-print-lifestyle-score { display: grid; grid-template-columns: 145px 270px; justify-content: start; gap: 8px; align-items: start; direction: rtl; }
-.lim-print-lifestyle-score [data-lifestyle-score-card] { min-width: 0; padding: 8px; border-radius: 10px; }
+.lim-print-lifestyle-score [data-lifestyle-score-card] { min-width: 0; padding: 8px 8px 11px; border-radius: 10px; }
 .lim-print-lifestyle-score [data-lifestyle-score-card] p:nth-child(2) { font-size: 25px; }
-.lim-print-lifestyle-score [data-lifestyle-reference] { border-radius: 9px; padding: 5px; }
-.lim-print-lifestyle-score [data-lifestyle-reference] p { margin: 0; font-size: 9px; }
+.lim-print-lifestyle-score [data-lifestyle-score-classification] { padding-bottom: 2px; }
+.lim-print-lifestyle-score [data-lifestyle-reference] { border-radius: 9px; padding: 7px 6px 6px; }
+.lim-print-lifestyle-score [data-lifestyle-reference-title] { display: block; min-height: 17px; margin: 0 0 5px; padding: 0 2px; font-size: 12px; line-height: 1.4; }
+.lim-print-lifestyle-score [data-lifestyle-reference] p { margin: 0; font-size: 12px; line-height: 1.35; }
+.lim-print-lifestyle-score [data-lifestyle-band-row] { min-height: 20px; padding-top: 3px; padding-bottom: 3px; font-size: 11px !important; line-height: 1.35 !important; }
 .lim-print-lifestyle [data-lifestyle-pillars] { gap: 5px 10px; margin-top: 5px; }
-.lim-print-lifestyle [data-lifestyle-pillars] > div > div:first-child { font-size: 10px; }
+.lim-print-lifestyle [data-lifestyle-pillars] > div > div:first-child { font-size: 11px; }
 .lim-print-lifestyle [data-lifestyle-improvements] { gap: 3px; }
-.lim-print-lifestyle [data-lifestyle-improvement] { grid-template-columns: 122px 38px minmax(0, 1fr); gap: 5px; padding: 4px 6px; border-radius: 7px; font-size: 10px; line-height: 1.35; }
-.lim-print-lifestyle [data-lifestyle-improvement] strong { font-size: 10px; }
-.lim-print-lifestyle [data-lifestyle-improvement] span { font-size: 9px; }
+.lim-print-lifestyle [data-lifestyle-improvement] { grid-template-columns: 124px 40px minmax(0, 1fr); gap: 6px; padding: 3px 6px; border-radius: 7px; font-size: 13px; line-height: 1.45; }
+.lim-print-lifestyle [data-lifestyle-improvement] strong { font-size: 12px; }
+.lim-print-lifestyle [data-lifestyle-improvement] span { font-size: 11px; }
 .lim-print-lifestyle [data-lifestyle-improvement] ul,
-.lim-print-lifestyle [data-lifestyle-improvement] p { margin: 0; font-size: 10px; line-height: 1.4; }
-.lim-print-improvements { margin-top: 7px; }
-.lim-print-improvements h3 { margin: 0 0 5px; font-size: 12px; font-weight: 900; color: #153f38; }
-.lim-print-strengths, .lim-print-next-steps { margin-top: 7px; border-radius: 8px; padding: 6px 8px; }
+.lim-print-lifestyle [data-lifestyle-improvement] p { margin: 0; font-size: 14px; line-height: 1.5; }
+.lim-print-lifestyle [data-lifestyle-bullets] { margin: 0; }
+.lim-print-lifestyle [data-lifestyle-bullet] { direction: rtl; }
+.lim-print-lifestyle [data-lifestyle-bullet-glyph] { display: inline-block; color: #197f6f; font-weight: 900; line-height: 1.5; text-align: center; }
+.lim-print-improvements { margin-top: 5px; }
+.lim-print-improvements [data-lifestyle-improvements-heading] { display: block; min-height: 21px; margin: 0 0 6px; padding: 1px 0 2px; font-size: 13px; font-weight: 900; line-height: 1.45; color: #153f38; }
+.lim-print-strengths, .lim-print-next-steps { margin-top: 4px; border-radius: 8px; padding: 3px 8px; }
 .lim-print-strengths { border: 1px solid #dbe8e4; background: #f6fbf8; }
 .lim-print-next-steps { border: 1px solid #dce8c4; background: #fbfff0; }
-.lim-print-strengths ul, .lim-print-next-steps ol { margin: 3px 0 0; }
+.lim-print-strengths h3, .lim-print-next-steps h3 { font-size: 13px; }
+.lim-print-strengths ul, .lim-print-next-steps ol { margin: 2px 0 0; font-size: 14px; line-height: 1.45; }
+.lim-print-next-steps [data-lifestyle-next-step-list] { margin: 2px 0 0; font-size: 14px; line-height: 1.45; }
+.lim-print-next-steps [data-lifestyle-next-step] { direction: rtl; }
+.lim-print-next-steps [data-lifestyle-step-number] { color: #41665c; font-weight: 800; text-align: center; }
 .lim-print-lifestyle-disclaimer { margin-top: 6px !important; font-size: 9px !important; line-height: 1.35; color: #5c7168; }
-.lim-print-body-page .lim-results-page { gap: 5px; }
+.lim-print-body-page .lim-results-page { gap: 9px; }
+.lim-print-body-page .lim-results-header { padding-bottom: 5px; }
+.lim-print-body-page .lim-results-title h2 { margin-bottom: 4px; line-height: 1.35; }
 .lim-print-body-page .lim-results-footer { padding-bottom: 0; }
 .lim-print-body-page .lim-print-nursing-panel { margin-top: 0; }
 .lim-print-logical-page .lim-print-disclaimer { margin-top: 0; }
+.lim-print-report[data-lifestyle-enabled="false"] .lim-print-body-page { gap: 3px; }
+.lim-print-report[data-lifestyle-enabled="false"] .lim-results-page { gap: 3px; }
+.lim-print-report[data-lifestyle-enabled="false"] .lim-result-metric { min-height: 118px; }
+.lim-print-report[data-lifestyle-enabled="false"] .lim-anatomy-stage { width: 180px; }
+.lim-print-report[data-lifestyle-enabled="false"] .lim-results-card { padding: 3px 5px; }
 
 @media (max-width: 340px) {
   [data-lifestyle-score-overview] { grid-template-columns: 1fr; }

@@ -8,12 +8,18 @@ export function logicalPdfPageRanges(
   pixelScale: number,
   canvasHeight: number
 ) {
-  const ranges = pages
-    .map(page => ({
-      top: Math.max(0, Math.floor(page.top * pixelScale)),
-      bottom: Math.min(canvasHeight, Math.ceil(page.bottom * pixelScale)),
-    }))
-    .filter(page => page.bottom > page.top);
+  let previousBottom = 0;
+  const ranges = pages.reduce<PdfLogicalPage[]>((result, page) => {
+    // Adjacent DOM rectangles can land between raster pixels. Floor/ceil alone
+    // would duplicate that row, leaving a clipped glyph at the next page top.
+    const top = Math.max(previousBottom, 0, Math.floor(page.top * pixelScale));
+    const bottom = Math.min(canvasHeight, Math.ceil(page.bottom * pixelScale));
+    if (bottom > top) {
+      result.push({ top, bottom });
+      previousBottom = bottom;
+    }
+    return result;
+  }, []);
   return ranges.length ? ranges : [{ top: 0, bottom: canvasHeight }];
 }
 
@@ -406,11 +412,11 @@ async function captureEventPdf(element: HTMLElement) {
   }
   const pdf = new JsPDF({ unit: "mm", format: "a4", compress: true });
   // Keep generous side margins for labels, but use the printable A4 height
-  // efficiently so the ordinary report is not split by a tiny trailing slice.
+  // efficiently so a normal report is not split by a tiny trailing slice.
   const marginX = 10,
-    marginY = 5,
+    marginY = 3,
     width = 190,
-    height = 287;
+    height = 291;
   const sliceHeight = Math.floor((canvas.width * height) / width);
   const pixelScale = canvas.width / captureWidth;
   const pageRanges = logicalPdfPageRanges(logicalPages, pixelScale, canvas.height);

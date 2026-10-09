@@ -81,3 +81,13 @@ it("keeps explicit questionnaire and body pages separate before raster paginatio
     { top: 480, bottom: 1400 },
   ]);
 });
+
+it("does not duplicate a fractional raster row between adjacent logical pages", () => {
+  expect(logicalPdfPageRanges([
+    { top: 0, bottom: 100.25 },
+    { top: 100.25, bottom: 220 },
+  ], 2, 500)).toEqual([
+    { top: 0, bottom: 201 },
+    { top: 201, bottom: 440 },
+  ]);
+});

@@ -159,6 +159,29 @@ describe("deterministic Events lifestyle insights", () => {
     expect(lifestyleNextSteps(active).some(step => step.key === "walk")).toBe(false);
   });
 
+  it("keeps isolated refined-grain and salty patterns visible with an actionable nutrition plan", () => {
+    const answers = currentAnswers({ refinedGrains: "5", salty: "5" });
+    const nutrition = find(answers, "nutrition");
+    const steps = lifestyleNextSteps(answers);
+
+    expect(nutrition.state).toBe("finding");
+    expect(nutrition.bullets).toContain("تكرار الحبوب المكررة والأطعمة المالحة مرتفع.");
+    expect(steps.map(step => step.key)).toEqual(expect.arrayContaining(["refined-grains", "salty"]));
+  });
+
+  it("keeps prepared and sugary food patterns visible when they are the only nutrition deficits", () => {
+    const answers = currentAnswers({ preparedFood: "5", sugary: "5" });
+    const nutrition = find(answers, "nutrition");
+    const steps = lifestyleNextSteps(answers);
+
+    expect(nutrition.state).toBe("finding");
+    expect(nutrition.bullets).toEqual([
+      "تكرار الوجبات الجاهزة أو من المطاعم مرتفع.",
+      "تكرار الأطعمة أو المشروبات المحلاة مرتفع.",
+    ]);
+    expect(steps.map(step => step.key)).toEqual(expect.arrayContaining(["prepared-food", "sugary"]));
+  });
+
   it("does not produce a substance action plan or infer abrupt withdrawal", () => {
     const answers = currentAnswers({ tobacco: "1" });
     const steps = lifestyleNextSteps(answers);

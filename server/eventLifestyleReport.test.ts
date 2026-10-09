@@ -56,6 +56,10 @@ describe("participant lifestyle report", () => {
     expect(markup).toContain("تجنب المواد الضارة");
     expect(markup).toContain("data-pdf-keep");
     expect(markup).toContain("data-lifestyle-improvement");
+    expect(markup).toContain("data-lifestyle-reference-title");
+    expect(markup).toContain("data-lifestyle-improvements-heading");
+    expect(markup).toContain("data-lifestyle-bullet-glyph");
+    expect(markup).toContain("data-lifestyle-next-step");
     expect(markup).not.toContain("<table");
   });
 

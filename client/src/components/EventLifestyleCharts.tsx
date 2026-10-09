@@ -40,7 +40,7 @@ function ScoreCard({ score, band }: { score: number; band: (typeof lifestyleScor
         {score}
         <span className="text-xs font-bold text-white/85"> / 100</span>
       </p>
-      <p className="mt-1 text-[11px] font-black leading-4 text-white">{band.label}</p>
+      <p className="mt-1 text-[11px] font-black leading-4 text-white" data-lifestyle-score-classification>{band.label}</p>
     </div>
   );
 }
@@ -49,7 +49,7 @@ function ScoreCard({ score, band }: { score: number; band: (typeof lifestyleScor
 export function LifestyleBandReference({ score }: { score: number }) {
   return (
     <div className="min-w-0 rounded-2xl border border-[#dbe8e4] bg-[#fbfdfc] p-2" data-lifestyle-reference>
-      <p className="mb-1 px-1 text-[10px] font-black text-[#56746c]">مرجع المؤشر العام</p>
+      <p className="mb-1 px-1 text-[10px] font-black text-[#56746c]" data-lifestyle-reference-title>مرجع المؤشر العام</p>
       <div className="grid gap-1" role="list">
         {lifestyleScoreBands.map(band => {
           const active = score >= band.min && score <= band.max;
@@ -95,6 +95,10 @@ function PillarBars({ insights }: { insights: LifestylePillarInsight[] }) {
   );
 }
 
+function ArabicStepNumber(index: number) {
+  return new Intl.NumberFormat("ar-SA", { useGrouping: false }).format(index + 1);
+}
+
 /** Readable cards on mobile and a compact three-column list in PDF/desktop. */
 export function LifestyleImprovementList({ insights }: { insights: LifestylePillarInsight[] }) {
   return (
@@ -105,9 +109,14 @@ export function LifestyleImprovementList({ insights }: { insights: LifestylePill
           <span className="rounded-md bg-[#f0f6f4] px-1 py-0.5 text-center text-[11px] font-black text-[#163f38]" dir="ltr">{insight.score}/10</span>
           <div className={insight.state === "missing" ? "text-[#6f817c]" : "text-[#4b6962]"}>
             {insight.state === "finding" ? (
-              <ul className="grid list-disc gap-1 pr-4 text-[14px] leading-6 marker:text-[#197f6f]">
-                {insight.bullets.map((bullet, index) => <li key={index}>{bullet}</li>)}
-              </ul>
+              <div className="grid gap-1 text-[14px] leading-6" dir="rtl" data-lifestyle-bullets>
+                {insight.bullets.map((bullet, index) => (
+                  <div className="grid grid-cols-[0.9em_minmax(0,1fr)] items-start gap-1" data-lifestyle-bullet key={index}>
+                    <span aria-hidden="true" data-lifestyle-bullet-glyph>•</span>
+                    <span>{bullet}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p className="text-[14px] leading-6">{insight.bullets[0]}</p>
             )}
@@ -136,9 +145,14 @@ function NextStepsPanel({ steps, compact }: { steps: LifestyleNextStep[]; compac
   return (
     <section className={compact ? "lim-print-next-steps" : "rounded-2xl border border-[#dce8c4] bg-[#fbfff0] p-4"} data-lifestyle-next-steps>
       <h3 className={compact ? "text-[12px] font-black text-[#153f38]" : "text-sm font-black text-[#153f38]"}>خطواتك الصحية القادمة</h3>
-      <ol className={compact ? "mt-1 grid list-decimal gap-1 pr-4 text-[11px] leading-5 text-[#41665c]" : "mt-2 grid list-decimal gap-1.5 pr-5 text-[14px] leading-6 text-[#41665c]"}>
-        {steps.map(step => <li key={step.key}>{step.text}</li>)}
-      </ol>
+      <div className={compact ? "mt-1 grid gap-1 text-[11px] leading-5 text-[#41665c]" : "mt-2 grid gap-1.5 text-[14px] leading-6 text-[#41665c]"} dir="rtl" data-lifestyle-next-step-list>
+        {steps.map((step, index) => (
+          <div className="grid grid-cols-[1.2em_minmax(0,1fr)] items-start gap-1" data-lifestyle-next-step key={step.key}>
+            <span aria-hidden="true" data-lifestyle-step-number>{ArabicStepNumber(index)}.</span>
+            <span>{step.text}</span>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -172,7 +186,7 @@ export default function EventLifestyleCharts({ answers, compact = false }: { ans
       </div>
       <StrengthsPanel strengths={report.strengths} compact />
       <section className="lim-print-improvements" data-pdf-keep>
-        <h3>جوانب التحسين بناء على إجاباتك</h3>
+        <h3 data-lifestyle-improvements-heading>جوانب التحسين بناء على إجاباتك</h3>
         <LifestyleImprovementList insights={report.insights} />
       </section>
       <NextStepsPanel steps={report.nextSteps} compact />
@@ -204,7 +218,7 @@ export default function EventLifestyleCharts({ answers, compact = false }: { ans
       </div>
       <div className="mt-5"><StrengthsPanel strengths={report.strengths} compact={false} /></div>
       <div className="mt-5">
-        <h3 className="text-sm font-black text-[#153f38]">جوانب التحسين بناء على إجاباتك</h3>
+        <h3 className="text-sm font-black text-[#153f38]" data-lifestyle-improvements-heading>جوانب التحسين بناء على إجاباتك</h3>
         <div className="mt-3"><LifestyleImprovementList insights={report.insights} /></div>
       </div>
       <div className="mt-5"><NextStepsPanel steps={report.nextSteps} compact={false} /></div>
