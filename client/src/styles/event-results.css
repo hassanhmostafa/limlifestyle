@@ -295,6 +295,7 @@
 .lim-print-lifestyle [data-lifestyle-improvement] p { margin: 0; font-size: 14px; line-height: 1.5; }
 .lim-print-lifestyle [data-lifestyle-bullets] { margin: 0; }
 .lim-print-lifestyle [data-lifestyle-bullet] { direction: rtl; }
+.lim-print-lifestyle [data-lifestyle-bullet] > span { font-size: 14px; line-height: 1.5; }
 .lim-print-lifestyle [data-lifestyle-bullet-glyph] { display: inline-block; color: #197f6f; font-weight: 900; line-height: 1.5; text-align: center; }
 .lim-print-improvements { margin-top: 5px; }
 .lim-print-improvements [data-lifestyle-improvements-heading] { display: block; min-height: 21px; margin: 0 0 6px; padding: 1px 0 2px; font-size: 13px; font-weight: 900; line-height: 1.45; color: #153f38; }
