@@ -97,9 +97,57 @@ describe("deterministic Events lifestyle insights", () => {
 
     const activity = insights.find(item => item.key === "activity")!;
     const nutrition = insights.find(item => item.key === "nutrition")!;
-    expect(activity.explanation).toContain("1 أيام نشاط أسبوعيًا");
+    expect(activity.explanation).toContain("عدد أيام النشاط: 1");
     expect(activity.explanation).toContain("20 دقيقة");
     expect(nutrition.explanation).toContain("الفواكه");
     expect(nutrition.explanation).toContain("الأطعمة والمشروبات الغنية بالسكر المضاف");
+  });
+
+  it("flags nonzero activity below the existing 150-minute weekly criterion", () => {
+    const activity = lifestylePillarInsights(currentAnswers({
+      activeDays: 1,
+      activeMinutes: 10,
+      strengthDays: 2,
+    })).find(item => item.key === "activity")!;
+
+    expect(activity.state).toBe("finding");
+    expect(activity.explanation).toContain("عدد أيام النشاط: 1");
+    expect(activity.explanation).toContain("متوسط المدة: 10 دقيقة");
+    expect(activity.explanation).toContain("الإجمالي: 10 دقيقة أسبوعيًا");
+    expect(activity.explanation).toContain("عدد جلسات تقوية العضلات: 2 أسبوعيًا");
+  });
+
+  it("uses concise Arabic topics with selected frequencies and preserves the legacy alcohol meaning", () => {
+    const revised = lifestylePillarInsights(currentAnswers({
+      lowInterest: "1",
+      lowMood: "2",
+      notOnTop: "1",
+      overwhelmed: "3",
+      purpose: "1",
+      support: "0",
+      tobacco: "1",
+      alcoholUse: "2",
+      medMisuse: "1",
+      cannabis: "0",
+      otherDrugs: "2",
+    }));
+    const mood = revised.find(item => item.key === "mood")!;
+    const connection = revised.find(item => item.key === "connection")!;
+    const substances = revised.find(item => item.key === "substances")!;
+
+    expect(mood.explanation).toContain("قلة الاستمتاع: عدة أيام");
+    expect(mood.explanation).toContain("الشعور بالضغط: كل يوم تقريبًا");
+    expect(mood.explanation).not.toContain("خلال الأسبوعين الماضيين");
+    expect(connection.explanation).toContain("الشعور بالهدف والمعنى: عدة أيام");
+    expect(connection.explanation).toContain("التواصل مع مصادر الدعم: أبدًا");
+    expect(substances.explanation).toContain("التبغ أو النيكوتين: أسبوعيًا");
+    expect(substances.explanation).toContain("تناول المشروبات الكحولية: أقل من مرة أسبوعيًا");
+    expect(substances.explanation).toContain("إساءة استخدام الأدوية الموصوفة: أسبوعيًا");
+
+    const legacy = currentAnswers({ _questionnaireVersion: "legacy", alcohol: "1" });
+    delete legacy.alcoholUse;
+    const legacySubstances = lifestylePillarInsights(legacy).find(item => item.key === "substances")!;
+    expect(legacySubstances.explanation).toContain("الإفراط في تناول الكحول في يوم واحد: أسبوعيًا");
+    expect(legacySubstances.explanation).not.toContain("تناول المشروبات الكحولية:");
   });
 });

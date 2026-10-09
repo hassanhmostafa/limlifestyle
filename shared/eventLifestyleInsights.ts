@@ -116,8 +116,11 @@ function activityInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "k
   const days = finite(answers.activeDays)!;
   const minutes = finite(answers.activeMinutes)!;
   const strength = finite(answers.strengthDays)!;
-  if (days === 0 || minutes === 0 || strength < 2)
-    return { state: "finding", explanation: `أفاد الاستبيان بـ ${days} أيام نشاط أسبوعيًا، ومتوسط ${minutes} دقيقة في اليوم النشط، و${strength} من تمارين تقوية العضلات أسبوعيًا.` };
+  // This matches the reviewed activity catalog/scoring threshold: fewer than
+  // 150 weekly aerobic minutes remains a finding even when the answers are nonzero.
+  const weeklyMinutes = days * minutes;
+  if (weeklyMinutes < 150 || strength < 2)
+    return { state: "finding", explanation: `عدد أيام النشاط: ${days}، متوسط المدة: ${minutes} دقيقة في اليوم، الإجمالي: ${weeklyMinutes} دقيقة أسبوعيًا، وعدد جلسات تقوية العضلات: ${strength} أسبوعيًا.` };
   return { state: "none", explanation: "لم يظهر جانب محدد للتحسين بناء على إجاباتك." };
 }
 
@@ -134,11 +137,17 @@ function sleepInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "key"
 
 function moodInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "key" | "label" | "score"> {
   const ids = ["lowInterest", "lowMood", "notOnTop", "overwhelmed"];
+  const topics: Record<string, string> = {
+    lowInterest: "قلة الاستمتاع",
+    lowMood: "الحزن أو الإحباط",
+    notOnTop: "التعامل مع المسؤوليات",
+    overwhelmed: "الشعور بالضغط",
+  };
   const missing = missingText(answers, ids);
   if (missing) return { state: "missing", explanation: missing };
   const selected = ids
     .filter(id => (finite(answers[id]) ?? 0) > 0)
-    .map(id => `${questionById(answers, id)?.text}: ${label(answers, id)}`);
+    .map(id => `${topics[id]}: ${label(answers, id)}`);
   return selected.length
     ? { state: "finding", explanation: `وردت إجابات عن أعراض أو ضغوط متكررة: ${joined(selected)}.` }
     : { state: "none", explanation: "لم يظهر جانب محدد للتحسين بناء على إجاباتك." };
@@ -146,11 +155,15 @@ function moodInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "key" 
 
 function connectionInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "key" | "label" | "score"> {
   const ids = ["purpose", "support"];
+  const topics: Record<string, string> = {
+    purpose: "الشعور بالهدف والمعنى",
+    support: "التواصل مع مصادر الدعم",
+  };
   const missing = missingText(answers, ids);
   if (missing) return { state: "missing", explanation: missing };
   const selected = ids
     .filter(id => (finite(answers[id]) ?? 0) < 2)
-    .map(id => `${questionById(answers, id)?.text}: ${label(answers, id)}`);
+    .map(id => `${topics[id]}: ${label(answers, id)}`);
   return selected.length
     ? { state: "finding", explanation: `وردت إجابات أقل تكرارًا عن ${joined(selected)}.` }
     : { state: "none", explanation: "لم يظهر جانب محدد للتحسين بناء على إجاباتك." };
@@ -159,11 +172,21 @@ function connectionInsight(answers: EventAnswers): Omit<LifestylePillarInsight, 
 function substancesInsight(answers: EventAnswers): Omit<LifestylePillarInsight, "key" | "label" | "score"> {
   const alcoholId = answers.alcoholUse !== undefined ? "alcoholUse" : "alcohol";
   const ids = ["tobacco", alcoholId, "medMisuse", "cannabis", "otherDrugs"];
+  const topics: Record<string, string> = {
+    tobacco: "التبغ أو النيكوتين",
+    alcoholUse: "تناول المشروبات الكحولية",
+    // Historical records used a separate binge-drinking question. Keep its
+    // meaning visible rather than recasting it as the revised alcohol question.
+    alcohol: "الإفراط في تناول الكحول في يوم واحد",
+    medMisuse: "إساءة استخدام الأدوية الموصوفة",
+    cannabis: "استخدام القنب أو منتجاته",
+    otherDrugs: "استخدام مواد مخدرة أخرى",
+  };
   const missing = missingText(answers, ids);
   if (missing) return { state: "missing", explanation: missing };
   const selected = ids
     .filter(id => (finite(answers[id]) ?? 3) < 3)
-    .map(id => `${questionById(answers, id)?.text}: ${label(answers, id)}`);
+    .map(id => `${topics[id]}: ${label(answers, id)}`);
   return selected.length
     ? { state: "finding", explanation: `أفاد الاستبيان باستخدام مُبلّغ عنه: ${joined(selected)}.` }
     : { state: "none", explanation: "لم يظهر جانب محدد للتحسين بناء على إجاباتك." };
