@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  lifestyleNextSteps,
   lifestylePillarInsights,
+  lifestyleStrengths,
   scoreBand,
 } from "../shared/eventLifestyleInsights";
 import type { EventAnswers } from "../shared/eventLifestyle";
@@ -42,112 +44,124 @@ function currentAnswers(overrides: EventAnswers = {}): EventAnswers {
   };
 }
 
+const find = (answers: EventAnswers, key: string) =>
+  lifestylePillarInsights(answers).find(item => item.key === key)!;
+
 describe("Events lifestyle score bands", () => {
   it.each([
-    [0, "سلوكيات صحية عالية الخطورة"],
-    [25, "سلوكيات صحية عالية الخطورة"],
-    [26, "سلوكيات صحية دون المستوى الأمثل"],
-    [50, "سلوكيات صحية دون المستوى الأمثل"],
-    [51, "سلوكيات صحية متوسطة"],
-    [75, "سلوكيات صحية متوسطة"],
-    [76, "سلوكيات صحية مثالية"],
-    [100, "سلوكيات صحية مثالية"],
-  ])("uses the approved band at %s", (score, label) => {
-    expect(scoreBand(score).label).toBe(label);
+    [0, "سلوكيات صحية عالية الخطورة", "#bd4747"],
+    [25, "سلوكيات صحية عالية الخطورة", "#bd4747"],
+    [26, "سلوكيات صحية دون المستوى الأمثل", "#c98220"],
+    [50, "سلوكيات صحية دون المستوى الأمثل", "#c98220"],
+    [51, "سلوكيات صحية متوسطة", "#3579be"],
+    [75, "سلوكيات صحية متوسطة", "#3579be"],
+    [76, "سلوكيات صحية مثالية", "#238b57"],
+    [100, "سلوكيات صحية مثالية", "#238b57"],
+  ])("uses the approved shared band at %s", (score, label, color) => {
+    const band = scoreBand(score);
+    expect(band.label).toBe(label);
+    expect(band.color).toBe(color);
+    expect(band.cardBackground).toBe(color);
   });
 });
 
 describe("deterministic Events lifestyle insights", () => {
-  it("uses actual selected answer labels and preserves fatigue even when sleep score is high", () => {
-    const insights = lifestylePillarInsights(currentAnswers({ dayTired: "1" }));
-    const sleep = insights.find(item => item.key === "sleep")!;
-
+  it("keeps fatigue as a finding even when sleep is among the highest relative scores", () => {
+    const sleep = find(currentAnswers({ dayTired: "1" }), "sleep");
     expect(sleep.state).toBe("finding");
-    expect(sleep.explanation).toContain("نحو 7-8 ساعات");
-    expect(sleep.explanation).toContain("عدة أيام");
+    expect(sleep.bullets).toContain("التعب أو صعوبة البقاء مستيقظًا: عدة أيام.");
   });
 
   it("keeps missing answers unavailable instead of inventing a deficit", () => {
     const answers = currentAnswers();
     delete answers.fried;
-    const nutrition = lifestylePillarInsights(answers).find(item => item.key === "nutrition")!;
-
+    const nutrition = find(answers, "nutrition");
     expect(nutrition.state).toBe("missing");
     expect(nutrition.explanation).toContain("إجابات جزئية");
-    expect(nutrition.explanation).not.toContain("الأطعمة المقلية:");
+    expect(nutrition.bullets).toHaveLength(1);
   });
 
-  it("supports the legacy alcohol response schema without treating it as missing", () => {
-    const answers = currentAnswers({ _questionnaireVersion: "legacy", alcohol: "3" });
-    delete answers.alcoholUse;
-    const substances = lifestylePillarInsights(answers).find(item => item.key === "substances")!;
-
-    expect(substances.state).toBe("none");
-    expect(substances.explanation).toBe("لم يظهر جانب محدد للتحسين بناء على إجاباتك.");
-  });
-
-  it("reports actual activity and food frequencies rather than generic lowest-domain advice", () => {
-    const insights = lifestylePillarInsights(currentAnswers({
-      activeDays: 1,
-      activeMinutes: 20,
-      strengthDays: 0,
+  it("creates short answer-backed improvement bullets without raw question paragraphs", () => {
+    const answers = currentAnswers({
       fruit: "0.5",
-      sugary: "10.5",
-    }));
-
-    const activity = insights.find(item => item.key === "activity")!;
-    const nutrition = insights.find(item => item.key === "nutrition")!;
-    expect(activity.explanation).toContain("عدد أيام النشاط: 1");
-    expect(activity.explanation).toContain("20 دقيقة");
-    expect(nutrition.explanation).toContain("الفواكه");
-    expect(nutrition.explanation).toContain("الأطعمة والمشروبات الغنية بالسكر المضاف");
-  });
-
-  it("flags nonzero activity below the existing 150-minute weekly criterion", () => {
-    const activity = lifestylePillarInsights(currentAnswers({
+      vegetables: "0.5",
+      wholeGrains: "2",
+      fried: "5",
       activeDays: 1,
       activeMinutes: 10,
-      strengthDays: 2,
-    })).find(item => item.key === "activity")!;
-
-    expect(activity.state).toBe("finding");
-    expect(activity.explanation).toContain("عدد أيام النشاط: 1");
-    expect(activity.explanation).toContain("متوسط المدة: 10 دقيقة");
-    expect(activity.explanation).toContain("الإجمالي: 10 دقيقة أسبوعيًا");
-    expect(activity.explanation).toContain("عدد جلسات تقوية العضلات: 2 أسبوعيًا");
-  });
-
-  it("uses concise Arabic topics with selected frequencies and preserves the legacy alcohol meaning", () => {
-    const revised = lifestylePillarInsights(currentAnswers({
+      strengthDays: 1,
       lowInterest: "1",
       lowMood: "2",
       notOnTop: "1",
       overwhelmed: "3",
       purpose: "1",
       support: "0",
-      tobacco: "1",
-      alcoholUse: "2",
-      medMisuse: "1",
-      cannabis: "0",
-      otherDrugs: "2",
-    }));
-    const mood = revised.find(item => item.key === "mood")!;
-    const connection = revised.find(item => item.key === "connection")!;
-    const substances = revised.find(item => item.key === "substances")!;
+    });
+    const nutrition = find(answers, "nutrition");
+    const activity = find(answers, "activity");
+    const mood = find(answers, "mood");
+    const connection = find(answers, "connection");
 
-    expect(mood.explanation).toContain("قلة الاستمتاع: عدة أيام");
-    expect(mood.explanation).toContain("الشعور بالضغط: كل يوم تقريبًا");
-    expect(mood.explanation).not.toContain("خلال الأسبوعين الماضيين");
-    expect(connection.explanation).toContain("الشعور بالهدف والمعنى: عدة أيام");
-    expect(connection.explanation).toContain("التواصل مع مصادر الدعم: أبدًا");
-    expect(substances.explanation).toContain("التبغ أو النيكوتين: أسبوعيًا");
-    expect(substances.explanation).toContain("تناول المشروبات الكحولية: أقل من مرة أسبوعيًا");
-    expect(substances.explanation).toContain("إساءة استخدام الأدوية الموصوفة: أسبوعيًا");
+    expect(nutrition.bullets).toEqual([
+      "تناول الفواكه والخضراوات أقل تكرارًا.",
+      "تناول الحبوب الكاملة غير منتظم.",
+      "توجد فرصة لتقليل الأطعمة المقلية.",
+    ]);
+    expect(activity.bullets).toEqual([
+      "النشاط البدني أقل من المستوى المستهدف أسبوعيًا.",
+      "تمارين تقوية العضلات أقل من يومين أسبوعيًا.",
+    ]);
+    expect(mood.bullets).toHaveLength(3);
+    expect(mood.bullets[0]).toBe("قلة الاستمتاع: عدة أيام.");
+    expect(connection.bullets).toEqual([
+      "الشعور بالهدف والمعنى: عدة أيام.",
+      "التواصل مع مصادر الدعم: أبدًا.",
+    ]);
+    expect(nutrition.explanation).not.toContain("خلال الأسابيع الأربعة الماضية");
+  });
 
-    const legacy = currentAnswers({ _questionnaireVersion: "legacy", alcohol: "1" });
-    delete legacy.alcoholUse;
-    const legacySubstances = lifestylePillarInsights(legacy).find(item => item.key === "substances")!;
-    expect(legacySubstances.explanation).toContain("الإفراط في تناول الكحول في يوم واحد: أسبوعيًا");
-    expect(legacySubstances.explanation).not.toContain("تناول المشروبات الكحولية:");
+  it("preserves the legacy alcohol meaning rather than recasting it", () => {
+    const answers = currentAnswers({ _questionnaireVersion: "legacy", alcohol: "1" });
+    delete answers.alcoholUse;
+    const substances = find(answers, "substances");
+    expect(substances.bullets).toContain("الإفراط في تناول الكحول في يوم واحد: أسبوعيًا.");
+    expect(substances.explanation).not.toContain("تناول المشروبات الكحولية:");
+  });
+
+  it("derives relative strengths from completed scores without calling them ideal", () => {
+    const answers = currentAnswers({ dayTired: "1", activeDays: 1, activeMinutes: 10, strengthDays: 0 });
+    const strengths = lifestyleStrengths(answers);
+    expect(strengths.length).toBeGreaterThan(0);
+    expect(strengths[0]?.message).toContain("من الركائز الأعلى تقييمًا لديك");
+    expect(strengths.map(item => item.message).join(" ")).not.toContain("مثالية");
+
+    const incomplete = currentAnswers();
+    delete incomplete.sleepHours;
+    expect(lifestyleStrengths(incomplete)).toEqual([]);
+  });
+
+  it("creates a small priority-aware plan without advising highly active people to start walking", () => {
+    const lowerActivity = currentAnswers({
+      priority1: "activity",
+      priority2: "nutrition",
+      activeDays: 1,
+      activeMinutes: 10,
+      strengthDays: 1,
+      vegetables: "0.5",
+    });
+    const steps = lifestyleNextSteps(lowerActivity);
+    expect(steps).toHaveLength(3);
+    expect(steps[0]?.text).toContain("المشي لمدة 10 دقائق بعد إحدى الوجبات");
+    expect(steps[0]?.source).toBe("cdc-activity");
+    expect(steps.some(step => step.text.includes("الخضراوات"))).toBe(true);
+
+    const active = currentAnswers({ activeDays: 5, activeMinutes: 45, strengthDays: 3 });
+    expect(lifestyleNextSteps(active).some(step => step.key === "walk")).toBe(false);
+  });
+
+  it("does not produce a substance action plan or infer abrupt withdrawal", () => {
+    const answers = currentAnswers({ tobacco: "1" });
+    const steps = lifestyleNextSteps(answers);
+    expect(steps.some(step => step.key.includes("substance") || step.text.includes("التبغ"))).toBe(false);
   });
 });

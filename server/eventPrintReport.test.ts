@@ -57,6 +57,9 @@ it("prints the exact same eight measurements and both distributions, preserving 
   expect(enabledPrint.indexOf("توصيات الطبيب")).toBeLessThan(enabledPrint.indexOf("نتائج استبيان نمط الحياة"));
   expect(enabledPrint.indexOf("نتائج استبيان نمط الحياة")).toBeLessThan(enabledPrint.indexOf("نتائج تحليل الجسم"));
   expect(enabledPrint).toContain("جوانب التحسين بناء على إجاباتك");
+  expect(enabledPrint).toContain("نقاط القوة في نمط حياتك");
+  expect(enabledPrint).toContain("خطواتك الصحية القادمة");
+  expect(enabledPrint).toContain("data-lifestyle-improvement");
 
   const disabledPrint = renderToStaticMarkup(
     createElement(EventPrintReport, {
