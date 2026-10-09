@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { adjustPdfSliceBottom, appendTextLineRectangles, hasPdfSliceInk } from "../client/src/lib/eventPdf";
+import { adjustPdfSliceBottom, appendTextLineRectangles, hasPdfSliceInk, logicalPdfPageRanges } from "../client/src/lib/eventPdf";
 
 it("keeps every rendered advice and nursing line together without treating a long block as one page", () => {
   const advice = { textContent: "سطر طويل" } as unknown as Node;
@@ -70,4 +70,14 @@ it("does not create a terminal PDF page for an all-white raster slice", () => {
   const text = new Uint8ClampedArray(4 * 20).fill(255);
   for (let pixel = 0; pixel < 12; pixel++) text[pixel * 4] = 20;
   expect(hasPdfSliceInk(text)).toBe(true);
+});
+
+it("keeps explicit questionnaire and body pages separate before raster pagination", () => {
+  expect(logicalPdfPageRanges([
+    { top: 0, bottom: 240 },
+    { top: 240, bottom: 700 },
+  ], 2, 1600)).toEqual([
+    { top: 0, bottom: 480 },
+    { top: 480, bottom: 1400 },
+  ]);
 });

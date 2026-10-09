@@ -25,7 +25,7 @@ function completeAnswers(): EventAnswers {
 }
 
 describe("participant lifestyle report", () => {
-  it("renders the one-page summary without exposing sensitive raw answers", () => {
+  it("renders score reference and all six answer-based improvement rows", () => {
     const markup = renderToStaticMarkup(
       createElement(EventLifestyleCharts, { answers: completeAnswers() })
     );
@@ -33,12 +33,16 @@ describe("participant lifestyle report", () => {
     expect(markup).toContain("المؤشر العام");
     expect(markup).toContain("أهمية التغيير");
     expect(markup).toContain("الثقة بالقدرة");
-    expect(markup).toContain("أولوياتك الصحية");
     expect(markup).toContain("المحاور الستة");
-    expect(markup).toContain("جوانب قوية لديك");
-    expect(markup).toContain("فرصتك القادمة للتحسين");
+    expect(markup).toContain("مرجع المؤشر العام");
+    expect(markup).toContain("سلوكيات صحية مثالية");
+    expect(markup).toContain("سلوكيات صحية متوسطة");
+    expect(markup).toContain("سلوكيات صحية دون المستوى الأمثل");
+    expect(markup).toContain("سلوكيات صحية عالية الخطورة");
+    expect(markup).toContain("جوانب التحسين بناء على إجاباتك");
+    expect(markup).toContain("تجنب المواد الضارة");
     expect(markup).toContain("data-pdf-keep");
-    expect(markup).not.toContain("قلة الاهتمام أو الاستمتاع بالأشياء");
-    expect(markup).not.toContain("استخدام مواد مخدرة أخرى");
+    expect(markup).not.toContain("فرصتك القادمة للتحسين");
+    expect(markup).not.toContain("استخدام مواد مخدرة أخرى: أبدًا");
   });
 });

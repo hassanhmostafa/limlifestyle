@@ -268,3 +268,35 @@
 .lim-approved-logo img, .lim-print-heading .lim-approved-logo img { position: static; width: 100%; height: 100%; max-width: 100%; object-fit: contain; }
 .lim-footer-legend { color: #48665e; }
 .lim-print-report .lim-footer-legend { color: #48665e; }
+
+/* The PDF capture engine reads these as deliberate A4 logical pages. The
+   questionnaire page never shares a canvas page with body composition. */
+.lim-print-logical-page { box-sizing: border-box; width: 760px; padding: 8px 0 5px; background: #fff; }
+.lim-print-logical-page + .lim-print-logical-page { border-top: 1px solid transparent; }
+.lim-print-questionnaire-page { display: grid; gap: 7px; }
+.lim-print-body-page { display: grid; gap: 6px; }
+.lim-print-questionnaire-page .lim-print-advice { margin-top: 0; }
+.lim-print-questionnaire-page .lim-print-lifestyle { margin-top: 0; }
+.lim-print-lifestyle-score { display: grid; grid-template-columns: 135px minmax(0, 1fr); gap: 7px; align-items: start; direction: rtl; }
+.lim-print-lifestyle-score [data-lifestyle-score-card] { min-width: 0; padding: 8px; border-radius: 10px; }
+.lim-print-lifestyle-score [data-lifestyle-score-card] p:nth-child(2) { font-size: 25px; }
+.lim-print-lifestyle-score [data-lifestyle-reference] { border-radius: 9px; padding: 5px; }
+.lim-print-lifestyle-score [data-lifestyle-reference] p { margin: 0; font-size: 9px; }
+.lim-print-lifestyle-score [data-lifestyle-reference] table { font-size: 9px; line-height: 1.2; }
+.lim-print-lifestyle-score [data-lifestyle-reference] td { padding: 3px 5px; }
+.lim-print-lifestyle [data-lifestyle-pillars] { gap: 5px 10px; margin-top: 5px; }
+.lim-print-lifestyle [data-lifestyle-pillars] > div > div:first-child { font-size: 10px; }
+.lim-print-lifestyle [data-lifestyle-improvements] table { font-size: 9px; line-height: 1.35; }
+.lim-print-lifestyle [data-lifestyle-improvements] th,
+.lim-print-lifestyle [data-lifestyle-improvements] td { padding: 3px 5px; }
+.lim-print-lifestyle h3 { margin: 0; }
+.lim-print-body-page .lim-results-page { gap: 5px; }
+.lim-print-body-page .lim-results-footer { padding-bottom: 0; }
+.lim-print-body-page .lim-print-nursing-panel { margin-top: 0; }
+.lim-print-logical-page .lim-print-disclaimer { margin-top: 0; }
+
+@media (max-width: 340px) {
+  [data-lifestyle-score-overview] { grid-template-columns: 1fr; }
+  [data-lifestyle-score-overview] [data-lifestyle-score-card] { width: 100%; }
+  [data-lifestyle-score-overview] [data-lifestyle-reference] { width: 100%; }
+}

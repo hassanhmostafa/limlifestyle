@@ -1,5 +1,21 @@
 /** Export the visible report as paginated A4 PDF; does not depend on window.print. */
 type PdfKeepTogether = { top: number; bottom: number };
+type PdfLogicalPage = { top: number; bottom: number };
+
+/** Translate explicit report-page bounds into raster capture coordinates. */
+export function logicalPdfPageRanges(
+  pages: PdfLogicalPage[],
+  pixelScale: number,
+  canvasHeight: number
+) {
+  const ranges = pages
+    .map(page => ({
+      top: Math.max(0, Math.floor(page.top * pixelScale)),
+      bottom: Math.min(canvasHeight, Math.ceil(page.bottom * pixelScale)),
+    }))
+    .filter(page => page.bottom > page.top);
+  return ranges.length ? ranges : [{ top: 0, bottom: canvasHeight }];
+}
 
 /** Keep a rendered line safely clear of a raster PDF page boundary. */
 export function adjustPdfSliceBottom(
@@ -191,6 +207,7 @@ async function captureEventPdf(element: HTMLElement) {
   let canvas: HTMLCanvasElement;
   let captureWidth = 760;
   let keepTogether: PdfKeepTogether[] = [];
+  let logicalPages: PdfLogicalPage[] = [];
   let sourceLineHeights: Array<{
     node: HTMLElement;
     value: string;
@@ -338,6 +355,15 @@ async function captureEventPdf(element: HTMLElement) {
         await Promise.all(adviceImages.map(({ image }) => image.decode()));
         const bounds = root.getBoundingClientRect();
         captureWidth = bounds.width;
+        logicalPages = Array.from(
+          root.querySelectorAll<HTMLElement>("[data-pdf-logical-page]")
+        )
+          .map(page => page.getBoundingClientRect())
+          .filter(rect => rect.height > 0)
+          .map(rect => ({
+            top: rect.top - bounds.top,
+            bottom: rect.bottom - bounds.top,
+          }));
         // Keep headings, text lines and metric cards off page boundaries.
         keepTogether = Array.from(
           root.querySelectorAll(
@@ -387,42 +413,45 @@ async function captureEventPdf(element: HTMLElement) {
     height = 287;
   const sliceHeight = Math.floor((canvas.width * height) / width);
   const pixelScale = canvas.width / captureWidth;
+  const pageRanges = logicalPdfPageRanges(logicalPages, pixelScale, canvas.height);
   let addedPages = 0;
-  for (let top = 0; top < canvas.height;) {
-    let bottom = Math.min(top + sliceHeight, canvas.height);
-    if (bottom < canvas.height)
-      bottom = adjustPdfSliceBottom(top, bottom, pixelScale, keepTogether);
-    const slice = document.createElement("canvas");
-    slice.width = canvas.width;
-    slice.height = bottom - top;
-    slice
-      .getContext("2d")!
-      .drawImage(
-        canvas,
-        0,
-        top,
-        canvas.width,
-        slice.height,
-        0,
-        0,
-        canvas.width,
-        slice.height
-      );
-    const context = slice.getContext("2d")!;
-    if (hasPdfSliceInk(context.getImageData(0, 0, slice.width, slice.height).data)) {
-      if (addedPages) pdf.addPage();
-      pdf.addImage(
-        slice.toDataURL("image/png"),
-        "PNG",
-        marginX,
-        marginY,
-        width,
-        (slice.height * width) / canvas.width
-      );
-      addedPages++;
+  for (const range of pageRanges) {
+    for (let top = range.top; top < range.bottom;) {
+      let bottom = Math.min(top + sliceHeight, range.bottom);
+      if (bottom < range.bottom)
+        bottom = adjustPdfSliceBottom(top, bottom, pixelScale, keepTogether);
+      const slice = document.createElement("canvas");
+      slice.width = canvas.width;
+      slice.height = bottom - top;
+      slice
+        .getContext("2d")!
+        .drawImage(
+          canvas,
+          0,
+          top,
+          canvas.width,
+          slice.height,
+          0,
+          0,
+          canvas.width,
+          slice.height
+        );
+      const context = slice.getContext("2d")!;
+      if (hasPdfSliceInk(context.getImageData(0, 0, slice.width, slice.height).data)) {
+        if (addedPages) pdf.addPage();
+        pdf.addImage(
+          slice.toDataURL("image/png"),
+          "PNG",
+          marginX,
+          marginY,
+          width,
+          (slice.height * width) / canvas.width
+        );
+        addedPages++;
+      }
+      slice.width = slice.height = 0;
+      top = bottom;
     }
-    slice.width = slice.height = 0;
-    top = bottom;
   }
   canvas.width = canvas.height = 0;
   return pdf;
