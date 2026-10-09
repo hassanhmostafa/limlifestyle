@@ -324,8 +324,24 @@
 .lim-print-report[data-lifestyle-enabled="false"] .lim-print-body-page { gap: 3px; }
 .lim-print-report[data-lifestyle-enabled="false"] .lim-results-page { gap: 3px; }
 .lim-print-report[data-lifestyle-enabled="false"] .lim-result-metric { min-height: 118px; }
-.lim-print-report[data-lifestyle-enabled="false"] .lim-anatomy-stage { width: 180px; }
-.lim-print-report[data-lifestyle-enabled="false"] .lim-results-card { padding: 3px 5px; }
+	.lim-print-report[data-lifestyle-enabled="false"] .lim-anatomy-stage { width: 180px; }
+	.lim-print-report[data-lifestyle-enabled="false"] .lim-results-card { padding: 3px 5px; }
+	/* Keep the fully populated questionnaire page within one A4 canvas. These
+	 * are structural reductions only: 14px insight/step text and the existing
+	 * bottom glyph clearance are intentionally left unchanged. */
+	.lim-print-heading { gap: 10px; padding-bottom: 5px; margin-bottom: 4px; }
+	.lim-print-heading .lim-approved-logo { width: 70px; height: 50px; }
+	.lim-print-logical-page { padding: 3px 0 2px; }
+	.lim-print-panel { padding: 5px 8px; }
+	.lim-print-advice [data-doctor-advice] { margin-top: 2px; }
+	.lim-print-lifestyle-score { gap: 5px; }
+	.lim-print-lifestyle [data-lifestyle-pillars] { gap: 3px 7px; margin-top: 3px; }
+	.lim-print-lifestyle [data-lifestyle-improvements] { gap: 1px; }
+	.lim-print-improvements [data-lifestyle-improvements-heading] { margin-bottom: 3px; }
+	.lim-print-strengths, .lim-print-next-steps { margin-top: 1px; padding: 2px 7px 5px; }
+	.lim-print-strengths ul, .lim-print-next-steps ol,
+	.lim-print-next-steps [data-lifestyle-next-step-list] { margin-top: 1px; }
+	.lim-print-lifestyle-disclaimer { margin-top: 3px !important; }
 
 @media (max-width: 340px) {
   [data-lifestyle-score-overview] { grid-template-columns: 1fr; }
