@@ -94,6 +94,10 @@ export default function EventResearch() {
     return me.data.events.filter(event => [event.name, event.organizer, event.startsOn, event.endsOn, event.eventCode]
       .filter(Boolean).some(value => String(value).toLocaleLowerCase("ar").includes(query)));
   }, [eventFilter, me.data]);
+  const activeEvent = me.data?.events.find(event => event.eventCode === eventCode);
+  const activeEventFilteredOut = activeEvent && !visibleEvents.some(event => event.eventCode === activeEvent.eventCode)
+    ? activeEvent
+    : undefined;
   const login = trpc.eventResearch.login.useMutation({
     onSuccess: async () => {
       setCode("");
@@ -250,6 +254,11 @@ export default function EventResearch() {
                   {!me.data.events.length && (
                     <option value="">لا توجد فعاليات متاحة</option>
                   )}
+                  {activeEventFilteredOut && (
+                    <option value={activeEventFilteredOut.eventCode}>
+                      الفعالية المعروضة حاليًا: {activeEventFilteredOut.name} · {activeEventFilteredOut.startsOn ?? activeEventFilteredOut.eventCode} · {activeEventFilteredOut.completed}/{activeEventFilteredOut.total} مكتملة
+                    </option>
+                  )}
                   {visibleEvents.map(e => (
                     <option value={e.eventCode} key={e.eventCode}>
                       {e.name} · {e.startsOn ?? e.eventCode} · {e.completed}/{e.total} مكتملة
@@ -331,7 +340,7 @@ export default function EventResearch() {
                     {data.data.records.map(r => <tr key={r.id} className="border-t border-emerald-50">
                       {columns.includes("visit") && <td className="p-3">{r.id}</td>}
                       {columns.includes("participant") && <td className="p-3"><bdi>{r.participantId}</bdi></td>}
-                      {columns.includes("date") && <td className="whitespace-nowrap p-3">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-CA") : "—"}</td>}
+                      {columns.includes("date") && <td className="whitespace-nowrap p-3">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }) : "—"}</td>}
                       {columns.includes("status") && <td className="p-3">{r.approvedAt ? "مكتمل" : r.nursingCompletedAt ? "بانتظار التقرير" : "قيد الإجراء"}</td>}
                       {columns.includes("age") && <td className="p-3">{r.age ?? "—"}</td>}
                       {columns.includes("sex") && <td className="p-3">{r.sex === "male" ? "ذكر" : r.sex === "female" ? "أنثى" : "—"}</td>}
