@@ -22,6 +22,7 @@ import {
 import { eventParticipantSessions } from "../drizzle/schema";
 import { getDb } from "./db";
 import { and, eq } from "drizzle-orm";
+import { archiveApprovedEventReportSnapshot } from "./eventReportArchive";
 
 const MAX_NUMERIC_NURSING_VALUE = 10_000;
 /** Keep all provider work below the 90-second automatic-generation lease. */
@@ -414,7 +415,11 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
         },
         model: null,
       });
-      return published ? { state: "generated", mode: "automatic" } : { state: "input_changed" };
+      if (published) {
+        try { await archiveApprovedEventReportSnapshot(sessionId); } catch { /* retried when the final report is read */ }
+        return { state: "generated", mode: "automatic" };
+      }
+      return { state: "input_changed" };
     }
     const selected = await chooseSuggestionIds(context.input);
     if (!(await inputStillMatches(sessionId, {
@@ -427,7 +432,11 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
       recommendationMeta: recommendationMeta(selected.ids, context.fingerprint, "automatic"),
       model: selected.model,
     });
-    return published ? { state: "generated", mode: "automatic" } : { state: "input_changed" };
+    if (published) {
+      try { await archiveApprovedEventReportSnapshot(sessionId); } catch { /* retried when the final report is read */ }
+      return { state: "generated", mode: "automatic" };
+    }
+    return { state: "input_changed" };
   } catch {
     await failAutomaticRecommendationGeneration(
       sessionId,

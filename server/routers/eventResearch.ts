@@ -12,6 +12,8 @@ import {
 } from "../lib/eventStaffAuth";
 import { hashApiKey } from "../lib/apiSecurity";
 import * as store from "../eventResearchDb";
+import { readArchivedReportSnapshot } from "../eventReportArchive";
+import { buildResearchWorkbook } from "../eventResearchWorkbook";
 const COOKIE = "lim_event_research";
 const readToken = (headers: { cookie?: string }) => {
   const t = parse(headers.cookie ?? "")[COOKIE];
@@ -46,6 +48,7 @@ const assignment = z.object({
   includeIdentity: z.literal(false, {
     error: "بيانات الباحثين منزوعة الهوية حتى تُسجل موافقة بحثية مستقلة",
   }),
+  reportArchiveAccess: z.boolean().default(false),
   eventCodes: z
     .array(z.string().min(1).max(64))
     .max(500)
@@ -120,6 +123,7 @@ export const eventResearchRouter = router({
     name: ctx.researcher.name,
     username: ctx.researcher.username,
     includeIdentity: false,
+    reportArchiveAccess: ctx.researcher.reportArchiveAccess === 1,
     events: await store.allowedResearchEvents(ctx.researcher),
   })),
   data: researcherProcedure
@@ -140,4 +144,44 @@ export const eventResearchRouter = router({
         input.purpose
       )
     ),
+  archives: researcherProcedure
+    .input(
+      z.object({
+        eventCode: z.string().min(1).max(64),
+        after: z.number().int().nonnegative().default(0),
+        limit: z.number().int().min(1).max(50).default(25),
+      })
+    )
+    .query(({ ctx, input }) =>
+      store.reportArchivePage(ctx.researcher, input.eventCode, input.after, input.limit)
+    ),
+  archiveSnapshot: researcherProcedure
+    .input(z.object({ archiveId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const archive = await store.authorizeReportArchive(ctx.researcher, input.archiveId);
+      const archived = await readArchivedReportSnapshot(archive.archiveId);
+      if (!archived)
+        throw new TRPCError({ code: "NOT_FOUND", message: "نسخة التقرير غير متاحة" });
+      await store.auditReportArchiveAccess(ctx.researcher, archive.eventCode, "archive_snapshot");
+      return { archive: archived.archive, snapshot: archived.snapshot };
+    }),
+  exportXlsx: researcherProcedure
+    .input(z.object({
+      eventCodes: z.array(z.string().min(1).max(64)).min(1).max(50),
+      latestPerParticipant: z.boolean().default(false),
+    }).refine(input => new Set(input.eventCodes).size === input.eventCodes.length, "لا تكرر الفعاليات"))
+    .mutation(async ({ ctx, input }) => {
+      const records = await store.researchExport(
+        ctx.researcher,
+        input.eventCodes,
+        input.latestPerParticipant
+      );
+      const workbook = buildResearchWorkbook(records);
+      return {
+        filename: `lim-research-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        base64: workbook.toString("base64"),
+        rowCount: records.length,
+      };
+    }),
 });

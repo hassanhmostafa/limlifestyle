@@ -30,6 +30,7 @@ export function researchRecord(
   return {
     id: row.id,
     eventCode: row.eventCode,
+    visitId: row.id,
     participantId: `P-${row.userId}`,
     age: row.age,
     sex: row.sex,

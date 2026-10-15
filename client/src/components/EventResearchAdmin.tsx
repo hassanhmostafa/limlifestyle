@@ -9,6 +9,7 @@ const empty = {
   active: true,
   allEvents: false,
   includeIdentity: false,
+  reportArchiveAccess: false,
   eventCodes: [] as string[],
 };
 export default function EventResearchAdmin() {
@@ -177,6 +178,14 @@ export default function EventResearchAdmin() {
               بيانات الباحثين منزوعة الهوية. إتاحة الاسم والجوال والملاحظات
               النصية متوقفة حتى إضافة موافقة بحثية مستقلة من المشارك.
             </div>
+            <label className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+              <input
+                type="checkbox"
+                checked={form.reportArchiveAccess}
+                onChange={e => setForm({ ...form, reportArchiveAccess: e.target.checked })}
+              />
+              <span><b>إتاحة أرشيف التقارير (صلاحية إضافية)</b><br />تسمح بعرض نسخة التقرير المؤرشفة وتنزيل PDF الأصلي للفعاليات المحددة. لا تمنح الاسم أو الجوال أو الملاحظات النصية.</span>
+            </label>
             <label className="flex gap-3">
               <input
                 type="checkbox"
@@ -236,6 +245,7 @@ export default function EventResearchAdmin() {
                       active: Boolean(r.active),
                       allEvents: Boolean(r.allEvents),
                       includeIdentity: false,
+                      reportArchiveAccess: Boolean(r.reportArchiveAccess),
                     });
                   }}
                 >

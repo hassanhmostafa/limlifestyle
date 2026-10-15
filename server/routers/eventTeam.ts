@@ -22,6 +22,7 @@ import {
   generateAutomaticRecommendationsForSession,
   generatePhysicianRecommendationDraftForSession,
 } from "../eventRecommendationEngine";
+import { archiveApprovedEventReportSnapshot } from "../eventReportArchive";
 
 const staffProcedure = publicProcedure.use(async ({ ctx, next }) => {
   const token = readStaffToken(ctx.req);
@@ -321,6 +322,14 @@ export const eventTeamRouter = router({
         ctx.assignment.trackId,
         input.expectedRevision
       );
+      if (input.finalize) {
+        try {
+          await archiveApprovedEventReportSnapshot(session.id);
+        } catch {
+          // The approval remains authoritative. Subsequent final-report reads
+          // retry archive creation rather than losing the visit report.
+        }
+      }
       return { success: true };
     }),
   generateDraft: staffProcedure

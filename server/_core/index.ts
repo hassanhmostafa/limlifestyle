@@ -11,6 +11,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleKioskData, handleKioskLoginPoll } from "../routers/kioskIntegration";
 import { handleClinicianParticipantResults, handleClinicianParticipants, handleEventMyResults, handleEventPhoneLogin } from "../routers/eventApi";
 import { handleEventAnatomyAsset } from "../eventAssets";
+import { handleArchivedReportPdf } from "../eventResearchArchiveApi";
 import { seedKiosks, updateUserProfile, getUserByOpenId } from "../db";
 import { SEED_KIOSKS } from "../seed";
 import { ENV } from "./env";
@@ -119,6 +120,10 @@ async function startServer() {
   app.get("/api/event/health-readings", handleEventMyResults);
   app.get("/api/event/clinician/participants", handleClinicianParticipants);
   app.get("/api/event/clinician/participants/:participantUserId/readings", handleClinicianParticipantResults);
+
+  // Researcher archive download: authentication and scope are rechecked inside
+  // the handler; raw storage URLs and unencrypted objects are never public.
+  app.get("/api/research/reports/:archiveId/original.pdf", handleArchivedReportPdf);
 
   // tRPC API
   app.use(

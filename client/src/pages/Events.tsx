@@ -68,6 +68,20 @@ const storageKey = "lim-events-session-token";
 const emptyRegistration: Registration = { firstName: "", age: "", sex: "", phone: "", city: "جدة", consent: false };
 const phonePattern = /^((\+966)|(00966)|(966)|(0))5\d{8}$/;
 
+function pdfBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("PDF_READ_FAILED"));
+    reader.onload = () => {
+      const value = String(reader.result ?? "");
+      const marker = "base64,";
+      const offset = value.indexOf(marker);
+      offset >= 0 ? resolve(value.slice(offset + marker.length)) : reject(new Error("PDF_ENCODING_FAILED"));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * The standalone Events web journey from the supplied project. It deliberately
  * has no main-LIM navigation or sign-in dependency. Its opaque session token
@@ -149,6 +163,7 @@ export default function Events() {
     },
     onError: (eventError) => setError(eventError.message),
   });
+  const archivePdf = trpc.events.archivePdf.useMutation();
 
   const apiSession = sessionQuery.data;
   const session: StoredSession | null = apiSession && accessToken ? {
@@ -247,7 +262,10 @@ export default function Events() {
       {screen === "report" && session && (care?.approvedAt ? <div data-final-report data-pdf-report>
         <EventPrintReport participant={session} readings={physicalReadings} answers={session.answers} lifestyleEnabled={lifestyleEnabled} care={care} />
         <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">{care.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "نصائح الطبيب"}</h2><div data-doctor-advice dir="rtl" lang="ar" className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-right leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]">{care.advice}</div>{care.consultationMode !== "automatic" && <p className="text-sm">اعتمدها: {care.doctorName}</p>}{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
-        <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} />
+        <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} onPreparedPdf={async file => {
+          try { await archivePdf.mutateAsync({ accessToken: session.token, pdfBase64: await pdfBase64(file) }); }
+          catch { /* The report remains usable; the next preparation retries archival. */ }
+        }} />
       </div> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
     </div>
@@ -318,7 +336,7 @@ function DeviceView({ session, readings, loading, onBack, onRefresh, onViewConsu
   </section>;
 }
 
-function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, onFinish }: { lifestyleEnabled: boolean; session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void }) {
+function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, onFinish, onPreparedPdf }: { lifestyleEnabled: boolean; session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void; onPreparedPdf: (file: File) => Promise<void> }) {
   return <section className="px-5 pb-14 pt-6 print:px-0">
     <div className="print:hidden"><BackButton onClick={onBack} /></div>
     <div className="rounded-[28px] border border-[#dce9e5] bg-white p-5">
@@ -331,7 +349,7 @@ function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, on
         It prevents the report's extra padded card from reflowing the anatomy stage. */}
     {readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}
     <p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p>
-    <div className="mt-5"><EventPdfButton filename={`lim-final-${session.code}.pdf`} shareable className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white" /></div>
+    <div className="mt-5"><EventPdfButton filename={`lim-final-${session.code}.pdf`} shareable onPreparedPdf={onPreparedPdf} className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white" /></div>
     <PrimaryButton disabled={finishing || Boolean(session.reportCompletedAt)} onClick={onFinish} className="mt-4 print:hidden">{finishing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />}{session.reportCompletedAt ? "اكتملت الرحلة" : "إنهاء الرحلة"}</PrimaryButton>
   </section>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { researchCsv } from "@shared/eventResearchExport";
 import {
@@ -7,6 +7,9 @@ import {
   EVENT_LIFESTYLE_VERSION,
 } from "@shared/eventLifestyle";
 import { nursingCatalog } from "@shared/eventNursing";
+import EventPrintReport from "@/components/EventPrintReport";
+import EventPdfButton from "@/components/EventPdfButton";
+import type { DashboardReading } from "@/components/BodyCompositionReport";
 const button =
   "rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white disabled:opacity-40";
 const input = "w-full rounded-xl border border-emerald-100 p-3";
@@ -16,6 +19,15 @@ function download(name: string, body: string, type: string) {
   a.href = url;
   a.download = name;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function downloadBase64(name: string, base64: string, type: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const link = document.createElement("a");
+  link.href = url; link.download = name; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export default function EventResearch() {
@@ -28,13 +40,34 @@ export default function EventResearch() {
   const [code, setCode] = useState("");
   const [message, setMessage] = useState("");
   const [eventCode, setEventCode] = useState("");
+  const [eventFilter, setEventFilter] = useState("");
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [latestOnly, setLatestOnly] = useState(false);
   const [after, setAfter] = useState(0);
   const [history, setHistory] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
+  const [archive, setArchive] = useState<any>(null);
   const data = trpc.eventResearch.data.useQuery(
     { eventCode, after, limit: 25, purpose: "view" },
     { enabled: Boolean(me.data && eventCode), retry: false }
   );
+  const archives = trpc.eventResearch.archives.useQuery(
+    { eventCode, after: 0, limit: 25 },
+    { enabled: Boolean(me.data?.reportArchiveAccess && eventCode), retry: false }
+  );
+  const exportXlsx = trpc.eventResearch.exportXlsx.useMutation({
+    onSuccess: result => {
+      downloadBase64(result.filename, result.base64, result.mimeType);
+      setMessage(`تم تنزيل ملف Excel يحتوي على ${result.rowCount} زيارة`);
+    },
+    onError: error => setMessage(error.message),
+  });
+  const visibleEvents = useMemo(() => {
+    const query = eventFilter.trim().toLocaleLowerCase("ar");
+    if (!query || !me.data) return me.data?.events ?? [];
+    return me.data.events.filter(event => [event.name, event.organizer, event.startsOn, event.endsOn, event.eventCode]
+      .filter(Boolean).some(value => String(value).toLocaleLowerCase("ar").includes(query)));
+  }, [eventFilter, me.data]);
   const login = trpc.eventResearch.login.useMutation({
     onSuccess: async () => {
       setCode("");
@@ -54,6 +87,7 @@ export default function EventResearch() {
   useEffect(() => {
     if (me.data && !me.data.events.some(e => e.eventCode === eventCode)) {
       setEventCode(me.data.events[0]?.eventCode ?? "");
+      setSelectedCodes(me.data.events[0] ? [me.data.events[0].eventCode] : []);
       setAfter(0);
       setHistory([]);
     }
@@ -180,6 +214,7 @@ export default function EventResearch() {
               </p>
               <label className="block">
                 الفعالية
+                <input value={eventFilter} onChange={e => setEventFilter(e.target.value)} className={input + " mb-2 text-sm"} placeholder="ابحث بالاسم أو الجهة أو التاريخ" />
                 <select
                   className={input}
                   value={eventCode}
@@ -192,7 +227,7 @@ export default function EventResearch() {
                   {!me.data.events.length && (
                     <option value="">لا توجد فعاليات متاحة</option>
                   )}
-                  {me.data.events.map(e => (
+                  {visibleEvents.map(e => (
                     <option value={e.eventCode} key={e.eventCode}>
                       {e.name} · {e.startsOn ?? e.eventCode}
                     </option>
@@ -244,6 +279,14 @@ export default function EventResearch() {
                   قاموس المتغيرات
                 </button>
               </div>
+              <fieldset className="space-y-3 rounded-2xl border border-emerald-100 p-4">
+                <legend className="px-1 font-bold">تصدير Excel للفعاليات المسموح بها</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {me.data.events.map(event => <label key={event.eventCode} className="flex gap-2 text-sm"><input type="checkbox" checked={selectedCodes.includes(event.eventCode)} onChange={e => setSelectedCodes(current => e.target.checked ? [...current, event.eventCode] : current.filter(code => code !== event.eventCode))} />{event.name} <span dir="ltr">({event.eventCode})</span></label>)}
+                </div>
+                <label className="flex gap-2 text-sm"><input type="checkbox" checked={latestOnly} onChange={e => setLatestOnly(e.target.checked)} />أحدث زيارة فقط لكل مشارك (الافتراضي: كل الزيارات)</label>
+                <button className={button} disabled={!selectedCodes.length || exportXlsx.isPending} onClick={() => exportXlsx.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly })}>{exportXlsx.isPending ? "جارٍ تجهيز Excel…" : "تنزيل Excel للفعاليات المحددة"}</button>
+              </fieldset>
             </section>
             <section className="space-y-4 rounded-3xl bg-white p-5">
               <h2 className="text-xl font-bold">الزيارات والبيانات الخام</h2>
@@ -322,9 +365,40 @@ export default function EventResearch() {
                 </button>
               </div>
             </section>
+            {me.data.reportArchiveAccess && <section className="space-y-4 rounded-3xl bg-white p-5">
+              <div>
+                <h2 className="text-xl font-bold">أرشيف التقارير النهائيّة</h2>
+                <p className="mt-1 text-sm text-slate-600">هذه صلاحية إضافية. فتح النسخة أو تنزيل الملف الأصلي يُسجّل في سجل التدقيق.</p>
+              </div>
+              {archives.isLoading ? <p>جارٍ تحميل الأرشيف…</p> : archives.error ? <p role="alert">تعذر تحميل الأرشيف.</p> : !archives.data?.archives.length ? <p>لا توجد تقارير مؤرشفة لهذه الفعالية.</p> : <div className="space-y-3">
+                {archives.data.archives.map(item => <article key={item.archiveId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 p-4">
+                  <div><b>نسخة التقرير {item.reportRevision}</b><p className="text-xs text-slate-500">اللقطة: {item.snapshotStatus} · PDF: {item.pdfStatus}</p></div>
+                  <div className="flex flex-wrap gap-3">
+                    <button className="underline" onClick={() => void utils.eventResearch.archiveSnapshot.fetch({ archiveId: item.archiveId }).then(setArchive).catch(error => setMessage(error instanceof Error ? error.message : "تعذر فتح النسخة المؤرشفة"))}>فتح النسخة المؤرشفة</button>
+                    {item.pdfStatus === "archived" ? <a className="underline" href={`/api/research/reports/${item.archiveId}/original.pdf`}>تنزيل PDF الأصلي</a> : <span className="text-xs text-slate-500">ملف PDF غير محفوظ بعد</span>}
+                  </div>
+                </article>)}
+              </div>}
+              {archive?.snapshot && <ArchivedSnapshot snapshot={archive.snapshot} />}
+            </section>}
           </>
         )}
       </div>
     </main>
   );
+}
+
+/** Reuses the participant report renderer with saved inputs only; no AI or live visit data is read. */
+function ArchivedSnapshot({ snapshot }: { snapshot: any }) {
+  return <section className="space-y-4 rounded-2xl border-2 border-emerald-200 bg-[#f7fbf9] p-4" data-final-report data-pdf-report>
+    <div><h3 className="font-bold">إعادة إنشاء التقرير من النسخة المؤرشفة</h3><p className="text-sm text-slate-600">لقطة ثابتة؛ لا يعيد النظام حساب التوصيات أو يستدعي الذكاء الاصطناعي.</p></div>
+    <EventPrintReport
+      participant={snapshot.participant}
+      readings={snapshot.readings as DashboardReading[]}
+      answers={snapshot.answers}
+      lifestyleEnabled={snapshot.lifestyleEnabled}
+      care={snapshot.care}
+    />
+    <div data-pdf-hide><EventPdfButton filename={`lim-archived-${snapshot.participant.code}.pdf`} label="تنزيل التقرير المعاد إنشاؤه" /></div>
+  </section>;
 }

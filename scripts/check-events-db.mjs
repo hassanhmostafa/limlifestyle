@@ -28,10 +28,11 @@ function connectionOptions(databaseUrl) {
 const connection = await mysql.createConnection(connectionOptions(process.env.DATABASE_URL));
 try {
   for (const query of [
-    'SELECT id, username, codeHash, allEvents, includeIdentity, credentialVersion FROM event_researchers LIMIT 0',
+    'SELECT id, username, codeHash, allEvents, includeIdentity, reportArchiveAccess, credentialVersion FROM event_researchers LIMIT 0',
     'SELECT researcherId, eventCode FROM event_research_grants LIMIT 0',
     'SELECT tokenHash, researcherId, credentialVersion, expiresAt FROM event_research_sessions LIMIT 0',
     'SELECT actorId, action, eventCode, rowCount FROM event_research_audit LIMIT 0',
+    'SELECT archiveId, sessionId, eventCode, reportRevision, snapshotKey, snapshotSha256, snapshotStatus, pdfKey, pdfSha256, pdfBytes, pdfStatus, encryptionVersion, retentionUntil FROM event_report_archives LIMIT 0',
     'SELECT eventCode, name, startsOn, endsOn, location, organizer, poster, questionnaireIds, closed FROM event_profiles LIMIT 0',
     'SELECT questionnaireIds, consentVersion, consentedAt, latestReadingFingerprint FROM event_participant_sessions LIMIT 0',
     'SELECT id, eventCode, name, active FROM event_tracks LIMIT 0',

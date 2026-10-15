@@ -141,6 +141,13 @@
       "when": 1791736800001,
       "tag": "0019_events_reading_fingerprint",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1792151760000,
+      "tag": "0020_event_report_archive",
+      "breakpoints": true
     }
   ]
 }

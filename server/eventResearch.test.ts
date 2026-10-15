@@ -14,6 +14,7 @@ vi.mock("./eventResearchDb", () => ({
   researcherBySession: vi.fn(),
   allowedResearchEvents: vi.fn(),
   researchPage: vi.fn(),
+  researchExport: vi.fn(),
 }));
 const token = "a".repeat(43);
 function context(user: any = null, cookie = "") {
@@ -40,6 +41,7 @@ const input = {
   allEvents: false,
   eventCodes: ["event-a"],
   includeIdentity: false,
+  reportArchiveAccess: false,
   active: true,
 };
 beforeEach(() => vi.resetAllMocks());
@@ -119,6 +121,17 @@ describe("research access boundaries", () => {
       c.data({ eventCode: "event-b", limit: 1000 })
     ).rejects.toThrow();
   });
+  it("denies multi-event workbook export without a valid researcher session", async () => {
+    await expect(eventResearchRouter.createCaller(context()).exportXlsx({ eventCodes: ["event-a", "event-b"] })).rejects.toThrow();
+    expect(store.researchExport).not.toHaveBeenCalled();
+  });
+  it("passes every selected event to the server-scoped workbook query", async () => {
+    vi.mocked(store.researcherBySession).mockResolvedValue(r);
+    vi.mocked(store.researchExport).mockResolvedValue([]);
+    const result = await eventResearchRouter.createCaller(context(null, `lim_event_research=${token}`)).exportXlsx({ eventCodes: ["event-a", "event-b"], latestPerParticipant: false });
+    expect(store.researchExport).toHaveBeenCalledWith(r, ["event-a", "event-b"], false);
+    expect(result.filename).toMatch(/^lim-research-.*\.xlsx$/);
+  });
   it("returns only public identity, not credential fields", async () => {
     vi.mocked(store.researcherBySession).mockResolvedValue({
       ...r,
@@ -133,6 +146,7 @@ describe("research access boundaries", () => {
       name: r.name,
       username: r.username,
       includeIdentity: false,
+      reportArchiveAccess: false,
       events: [],
     });
   });

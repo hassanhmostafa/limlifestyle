@@ -462,6 +462,8 @@ export const eventResearchers = mysqlTable('event_researchers', {
   codeHash: varchar('codeHash',{length:64}).notNull(),
   allEvents: int('allEvents').notNull().default(0),
   includeIdentity: int('includeIdentity').notNull().default(0),
+  /** Separate, default-off permission for original reports and encrypted snapshots. */
+  reportArchiveAccess: int('reportArchiveAccess').notNull().default(0),
   active: int('active').notNull().default(1),
   credentialVersion: int('credentialVersion').notNull().default(1),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
@@ -485,3 +487,31 @@ export const eventResearchAudit = mysqlTable('event_research_audit', {
   rowCount: int('rowCount').notNull().default(0),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
 });
+
+/**
+ * Encrypted, immutable final-report inputs and an optional encrypted participant
+ * PDF. Object keys are opaque and are never returned to clients. The archive is
+ * a researcher privilege, distinct from ordinary de-identified data access.
+ */
+export const eventReportArchives = mysqlTable('event_report_archives', {
+  id: int('id').autoincrement().primaryKey(),
+  archiveId: varchar('archiveId', { length: 36 }).notNull().unique(),
+  sessionId: int('sessionId').notNull(),
+  eventCode: varchar('eventCode', { length: 64 }).notNull(),
+  reportRevision: int('reportRevision').notNull(),
+  snapshotKey: varchar('snapshotKey', { length: 255 }).notNull(),
+  snapshotSha256: varchar('snapshotSha256', { length: 64 }).notNull(),
+  snapshotStatus: varchar('snapshotStatus', { length: 16 }).notNull().default('archived'),
+  pdfKey: varchar('pdfKey', { length: 255 }),
+  pdfSha256: varchar('pdfSha256', { length: 64 }),
+  pdfBytes: int('pdfBytes'),
+  pdfStatus: varchar('pdfStatus', { length: 16 }).notNull().default('pending'),
+  encryptionVersion: varchar('encryptionVersion', { length: 32 }).notNull(),
+  retentionUntil: timestamp('retentionUntil').notNull(),
+  archivedAt: timestamp('archivedAt').defaultNow().notNull(),
+  pdfArchivedAt: timestamp('pdfArchivedAt'),
+  lastError: varchar('lastError', { length: 255 }),
+}, table => [
+  uniqueIndex('event_report_archive_session_revision_unique').on(table.sessionId, table.reportRevision),
+  uniqueIndex('event_report_archive_event_session_unique').on(table.eventCode, table.sessionId, table.reportRevision),
+]);

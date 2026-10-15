@@ -1,10 +1,11 @@
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   eventResearchers as researchers,
   eventResearchGrants as grants,
   eventResearchSessions as sessions,
   eventResearchAudit as audit,
+  eventReportArchives,
   eventProfiles,
   eventParticipantSessions as visits,
   eventCare,
@@ -18,6 +19,7 @@ export type ResearchPermissions = {
   allEvents: boolean;
   eventCodes: string[];
   includeIdentity: boolean;
+  reportArchiveAccess: boolean;
 };
 async function database() {
   const db = await getDb();
@@ -37,6 +39,7 @@ export async function researchEvents() {
         name: eventProfiles.name,
         startsOn: eventProfiles.startsOn,
         endsOn: eventProfiles.endsOn,
+        organizer: eventProfiles.organizer,
       })
       .from(eventProfiles),
     db.selectDistinct({ eventCode: visits.eventCode }).from(visits),
@@ -49,6 +52,7 @@ export async function researchEvents() {
         name: c.eventCode,
         startsOn: null,
         endsOn: null,
+        organizer: "",
       });
   return Array.from(map.values()).sort((a, b) =>
     a.eventCode.localeCompare(b.eventCode)
@@ -75,6 +79,7 @@ export async function listResearchers() {
       active: researchers.active,
       allEvents: researchers.allEvents,
       includeIdentity: researchers.includeIdentity,
+      reportArchiveAccess: researchers.reportArchiveAccess,
     })
     .from(researchers)
     .orderBy(researchers.id);
@@ -110,6 +115,7 @@ export async function saveResearcher(
         active: Number(rest.active),
         allEvents: Number(rest.allEvents),
         includeIdentity: 0,
+        reportArchiveAccess: Number(rest.reportArchiveAccess),
       };
       let researcherId = id;
       if (researcherId) {
@@ -265,6 +271,79 @@ export async function requireResearchEvent(r: Researcher, eventCode: string) {
       message: "ليست لديك صلاحية لهذه الفعالية",
     });
 }
+
+/** Archive access is a distinct, default-off privilege above structured research data. */
+export async function requireReportArchiveAccess(r: Researcher, eventCode: string) {
+  if (r.reportArchiveAccess !== 1)
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "ليست لديك صلاحية لعرض أرشيف التقارير",
+    });
+  await requireResearchEvent(r, eventCode);
+}
+
+export async function reportArchivePage(
+  r: Researcher,
+  eventCode: string,
+  after: number,
+  limit: number
+) {
+  await requireReportArchiveAccess(r, eventCode);
+  const db = await database();
+  const rows = await db
+    .select({
+      id: eventReportArchives.id,
+      archiveId: eventReportArchives.archiveId,
+      eventCode: eventReportArchives.eventCode,
+      reportRevision: eventReportArchives.reportRevision,
+      snapshotStatus: eventReportArchives.snapshotStatus,
+      pdfStatus: eventReportArchives.pdfStatus,
+      pdfBytes: eventReportArchives.pdfBytes,
+      archivedAt: eventReportArchives.archivedAt,
+      retentionUntil: eventReportArchives.retentionUntil,
+    })
+    .from(eventReportArchives)
+    .where(
+      and(
+        eq(eventReportArchives.eventCode, eventCode),
+        gt(eventReportArchives.id, after)
+      )
+    )
+    .orderBy(eventReportArchives.id)
+    .limit(limit + 1);
+  const page = rows.slice(0, limit);
+  await db.insert(audit).values({
+    actorId: r.id,
+    action: "archive_list",
+    eventCode,
+    rowCount: page.length,
+  });
+  return { archives: page, nextCursor: rows.length > limit ? page.at(-1)!.id : null };
+}
+
+export async function authorizeReportArchive(r: Researcher, archiveId: string) {
+  const db = await database();
+  const [archive] = await db
+    .select()
+    .from(eventReportArchives)
+    .where(eq(eventReportArchives.archiveId, archiveId))
+    .limit(1);
+  if (!archive)
+    throw new TRPCError({ code: "NOT_FOUND", message: "أرشيف التقرير غير موجود" });
+  await requireReportArchiveAccess(r, archive.eventCode);
+  return archive;
+}
+
+export async function auditReportArchiveAccess(
+  r: Researcher,
+  eventCode: string,
+  action: "archive_snapshot" | "archive_pdf",
+  rowCount = 1
+) {
+  const db = await database();
+  await db.insert(audit).values({ actorId: r.id, action, eventCode, rowCount });
+}
+
 export async function researchPage(
   r: Researcher,
   eventCode: string,
@@ -334,4 +413,59 @@ export async function researchPage(
       rowCount: records.length,
     });
   return { records, nextCursor: rows.length > limit ? page.at(-1)!.id : null };
+}
+
+/** A bounded server-side export. Default behavior deliberately retains repeat visits. */
+export async function researchExport(
+  r: Researcher,
+  eventCodes: string[],
+  latestPerParticipant: boolean
+) {
+  const selected = Array.from(new Set(eventCodes));
+  if (!selected.length || selected.length > 50)
+    throw new TRPCError({ code: "BAD_REQUEST", message: "اختر من 1 إلى 50 فعالية" });
+  await Promise.all(selected.map(eventCode => requireResearchEvent(r, eventCode)));
+  const db = await database();
+  const rows = await db
+    .select({
+      id: visits.id,
+      eventCode: visits.eventCode,
+      userId: visits.userId,
+      age: visits.age,
+      sex: visits.sex,
+      city: visits.city,
+      trackId: visits.trackId,
+      createdAt: visits.createdAt,
+      answers: visits.answers,
+      questionnaireIds: visits.questionnaireIds,
+      recordNo: visits.latestRecordNo,
+      consultationCompletedAt: visits.consultationCompletedAt,
+      reportCompletedAt: visits.reportCompletedAt,
+      measurements: eventCare.measurements,
+      testIds: eventCare.testIds,
+      nursingCompletedAt: eventCare.nursingCompletedAt,
+      approvedAt: eventCare.approvedAt,
+      advice: eventCare.advice,
+    })
+    .from(visits)
+    .leftJoin(eventCare, eq(eventCare.sessionId, visits.id))
+    .where(and(inArray(visits.eventCode, selected), eq(visits.consent, "true")))
+    .orderBy(desc(visits.createdAt), desc(visits.id))
+    .limit(10_000);
+  const kept = latestPerParticipant
+    ? rows.filter((row, index, all) => all.findIndex(other => other.userId === row.userId) === index)
+    : rows;
+  const records = await Promise.all(
+    kept.map(async row => researchRecord(
+      row,
+      row.recordNo ? await getEventReadingByRecordNo(row.userId, row.recordNo) : []
+    ))
+  );
+  await Promise.all(selected.map(eventCode => db.insert(audit).values({
+    actorId: r.id,
+    action: "export",
+    eventCode,
+    rowCount: records.filter(record => record.eventCode === eventCode).length,
+  })));
+  return records;
 }

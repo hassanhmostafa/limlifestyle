@@ -24,7 +24,8 @@ export default function EventPdfButton({
   filename = "lim-report.pdf", shareable = false,
   label = "تحميل التقرير للطباعة (PDF)",
   className = "rounded-xl bg-[#197f6f] px-5 py-3 font-bold text-white",
-}: { filename?: string; shareable?: boolean; label?: string; className?: string }) {
+  onPreparedPdf,
+}: { filename?: string; shareable?: boolean; label?: string; className?: string; onPreparedPdf?: (file: File) => void | Promise<void> }) {
   const wrapper = useRef<HTMLDivElement>(null);
   const cached = useRef<{ file: File; signature: string } | null>(null);
   const [preparing, setPreparing] = useState(shareable);
@@ -54,7 +55,11 @@ export default function EventPdfButton({
         try {
           const pdf = await createEventPdf(root);
           if (disposed || current !== revision || next !== reportSignature(root)) return;
-          cached.current = { file: new File([pdf.output("blob")], filename, { type: "application/pdf" }), signature: next };
+          const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
+          cached.current = { file, signature: next };
+          // Non-blocking: sharing/downloading remains usable if archival storage
+          // is temporarily unavailable. The next rendered report retries it.
+          void onPreparedPdf?.(file);
           setReady(true);
           setError("");
         } catch {

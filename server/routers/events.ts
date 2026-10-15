@@ -21,6 +21,10 @@ import {
 } from "../db";
 import { hashApiKey } from "../lib/apiSecurity";
 import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
+import {
+  archiveApprovedEventReportSnapshot,
+  storeParticipantReportPdf,
+} from "../eventReportArchive";
 
 const EVENT_CODE = "lim-events";
 const eventTokenInput = z.object({ accessToken: z.string().min(32).max(256) });
@@ -199,6 +203,14 @@ export const eventsRouter = router({
   care: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
     const care = await readCare(session.id);
+    if (care.approvedAt) {
+      try {
+        await archiveApprovedEventReportSnapshot(session.id);
+      } catch {
+        // Archive retry is intentionally non-blocking for the participant's
+        // approved report; no report input is recalculated or changed here.
+      }
+    }
     return {
       nursingEnabled: Boolean(care.nursingEnabled),
       consultationMode: care.consultationMode,
@@ -214,6 +226,30 @@ export const eventsRouter = router({
       nurseNotes: care.nursingCompletedAt ? care.nurseNotes : null,
     };
   }),
+
+  /** Receives only the participant's already-rendered final PDF over their opaque session. */
+  archivePdf: publicProcedure
+    .input(eventTokenInput.extend({ pdfBase64: z.string().min(8).max(14_000_000) }))
+    .mutation(async ({ input }) => {
+      const session = await requireEventSession(input.accessToken);
+      const care = await readCare(session.id);
+      if (!care.approvedAt)
+        throw new TRPCError({ code: "FORBIDDEN", message: "التقرير غير معتمد بعد" });
+      let pdf: Buffer;
+      try {
+        if (!/^[A-Za-z0-9+/=\r\n]+$/.test(input.pdfBase64)) throw new Error("format");
+        pdf = Buffer.from(input.pdfBase64, "base64");
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "ملف التقرير غير صالح" });
+      }
+      try {
+        await archiveApprovedEventReportSnapshot(session.id);
+        const archived = await storeParticipantReportPdf(session.id, pdf);
+        return { status: archived.pdfStatus };
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر حفظ نسخة التقرير المؤرشفة" });
+      }
+    }),
 
   /** Marks the report as read after its consultation milestone is complete. */
   completeReport: publicProcedure
