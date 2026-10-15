@@ -59,7 +59,7 @@ type DeliveryDependencies = {
 };
 
 type ReconciliationDependencies = {
-  listPage?: typeof archivedReportPdfReconciliationPage;
+  listPage?: (eventCode: string, afterId?: number, limit?: number) => ReturnType<typeof archivedReportPdfReconciliationPage>;
   deliver?: typeof deliverArchivedResearchPdf;
 };
 
@@ -301,12 +301,12 @@ export async function deliverArchivedResearchPdf(
  * in LIM: a durable outbox is intentionally not simulated in process memory.
  */
 export async function reconcileArchivedResearchPdfs(
-  input: { afterId?: number; limit?: number } = {},
+  input: { eventCode: string; afterId?: number; limit?: number },
   dependencies: ReconciliationDependencies = {},
 ) {
   const listPage = dependencies.listPage ?? archivedReportPdfReconciliationPage;
   const deliver = dependencies.deliver ?? deliverArchivedResearchPdf;
-  const page = await listPage(input.afterId, input.limit);
+  const page = await listPage(input.eventCode, input.afterId, input.limit);
   let delivered = 0;
   let skipped = 0;
   let failed = 0;

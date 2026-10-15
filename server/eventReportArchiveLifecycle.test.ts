@@ -4,11 +4,13 @@ vi.mock("./db", () => ({ getDb: vi.fn(), getEventReadingByRecordNo: vi.fn() }));
 vi.mock("./storage", () => ({ storageGet: vi.fn(), storagePut: vi.fn() }));
 
 import { getDb, getEventReadingByRecordNo } from "./db";
-import { storagePut } from "./storage";
+import { storageGet, storagePut } from "./storage";
 import {
+  archivedReportPdfReconciliationPage,
   encryptArchiveBytes,
   EVENT_REPORT_PDF_CLAIM_LEASE_MS,
   isPdfClaimLeaseExpired,
+  readArchivedReportPdf,
   readEmbeddedArchivedReportSnapshot,
   recoverRequestedEventReportArchive,
   retryArchivedReportSnapshot,
@@ -136,5 +138,51 @@ describe("immutable participant report archive lifecycle", () => {
     const decoded = readEmbeddedArchivedReportSnapshot({ ...context, snapshotPayload: encrypted, snapshotSha256: crypto.createHash("sha256").update(JSON.stringify(snapshot)).digest("hex") });
     expect(decoded?.care.advice).toBe("frozen advice");
     expect(decoded?.lifestyleReport).toBeNull();
+  });
+
+  it("reads an original PDF by its immutable archiveId even when it belongs to an older revision", async () => {
+    const crypto = require("node:crypto");
+    const original = Buffer.from("%PDF-1.4\nsynthetic older revision");
+    const older = {
+      ...baseArchive,
+      archiveId: "11111111-1111-4111-8111-111111111111",
+      reportRevision: 2,
+      pdfStatus: "archived",
+      pdfKey: "private/older-revision.bin",
+      pdfBytes: original.length,
+      pdfSha256: crypto.createHash("sha256").update(original).digest("hex"),
+    };
+    // The newer revision is intentionally not queried: lookup is by archiveId,
+    // not a "latest revision" selector.
+    mockDb([[older]]);
+    const ciphertext = encryptArchiveBytes(original, {
+      archiveId: older.archiveId,
+      sessionId: older.sessionId,
+      reportRevision: older.reportRevision,
+      kind: "pdf",
+    });
+    vi.mocked(storageGet).mockResolvedValue({ key: older.pdfKey, url: "https://storage.invalid/older" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(ciphertext)));
+
+    await expect(readArchivedReportPdf(older.archiveId)).resolves.toMatchObject({
+      archive: { archiveId: older.archiveId, reportRevision: 2 },
+      pdf: original,
+    });
+    expect(storageGet).toHaveBeenCalledWith(older.pdfKey);
+  });
+
+  it("keeps every archived revision as a separate reconciliation candidate", async () => {
+    const rows = [
+      { id: 41, archiveId: "11111111-1111-4111-8111-111111111111", eventCode: "test", reportRevision: 1, pdfSha256: "a".repeat(64), pdfBytes: 101, pdfArchivedAt: new Date() },
+      { id: 42, archiveId: "22222222-2222-4222-8222-222222222222", eventCode: "test", reportRevision: 2, pdfSha256: "b".repeat(64), pdfBytes: 102, pdfArchivedAt: new Date() },
+      { id: 43, archiveId: "33333333-3333-4333-8333-333333333333", eventCode: "test", reportRevision: 3, pdfSha256: "c".repeat(64), pdfBytes: 103, pdfArchivedAt: new Date() },
+    ];
+    mockDb([rows]);
+    const page = await archivedReportPdfReconciliationPage("test", 40, 2);
+    expect(page.archives.map(row => [row.archiveId, row.reportRevision])).toEqual([
+      ["11111111-1111-4111-8111-111111111111", 1],
+      ["22222222-2222-4222-8222-222222222222", 2],
+    ]);
+    expect(page.nextCursor).toBe(42);
   });
 });

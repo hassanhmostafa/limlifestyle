@@ -267,9 +267,20 @@ describe("independent Research PDF handoff boundary", () => {
   const archiveId = "d3f3f6a0-70fe-49c1-8691-0fc7202c86fe";
   const snapshotSha256 = "a".repeat(64);
   const encodedPdf = Buffer.from("%PDF-1.4\nsynthetic delivery fixture\n%%EOF").toString("base64");
+  // In-memory only: never inserted into an operational database or exposed to a
+  // researcher. This is the bounded QA event/participant used to exercise the
+  // actual Events archivePdf router path.
+  const syntheticQaSession = {
+    ...eventSession,
+    id: 801,
+    userId: -801,
+    eventCode: "lim-research-qa-20261015",
+    code: "QA-SYN-P001-V00001",
+    displayName: "Synthetic QA participant",
+  };
 
   beforeEach(() => {
-    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(syntheticQaSession);
     vi.mocked(readCare).mockResolvedValue({ approvedAt: new Date(), revision: 4 } as never);
   });
 
@@ -293,7 +304,7 @@ describe("independent Research PDF handoff boundary", () => {
 
     expect(result).toEqual({ status: "archived" });
     expect(storeParticipantReportPdf).toHaveBeenCalledWith(
-      eventSession.id,
+      syntheticQaSession.id,
       Buffer.from(encodedPdf, "base64"),
       { archiveId, reportRevision: 4, snapshotSha256 },
     );

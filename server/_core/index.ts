@@ -12,6 +12,11 @@ import { handleKioskData, handleKioskLoginPoll } from "../routers/kioskIntegrati
 import { handleClinicianParticipantResults, handleClinicianParticipants, handleEventMyResults, handleEventPhoneLogin } from "../routers/eventApi";
 import { handleEventAnatomyAsset } from "../eventAssets";
 import { handleArchivedReportPdf } from "../eventResearchArchiveApi";
+import {
+  LIM_RESEARCH_SOURCE_LIST_PATH,
+  LIM_RESEARCH_SOURCE_PDF_PATH_PREFIX,
+  createLimResearchSourceHandlers,
+} from "../limResearchSourceApi";
 import { seedKiosks, updateUserProfile, getUserByOpenId } from "../db";
 import { SEED_KIOSKS } from "../seed";
 import { ENV } from "./env";
@@ -124,6 +129,12 @@ async function startServer() {
   // Researcher archive download: authentication and scope are rechecked inside
   // the handler; raw storage URLs and unencrypted objects are never public.
   app.get("/api/research/reports/:archiveId/original.pdf", handleArchivedReportPdf);
+
+  // Independent Research service source. The handlers remain generic 404s until
+  // all server-only, QA-scoped HMAC configuration is explicitly enabled.
+  const limResearchSource = createLimResearchSourceHandlers();
+  app.get(LIM_RESEARCH_SOURCE_LIST_PATH, limResearchSource.list);
+  app.get(`${LIM_RESEARCH_SOURCE_PDF_PATH_PREFIX}:archiveId/original.pdf`, limResearchSource.pdf);
 
   // tRPC API
   app.use(

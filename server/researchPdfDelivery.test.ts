@@ -222,11 +222,11 @@ describe("independent Research PDF delivery contract v1", () => {
       .mockResolvedValueOnce({ attempted: false, delivered: false, reason: "disabled" })
       .mockRejectedValueOnce(new Error("synthetic receiver unavailable"));
 
-    await expect(reconcileArchivedResearchPdfs({ afterId: 40, limit: 3 }, {
+    await expect(reconcileArchivedResearchPdfs({ eventCode: "lim-research-qa-20261015", afterId: 40, limit: 3 }, {
       listPage: listPage as never,
       deliver: deliver as never,
     })).resolves.toEqual({ scanned: 3, delivered: 1, skipped: 1, failed: 1, nextCursor: 43 });
-    expect(listPage).toHaveBeenCalledWith(40, 3);
+    expect(listPage).toHaveBeenCalledWith("lim-research-qa-20261015", 40, 3);
     expect(deliver).toHaveBeenNthCalledWith(1, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     expect(deliver).toHaveBeenNthCalledWith(2, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     expect(deliver).toHaveBeenNthCalledWith(3, "cccccccc-cccc-4ccc-8ccc-cccccccccccc");

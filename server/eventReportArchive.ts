@@ -456,8 +456,10 @@ export async function eventReportArchiveForSession(sessionId: number, reportRevi
  * No delivery status is persisted here: that would require an explicitly approved
  * outbox outside the operational LIM schema.
  */
-export async function archivedReportPdfReconciliationPage(afterId = 0, limit = 25) {
+export async function archivedReportPdfReconciliationPage(eventCode: string, afterId = 0, limit = 25) {
   const db = await database();
+  const scopedEventCode = eventCode.trim();
+  if (!scopedEventCode) throw new Error("A reconciliation event code is required.");
   const boundedAfter = Math.max(0, Math.trunc(afterId) || 0);
   const boundedLimit = Math.max(1, Math.min(100, Math.trunc(limit) || 25));
   const rows = await db
@@ -472,6 +474,7 @@ export async function archivedReportPdfReconciliationPage(afterId = 0, limit = 2
     })
     .from(eventReportArchives)
     .where(and(
+      eq(eventReportArchives.eventCode, scopedEventCode),
       eq(eventReportArchives.pdfStatus, "archived"),
       gt(eventReportArchives.id, boundedAfter),
     ))
