@@ -75,6 +75,8 @@ export const eventCare = mysqlTable("event_care", {
   approvedAt: timestamp("approvedAt"),
   /** The X18 record explicitly reviewed when this report was approved. */
   approvedRecordNo: varchar("approvedRecordNo", { length: 64 }),
+  /** Set only with a new approval; allows crash-safe archive creation for that exact revision. */
+  archiveRequestedRevision: int("archiveRequestedRevision"),
   /** Internal allowlisted source IDs and prompt metadata; never participant-facing. */
   recommendationMeta: json("recommendationMeta").$type<Record<string, unknown>>(),
   autoGenerationState: varchar("autoGenerationState", { length: 32 }).notNull().default("not_requested"),
@@ -508,6 +510,10 @@ export const eventReportArchives = mysqlTable('event_report_archives', {
   pdfSha256: varchar('pdfSha256', { length: 64 }),
   pdfBytes: int('pdfBytes'),
   pdfStatus: varchar('pdfStatus', { length: 16 }).notNull().default('pending'),
+  /** Opaque owner for a bounded original-PDF storage attempt. */
+  pdfClaimToken: varchar('pdfClaimToken', { length: 36 }),
+  /** Expired upload leases can be safely reclaimed after a worker/browser crash. */
+  pdfLeaseExpiresAt: timestamp('pdfLeaseExpiresAt'),
   encryptionVersion: varchar('encryptionVersion', { length: 32 }).notNull(),
   retentionUntil: timestamp('retentionUntil'),
   archivedAt: timestamp('archivedAt').defaultNow().notNull(),

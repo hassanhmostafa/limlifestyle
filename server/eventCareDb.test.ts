@@ -136,4 +136,23 @@ describe("Events automatic recommendation lease", () => {
     expect(published).toBe(false);
     expect(updates).toHaveLength(0);
   });
+
+  it("records archive intent at exactly the newly approved automatic report revision", async () => {
+    const { db, updates } = fakeDatabase([
+      session,
+      {
+        ...baseCare,
+        autoGenerationState: "generating",
+        autoGenerationAttemptToken: "token",
+        autoGenerationFingerprint: "fingerprint",
+        autoGenerationInputRevision: 4,
+        autoGenerationLeaseExpiresAt: new Date(Date.now() + 60_000),
+      },
+    ]);
+    getDb.mockResolvedValue(db);
+    expect(await completeAutomaticRecommendationGeneration(9, {
+      token: "token", fingerprint: "fingerprint", inputRevision: 4, recordNo: "R1",
+    }, { advice: "approved", recommendationMeta: {}, model: "gpt-5-mini" })).toBe(true);
+    expect(updates[0]).toMatchObject({ revision: 5, archiveRequestedRevision: 5 });
+  });
 });

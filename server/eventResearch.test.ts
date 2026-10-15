@@ -214,8 +214,8 @@ describe("raw data projection and export", () => {
     expect(JSON.stringify(record)).not.toMatch(/private/i);
     expect(record.participantId).toBe("P-9");
     expect(record.readings[0].machineMetrics).toEqual({
-      weight: "70",
-      fatRate: "20",
+      weight: 70,
+      fatRate: 20,
     });
     expect(record.answers).toEqual({ fruit: "2" });
   });
@@ -224,6 +224,22 @@ describe("raw data projection and export", () => {
     expect(JSON.stringify(record)).not.toMatch(/private/i);
     expect(record).not.toHaveProperty("phone");
     expect(record).not.toHaveProperty("nurseNotes");
+  });
+  it("normalizes finite string clinical values without turning missing values into zero", () => {
+    const record = researchRecord({
+      ...row,
+      questionnaireIds: [],
+      answers: { activeDays: " ", activeMinutes: "not-a-number" },
+      measurements: { waist: { value: "91.5" }, blood_glucose: { value: "" }, temperature: { value: false } },
+    }, [{
+      source: "x18", weight: "70.4", bmi: "25.1", height: "", machineMetrics: { weight: "70.4", fatRate: "", muscle: null },
+    }]);
+    expect(record.clinical).toMatchObject({ weight: 70.4, bmi: 25.1, waist: 91.5 });
+    expect(record.clinical.glucose).toBeUndefined();
+    expect(record.readings[0].height).toBeUndefined();
+    expect(record.readings[0].machineMetrics).toEqual({ weight: 70.4 });
+    expect(record.lifestyleScore).toBeNull();
+    expect(record.lifestyleDomains).toEqual({});
   });
   it("flattens questionnaire and nursing values and blocks CSV formulas", () => {
     const csv = researchCsv([

@@ -17,6 +17,9 @@ const input = "w-full rounded-xl border border-emerald-100 p-3";
 const visitColumns = [
   ["visit", "رقم الزيارة"], ["participant", "رمز المشارك"], ["date", "التاريخ"],
   ["status", "حالة التقرير"], ["age", "العمر"], ["sex", "الجنس"], ["questionnaire", "نسخة الاستبيان"],
+  ["score", "المؤشر العام"], ["nutrition", "التغذية"], ["activity", "النشاط"], ["sleep", "النوم"],
+  ["mood", "المزاج"], ["connection", "التواصل"], ["substances", "المواد"],
+  ["weight", "الوزن"], ["bmi", "BMI"], ["waist", "الخصر"], ["glucose", "الجلوكوز"],
 ] as const;
 function download(name: string, body: string, type: string) {
   const url = URL.createObjectURL(new Blob([body], { type }));
@@ -48,7 +51,7 @@ export default function EventResearch() {
   const [eventFilter, setEventFilter] = useState("");
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [latestOnly, setLatestOnly] = useState(false);
-  const [columns, setColumns] = useState(["visit", "participant", "date", "status", "age", "sex", "questionnaire"]);
+  const [columns, setColumns] = useState(["visit", "participant", "date", "status", "age", "sex", "questionnaire", "score", "weight", "bmi", "waist", "glucose"]);
   const [after, setAfter] = useState(0);
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   const [visitCode, setVisitCode] = useState(""); const [identity, setIdentity] = useState("");
@@ -65,6 +68,8 @@ export default function EventResearch() {
     { enabled: Boolean(me.data?.reportArchiveAccess && eventCode), retry: false }
   );
   const exportFilters = { from: from || undefined, to: to || undefined, code: visitCode || undefined, identity: identity || undefined };
+  const invalidDateRange = Boolean(from && to && from > to);
+  const resetRecordPagination = () => { setAfter(0); setHistory([]); };
   const exportXlsx = trpc.eventResearch.exportXlsx.useMutation({
     onSuccess: result => {
       downloadBase64(result.filename, result.base64, result.mimeType);
@@ -228,11 +233,8 @@ export default function EventResearch() {
                   تسجيل الخروج
                 </button>
               </div>
-              <p>
-                {me.data.includeIdentity
-                  ? "صلاحيتك تشمل بيانات التعريف والملاحظات النصية."
-                  : "صلاحيتك لا تشمل الأسماء والجوال والملاحظات النصية."}
-              </p>
+              <p>الجداول وملفات التصدير الاعتيادية منزوعة الهوية ولا تشمل الأسماء أو الجوال أو الملاحظات النصية.</p>
+              {me.data.reportArchiveAccess && <p className="text-sm text-amber-800">لديك صلاحية إضافية للتقارير الكاملة المؤرشفة؛ قد تتضمن اسم المشارك والملاحظات والتوصية المعتمدة، ويُسجل الوصول إليها.</p>}
               <label className="block">
                 الفعالية
                 <input value={eventFilter} onChange={e => setEventFilter(e.target.value)} className={input + " mb-2 text-sm"} placeholder="ابحث بالاسم أو الجهة أو التاريخ" />
@@ -258,14 +260,14 @@ export default function EventResearch() {
               <div className="flex flex-wrap gap-3">
                 <button
                   className={button}
-                  disabled={busy || !eventCode}
+                  disabled={busy || !eventCode || invalidDateRange}
                   onClick={() => void exportData("csv")}
                 >
                   تنزيل CSV
                 </button>
                 <button
                   className={button}
-                  disabled={busy || !eventCode}
+                  disabled={busy || !eventCode || invalidDateRange}
                   onClick={() => void exportData("json")}
                 >
                   تنزيل JSON كامل
@@ -306,12 +308,13 @@ export default function EventResearch() {
                   {me.data.events.map(event => <label key={event.eventCode} className="flex gap-2 text-sm"><input type="checkbox" checked={selectedCodes.includes(event.eventCode)} onChange={e => setSelectedCodes(current => e.target.checked ? [...current, event.eventCode] : current.filter(code => code !== event.eventCode))} />{event.name} <span dir="ltr">({event.eventCode})</span></label>)}
                 </div>
                 <label className="flex gap-2 text-sm"><input type="checkbox" checked={latestOnly} onChange={e => setLatestOnly(e.target.checked)} />أحدث زيارة فقط لكل مشارك (الافتراضي: كل الزيارات)</label>
-                <div className="flex flex-wrap gap-3"><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsx.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly, filters: exportFilters })}>{exportXlsx.isPending ? "جارٍ تجهيز Excel…" : "تنزيل Excel موحّد"}</button><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsxZip.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly, filters: exportFilters })}>{exportXlsxZip.isPending ? "جارٍ تجهيز ZIP…" : "تنزيل ملفات Excel منفصلة (ZIP)"}</button></div>
+                <div className="flex flex-wrap gap-3"><button className={button} disabled={!selectedCodes.length || invalidDateRange || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsx.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly, filters: exportFilters })}>{exportXlsx.isPending ? "جارٍ تجهيز Excel…" : "تنزيل Excel موحّد"}</button><button className={button} disabled={!selectedCodes.length || invalidDateRange || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsxZip.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly, filters: exportFilters })}>{exportXlsxZip.isPending ? "جارٍ تجهيز ZIP…" : "تنزيل ملفات Excel منفصلة (ZIP)"}</button></div>
               </fieldset>
             </section>
             <section className="space-y-4 rounded-3xl bg-white p-5">
               <h2 className="text-xl font-bold">الزيارات والبيانات الخام</h2>
-              <div className="grid gap-2 sm:grid-cols-4"><input className={input} type="date" value={from} onChange={e => {setFrom(e.target.value);setAfter(0)}} aria-label="من تاريخ"/><input className={input} type="date" value={to} onChange={e => {setTo(e.target.value);setAfter(0)}} aria-label="إلى تاريخ"/><input className={input} value={visitCode} onChange={e => {setVisitCode(e.target.value);setAfter(0)}} placeholder="رمز الزيارة"/>{me.data.reportArchiveAccess && <input className={input} value={identity} onChange={e => {setIdentity(e.target.value);setAfter(0)}} placeholder="اسم أو جوال (صلاحية خاصة)"/>}</div>
+              <div className="grid gap-2 sm:grid-cols-4"><input className={input} type="date" value={from} onChange={e => {setFrom(e.target.value);resetRecordPagination()}} aria-label="من تاريخ"/><input className={input} type="date" value={to} onChange={e => {setTo(e.target.value);resetRecordPagination()}} aria-label="إلى تاريخ"/><input className={input} value={visitCode} onChange={e => {setVisitCode(e.target.value);resetRecordPagination()}} placeholder="رمز الزيارة أو المشارك"/>{me.data.reportArchiveAccess && <input className={input} value={identity} onChange={e => {setIdentity(e.target.value);resetRecordPagination()}} placeholder="اسم أو جوال (صلاحية خاصة)"/>}</div>
+              {invalidDateRange && <p role="alert" className="text-sm text-red-700">يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له.</p>}
               <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-2xl bg-slate-50 p-3 text-sm">
                 <legend className="px-1 font-bold">الأعمدة الظاهرة</legend>
                 {visitColumns.map(([id, label]) => <label key={id} className="flex gap-1.5"><input type="checkbox" checked={columns.includes(id)} onChange={e => setColumns(current => e.target.checked ? [...current, id] : current.filter(column => column !== id))} />{label}</label>)}
@@ -333,6 +336,17 @@ export default function EventResearch() {
                       {columns.includes("age") && <td className="p-3">{r.age ?? "—"}</td>}
                       {columns.includes("sex") && <td className="p-3">{r.sex === "male" ? "ذكر" : r.sex === "female" ? "أنثى" : "—"}</td>}
                       {columns.includes("questionnaire") && <td className="p-3">{r.questionnaireVersion}</td>}
+                      {columns.includes("score") && <td className="p-3">{r.lifestyleScore ?? "—"}</td>}
+                      {columns.includes("nutrition") && <td className="p-3">{r.lifestyleDomains?.nutrition ?? "—"}</td>}
+                      {columns.includes("activity") && <td className="p-3">{r.lifestyleDomains?.activity ?? "—"}</td>}
+                      {columns.includes("sleep") && <td className="p-3">{r.lifestyleDomains?.sleep ?? "—"}</td>}
+                      {columns.includes("mood") && <td className="p-3">{r.lifestyleDomains?.mood ?? "—"}</td>}
+                      {columns.includes("connection") && <td className="p-3">{r.lifestyleDomains?.connection ?? "—"}</td>}
+                      {columns.includes("substances") && <td className="p-3">{r.lifestyleDomains?.substances ?? "—"}</td>}
+                      {columns.includes("weight") && <td className="p-3">{r.clinical?.weight ?? "—"}</td>}
+                      {columns.includes("bmi") && <td className="p-3">{r.clinical?.bmi ?? "—"}</td>}
+                      {columns.includes("waist") && <td className="p-3">{r.clinical?.waist ?? "—"}</td>}
+                      {columns.includes("glucose") && <td className="p-3">{r.clinical?.glucose ?? "—"}</td>}
                       <td className="p-3">{r.archiveId && me.data.reportArchiveAccess ? <button className="ml-3 underline" onClick={() => void utils.eventResearch.archiveSnapshot.fetch({ archiveId: r.archiveId! }).then(setArchive).catch(error => setMessage(error instanceof Error ? error.message : "تعذر فتح النسخة المؤرشفة"))}>التقرير المؤرشف</button> : null}<details><summary className="cursor-pointer underline">عرض</summary><pre dir="ltr" className="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-50 p-3 text-xs">{JSON.stringify(r, null, 2)}</pre></details></td>
                     </tr>)}
                   </tbody></table>

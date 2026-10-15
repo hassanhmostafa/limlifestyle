@@ -24,6 +24,46 @@ export type ResearchPermissions = {
   includeIdentity: boolean;
   reportArchiveAccess: boolean;
 };
+
+export type ResearchFilters = { from?: string; to?: string; code?: string; identity?: string };
+export function saudiResearchDayBounds(day: string) {
+  return {
+    start: new Date(`${day}T00:00:00.000+03:00`),
+    end: new Date(`${day}T23:59:59.999+03:00`),
+  };
+}
+
+/** Saudi-calendar bounds keep portal and report dates aligned at UTC+03:00. */
+export function validateResearchFilters(filters: ResearchFilters) {
+  if (filters.from && filters.to && filters.from > filters.to)
+    throw new TRPCError({ code: "BAD_REQUEST", message: "يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له" });
+}
+
+/** Accepts the stored session code plus stable participant P-125/P00125 and visit V00003 forms. */
+export function researchCodeCondition(code?: string) {
+  const value = code?.trim();
+  if (!value) return undefined;
+  const participantHyphen = sql<string>`concat('P-', ${visits.userId})`;
+  const participantPadded = sql<string>`concat('P', lpad(${visits.userId}, 5, '0'))`;
+  const visitPadded = sql<string>`concat('V', lpad(${visits.id}, 5, '0'))`;
+  return or(
+    like(visits.code, `%${value}%`),
+    like(participantHyphen, `%${value}%`),
+    like(participantPadded, `%${value}%`),
+    like(visitPadded, `%${value}%`)
+  );
+}
+
+function scopedResearchConditions(filters: ResearchFilters) {
+  validateResearchFilters(filters);
+  return [
+    filters.from ? gte(visits.createdAt, saudiResearchDayBounds(filters.from).start) : undefined,
+    filters.to ? lte(visits.createdAt, saudiResearchDayBounds(filters.to).end) : undefined,
+    researchCodeCondition(filters.code),
+    filters.identity ? or(like(visits.displayName, `%${filters.identity}%`), like(users.phone, `%${filters.identity}%`)) : undefined,
+  ].filter(Boolean) as any[];
+}
+
 async function database() {
   const db = await getDb();
   if (!db)
@@ -366,12 +406,7 @@ export async function researchPage(
   await requireResearchEvent(r, eventCode);
   const db = await database();
   if (filters.identity && r.reportArchiveAccess !== 1) throw new TRPCError({ code: "FORBIDDEN", message: "البحث بالاسم أو الجوال يتطلب صلاحية أرشيف التقارير" });
-  const conditions = [
-    filters.from ? gte(visits.createdAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
-    filters.to ? lte(visits.createdAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
-    filters.code ? like(visits.code, `%${filters.code}%`) : undefined,
-    filters.identity ? or(like(visits.displayName, `%${filters.identity}%`), like(users.phone, `%${filters.identity}%`)) : undefined,
-  ].filter(Boolean) as any[];
+  const conditions = scopedResearchConditions(filters);
   const rows = await db
     .select({
       id: visits.id,
@@ -422,10 +457,9 @@ export async function researchPage(
     page.map(async row => {
       const frozen = row.archiveId ? readEmbeddedArchivedReportSnapshot({ archiveId: row.archiveId, sessionId: row.archiveSessionId!, reportRevision: row.revision!, snapshotPayload: row.snapshotPayload, snapshotSha256: row.snapshotSha256! }) : undefined;
       return researchRecord(row, row.recordNo ? await getEventReadingByRecordNo(row.userId, row.recordNo) : [], {
-        frozenLifestyleReport: frozen?.lifestyleReport ?? null,
-        finalAdvice: r.reportArchiveAccess === 1 ? frozen?.care.advice ?? row.advice ?? null : null,
+        ...(frozen ? { frozenLifestyleReport: frozen.lifestyleReport ?? null, frozenMetadata: frozen.metadata ?? null } : {}),
+        finalAdvice: r.reportArchiveAccess === 1 && row.approvedAt ? frozen?.care.advice ?? row.advice ?? null : null,
         archiveId: row.archiveId ?? null,
-        frozenMetadata: frozen?.metadata ?? null,
       });
     })
   );
@@ -454,12 +488,7 @@ export async function researchExport(
   await Promise.all(selected.map(eventCode => requireResearchEvent(r, eventCode)));
   const db = await database();
   if (filters.identity && r.reportArchiveAccess !== 1) throw new TRPCError({ code: "FORBIDDEN", message: "البحث بالاسم أو الجوال يتطلب صلاحية أرشيف التقارير" });
-  const conditions = [
-    filters.from ? gte(visits.createdAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
-    filters.to ? lte(visits.createdAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
-    filters.code ? like(visits.code, `%${filters.code}%`) : undefined,
-    filters.identity ? or(like(visits.displayName, `%${filters.identity}%`), like(users.phone, `%${filters.identity}%`)) : undefined,
-  ].filter(Boolean) as any[];
+  const conditions = scopedResearchConditions(filters);
   const rows = await db
     .select({
       id: visits.id,
@@ -503,10 +532,9 @@ export async function researchExport(
     kept.map(async row => {
       const frozen = row.archiveId ? readEmbeddedArchivedReportSnapshot({ archiveId: row.archiveId, sessionId: row.archiveSessionId!, reportRevision: row.revision!, snapshotPayload: row.snapshotPayload, snapshotSha256: row.snapshotSha256! }) : undefined;
       return researchRecord(row, row.recordNo ? await getEventReadingByRecordNo(row.userId, row.recordNo) : [], {
-        frozenLifestyleReport: frozen?.lifestyleReport ?? null,
-        finalAdvice: r.reportArchiveAccess === 1 ? frozen?.care.advice ?? row.advice ?? null : null,
+        ...(frozen ? { frozenLifestyleReport: frozen.lifestyleReport ?? null, frozenMetadata: frozen.metadata ?? null } : {}),
+        finalAdvice: r.reportArchiveAccess === 1 && row.approvedAt ? frozen?.care.advice ?? row.advice ?? null : null,
         archiveId: row.archiveId ?? null,
-        frozenMetadata: frozen?.metadata ?? null,
       });
     })
   );

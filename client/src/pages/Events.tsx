@@ -183,10 +183,14 @@ export default function Events() {
     if (!accessToken || !binding?.originEligible || binding.pdfStatus === "archived") return;
     setArchiveMessage("جارٍ حفظ نسخة التقرير الأصلية…");
     try {
-      await archivePdf.mutateAsync({ accessToken, pdfBase64: await pdfBase64(file),
+      const result = await archivePdf.mutateAsync({ accessToken, pdfBase64: await pdfBase64(file),
         archiveId: binding.archiveId, reportRevision: binding.reportRevision, snapshotSha256: binding.snapshotSha256 });
       if (archiveBindingId.current !== binding.archiveId) return;
-      setArchiveMessage("حُفظت نسخة التقرير الأصلية.");
+      setArchiveMessage(result.status === "archived"
+        ? "حُفظت نسخة التقرير الأصلية."
+        : result.status === "uploading"
+          ? "يجري حفظ النسخة الأصلية في محاولة أخرى. احتفظ بهذا الملف وأعد المحاولة بعد دقائق إذا لم تتغير الحالة."
+          : "نسخة التقرير الأصلية بانتظار الحفظ. يمكنك إعادة المحاولة بنفس الملف.");
       await archiveView.refetch();
     } catch {
       if (archiveBindingId.current !== binding.archiveId) return;

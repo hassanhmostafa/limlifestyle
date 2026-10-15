@@ -7,7 +7,10 @@ import { getDb, getEventReadingByRecordNo } from "./db";
 import { storagePut } from "./storage";
 import {
   encryptArchiveBytes,
+  EVENT_REPORT_PDF_CLAIM_LEASE_MS,
+  isPdfClaimLeaseExpired,
   readEmbeddedArchivedReportSnapshot,
+  recoverRequestedEventReportArchive,
   retryArchivedReportSnapshot,
   storeParticipantReportPdf,
 } from "./eventReportArchive";
@@ -19,19 +22,30 @@ const baseArchive = {
   snapshotSha256: expected.snapshotSha256, originEligible: 1, pdfStatus: "pending",
   snapshotStatus: "archived", snapshotKey: "private/snapshot", snapshotPayload: null,
 };
+const CURRENT = Symbol("current archive");
 
 function mockDb(rows: unknown[][]) {
   const select = vi.fn(() => {
-    const result = rows.shift() ?? [];
-    const chain: any = { from: () => chain, where: () => chain, orderBy: () => chain, limit: () => Promise.resolve(result) };
+    const next = rows.shift() ?? [];
+    const result = next === (CURRENT as unknown) ? [currentArchive] : next;
+    const candidate = Array.isArray(result) ? result[0] as any : undefined;
+    if (candidate?.archiveId) currentArchive = candidate;
+    const chain: any = { from: () => chain, innerJoin: () => chain, where: () => chain, orderBy: () => chain, limit: () => Promise.resolve(result) };
     return chain;
   });
+  let currentArchive: any;
+  const updates: Record<string, unknown>[] = [];
   const update = vi.fn(() => {
-    const chain: any = { set: () => chain, where: () => Promise.resolve(undefined) };
+    const chain: any = { set: (patch: Record<string, unknown>) => {
+      updates.push(patch);
+      if (currentArchive) Object.assign(currentArchive, patch);
+      return chain;
+    }, where: () => Promise.resolve(undefined) };
     return chain;
   });
-  vi.mocked(getDb).mockResolvedValue({ select, update } as never);
-  return { select, update };
+  const insert = vi.fn(() => ({ values: () => ({ $returningId: async () => [{ id: 88 }] }) }));
+  vi.mocked(getDb).mockResolvedValue({ select, update, insert } as never);
+  return { select, update, updates };
 }
 
 beforeEach(() => {
@@ -55,16 +69,51 @@ describe("immutable participant report archive lifecycle", () => {
   });
 
   it("does not overwrite a PDF that another concurrent request has already claimed", async () => {
-    mockDb([[{ approvedAt: new Date(), revision: 3 }], [{ ...baseArchive, pdfStatus: "uploading", pdfKey: "private/in-flight" }]]);
+    const { updates } = mockDb([[{ approvedAt: new Date(), revision: 3 }], [{ ...baseArchive, pdfStatus: "uploading", pdfKey: "private/in-flight", pdfLeaseExpiresAt: new Date(Date.now() + 60_000) }]]);
     const result = await storeParticipantReportPdf(51, pdf, expected);
     expect(result.pdfStatus).toBe("uploading");
     expect(storagePut).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+  });
+
+  it("reclaims only an expired crashed PDF claim and issues a bounded new lease", async () => {
+    const expired = { ...baseArchive, pdfStatus: "uploading", pdfKey: "private/stale", pdfLeaseExpiresAt: new Date(Date.now() - 1_000) };
+    const { updates } = mockDb([[{ approvedAt: new Date(), revision: 3 }], [expired], CURRENT, CURRENT]);
+    vi.mocked(storagePut).mockResolvedValue({ key: "private/pdf", url: "/private/pdf" });
+    const result = await storeParticipantReportPdf(51, pdf, expected);
+    expect(updates[0]).toMatchObject({ pdfStatus: "uploading", pdfClaimToken: expect.stringMatching(/^[a-f0-9-]{36}$/) });
+    expect((updates[0].pdfLeaseExpiresAt as Date).getTime()).toBeGreaterThan(Date.now() + EVENT_REPORT_PDF_CLAIM_LEASE_MS - 5_000);
+    expect(result.pdfStatus).toBe("archived");
+    expect(storagePut).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats missing and elapsed claim leases as recoverable but preserves live claims", () => {
+    expect(isPdfClaimLeaseExpired(null)).toBe(true);
+    expect(isPdfClaimLeaseExpired(new Date(Date.now() - 1))).toBe(true);
+    expect(isPdfClaimLeaseExpired(new Date(Date.now() + 1_000))).toBe(false);
   });
 
   it("rejects historical archives that were not approved for original capture", async () => {
     mockDb([[{ approvedAt: new Date(), revision: 3 }], [{ ...baseArchive, originEligible: 0 }]]);
     await expect(storeParticipantReportPdf(51, pdf, expected)).rejects.toThrow("historical");
     expect(storagePut).not.toHaveBeenCalled();
+  });
+
+  it("recovers a failed initial snapshot only for the exact requested approval revision", async () => {
+    const care = { sessionId: 51, approvedAt: new Date(), approvedRecordNo: "R1", revision: 3, archiveRequestedRevision: 3, consultationMode: "physician", advice: "approved", measurements: {}, nursingCompletedAt: null, doctorName: null };
+    const session = { id: 51, userId: 7, eventCode: "lim-events", code: "P-051", displayName: "Synthetic", age: 30, sex: "male", createdAt: new Date(), questionnaireIds: [], answers: {} };
+    const archived = { ...baseArchive, id: 88, eventCode: "lim-events", snapshotPayload: "ciphertext", snapshotStatus: "failed" };
+    mockDb([[care], [{ session, care }], [], [archived], [archived]]);
+    vi.mocked(getEventReadingByRecordNo).mockResolvedValue([]);
+    vi.mocked(storagePut).mockRejectedValue(new Error("object unavailable"));
+    await expect(recoverRequestedEventReportArchive(51, 3)).resolves.toMatchObject({ id: 88, snapshotStatus: "failed" });
+    expect(getEventReadingByRecordNo).toHaveBeenCalledWith(7, "R1");
+  });
+
+  it("never creates a new original snapshot for a legacy approval without intent", async () => {
+    mockDb([[{ sessionId: 51, approvedAt: new Date(), revision: 3, archiveRequestedRevision: null }]]);
+    await expect(recoverRequestedEventReportArchive(51, 3)).resolves.toBeUndefined();
+    expect(getEventReadingByRecordNo).not.toHaveBeenCalled();
   });
 
   it("retries a failed snapshot from retained ciphertext without rereading the visit", async () => {

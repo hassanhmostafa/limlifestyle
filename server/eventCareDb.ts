@@ -171,7 +171,7 @@ export async function updateCare(
     const revision = current.revision + 1;
     await tx
       .update(eventCare)
-      .set({ ...patch, revision })
+      .set({ ...patch, revision, ...(approve ? { archiveRequestedRevision: revision } : {}) })
       .where(
         and(
           eq(eventCare.sessionId, sessionId),
@@ -347,6 +347,7 @@ export async function completeAutomaticRecommendationGeneration(
       .update(eventCare)
       .set({
         revision: care.revision + 1,
+        archiveRequestedRevision: care.revision + 1,
         advice: data.advice,
         doctorUserId: null,
         doctorStaffId: null,

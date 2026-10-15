@@ -155,6 +155,13 @@
       "when": 1792152300000,
       "tag": "0021_event_report_archive_durability",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1792056583557,
+      "tag": "0022_event_report_pdf_claim_lease",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import {
   eventCare,
   eventParticipantSessions,
@@ -12,6 +12,7 @@ import { EVENT_REPORT_TEMPLATE_VERSION, EVENT_REPORT_SCORING_VERSION, type Event
 
 export const EVENT_REPORT_ARCHIVE_ENCRYPTION_VERSION = "aes-256-gcm-hkdf-v1";
 export const EVENT_REPORT_ARCHIVE_MAX_PDF_BYTES = 10 * 1024 * 1024;
+export const EVENT_REPORT_PDF_CLAIM_LEASE_MS = 5 * 60 * 1000;
 const ARCHIVE_KEY_CONTEXT = "lim-event-report-archive-v1";
 
 type ArchiveStatus = "pending" | "uploading" | "archived" | "failed";
@@ -103,6 +104,10 @@ function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
+export function isPdfClaimLeaseExpired(value: Date | null | undefined, now = new Date()) {
+  return !value || value.getTime() <= now.getTime();
+}
+
 function iso(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
 }
@@ -131,6 +136,11 @@ async function database() {
   return db;
 }
 
+/**
+ * Creates the immutable approval snapshot. `originEligible` is accepted only
+ * for a newly approved revision that recorded explicit archival intent; legacy
+ * approvals never gain an original-PDF capture retroactively.
+ */
 export async function archiveApprovedEventReportSnapshot(sessionId: number, originEligible = false) {
   const db = await database();
   const [joined] = await db
@@ -148,6 +158,8 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
   const approvedAt = care.approvedAt!;
   const approvedRecordNo = care.approvedRecordNo!;
   const reportRevision = care.revision;
+  if (originEligible && care.archiveRequestedRevision !== reportRevision)
+    throw new Error("This approved report was not marked for original archive capture.");
   const [existing] = await db
     .select()
     .from(eventReportArchives)
@@ -253,6 +265,15 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
   }
 }
 
+/** Recover an approval-time archive only when its revision-bound intent survived a crash. */
+export async function recoverRequestedEventReportArchive(sessionId: number, reportRevision: number) {
+  const db = await database();
+  const [care] = await db.select().from(eventCare).where(eq(eventCare.sessionId, sessionId)).limit(1);
+  if (!care?.approvedAt || care.revision !== reportRevision || care.archiveRequestedRevision !== reportRevision)
+    return undefined;
+  return archiveApprovedEventReportSnapshot(sessionId, true);
+}
+
 /** Decodes only an already-joined encrypted DTO; never fetches object storage. */
 export function readEmbeddedArchivedReportSnapshot(archive: { archiveId: string; sessionId: number; reportRevision: number; snapshotPayload: string | null; snapshotSha256: string }) {
   if (!archive.snapshotPayload) return undefined;
@@ -314,9 +335,13 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
   if (!archive) throw new Error("The prepared report is stale; prepare the current final report again.");
   if (!archive.originEligible) throw new Error("This historical report has no original PDF capture.");
   if (archive.pdfStatus === "archived") return archive;
+  if (archive.pdfStatus === "uploading" && !isPdfClaimLeaseExpired(archive.pdfLeaseExpiresAt)) return archive;
 
   const key = `private/event-report-archive/v1/${crypto.randomUUID()}.bin`;
   const hash = sha256(bytes);
+  const claimToken = crypto.randomUUID();
+  const now = new Date();
+  const leaseExpiresAt = new Date(now.getTime() + EVENT_REPORT_PDF_CLAIM_LEASE_MS);
   // Claim the archive row before writing object storage. The unique temporary
   // key lets a concurrent upload prove it owns this capture, rather than
   // allowing two browser retries to race and create multiple originals.
@@ -327,14 +352,22 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       pdfSha256: hash,
       pdfBytes: bytes.length,
       pdfStatus: "uploading",
+      pdfClaimToken: claimToken,
+      pdfLeaseExpiresAt: leaseExpiresAt,
       lastError: null,
     })
     .where(and(
       eq(eventReportArchives.id, archive.id),
-      sql`${eventReportArchives.pdfStatus} in ('pending', 'failed')`
+      or(
+        sql`${eventReportArchives.pdfStatus} in ('pending', 'failed')`,
+        and(
+          eq(eventReportArchives.pdfStatus, "uploading"),
+          or(isNull(eventReportArchives.pdfLeaseExpiresAt), lte(eventReportArchives.pdfLeaseExpiresAt, now))
+        )
+      )
     ));
   const [claimed] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, archive.id)).limit(1);
-  if (!claimed || claimed.pdfKey !== key || claimed.pdfStatus !== "uploading") return claimed ?? archive;
+  if (!claimed || claimed.pdfClaimToken !== claimToken || claimed.pdfKey !== key || claimed.pdfStatus !== "uploading") return claimed ?? archive;
   try {
     await storagePut(
       key,
@@ -347,8 +380,8 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       "application/octet-stream"
     );
   } catch {
-    await db.update(eventReportArchives).set({ pdfStatus: "failed", lastError: "pdf-storage-failed" })
-      .where(and(eq(eventReportArchives.id, archive.id), eq(eventReportArchives.pdfKey, key), eq(eventReportArchives.pdfStatus, "uploading")));
+    await db.update(eventReportArchives).set({ pdfStatus: "failed", pdfClaimToken: null, pdfLeaseExpiresAt: null, lastError: "pdf-storage-failed" })
+      .where(and(eq(eventReportArchives.id, archive.id), eq(eventReportArchives.pdfKey, key), eq(eventReportArchives.pdfClaimToken, claimToken), eq(eventReportArchives.pdfStatus, "uploading")));
     throw new Error("The original PDF could not be stored. Retry the same prepared file.");
   }
   await db
@@ -356,9 +389,17 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
     .set({
       pdfStatus: "archived" as ArchiveStatus,
       pdfArchivedAt: new Date(),
+      pdfClaimToken: null,
+      pdfLeaseExpiresAt: null,
       lastError: null,
     })
-    .where(and(eq(eventReportArchives.id, archive.id), eq(eventReportArchives.pdfKey, key), eq(eventReportArchives.pdfStatus, "uploading")));
+    .where(and(
+      eq(eventReportArchives.id, archive.id),
+      eq(eventReportArchives.pdfKey, key),
+      eq(eventReportArchives.pdfClaimToken, claimToken),
+      eq(eventReportArchives.pdfStatus, "uploading"),
+      gte(eventReportArchives.pdfLeaseExpiresAt, new Date())
+    ));
   const [saved] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, archive.id)).limit(1);
   return saved!;
 }

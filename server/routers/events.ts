@@ -25,6 +25,7 @@ import {
   archiveApprovedEventReportSnapshot,
   eventReportArchiveForSession,
   readArchivedReportSnapshot,
+  recoverRequestedEventReportArchive,
   retryArchivedReportSnapshot,
   storeParticipantReportPdf,
 } from "../eventReportArchive";
@@ -210,7 +211,9 @@ export const eventsRouter = router({
   care: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
     const care = await readCare(session.id);
-    const archive = care.approvedAt ? await eventReportArchiveForSession(session.id, care.revision) : undefined;
+    let archive = care.approvedAt ? await eventReportArchiveForSession(session.id, care.revision) : undefined;
+    if (!archive && care.approvedAt && care.archiveRequestedRevision === care.revision)
+      archive = await recoverRequestedEventReportArchive(session.id, care.revision);
     return {
       nursingEnabled: Boolean(care.nursingEnabled),
       reportRevision: care.revision,
@@ -236,7 +239,11 @@ export const eventsRouter = router({
     if (!care.approvedAt) return null;
     if (input.reportRevision !== undefined && input.reportRevision !== care.revision)
       throw new TRPCError({ code: "CONFLICT", message: "تغير إصدار التقرير. حدّث الحالة ثم أعد المحاولة." });
-    const archive = await eventReportArchiveForSession(session.id, care.revision);
+    let archive = await eventReportArchiveForSession(session.id, care.revision);
+    if (!archive && care.archiveRequestedRevision === care.revision) {
+      const recovered = await recoverRequestedEventReportArchive(session.id, care.revision);
+      if (recovered) archive = recovered;
+    }
     if (!archive) return null;
     const saved = await readArchivedReportSnapshot(archive.archiveId);
     if (!saved) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "تعذر استرجاع نسخة التقرير الثابتة. أعد المحاولة." });
@@ -258,7 +265,11 @@ export const eventsRouter = router({
     const session = await requireEventSession(input.accessToken);
     const care = await readCare(session.id);
     if (!care.approvedAt) throw new TRPCError({ code: "FORBIDDEN" });
-    const archive = await eventReportArchiveForSession(session.id, care.revision);
+    let archive = await eventReportArchiveForSession(session.id, care.revision);
+    if (!archive && care.archiveRequestedRevision === care.revision) {
+      const recovered = await recoverRequestedEventReportArchive(session.id, care.revision);
+      if (recovered) archive = recovered;
+    }
     if (!archive) throw new TRPCError({ code: "NOT_FOUND", message: "لا توجد نسخة أصلية محفوظة لهذه الزيارة." });
     const updated = await retryArchivedReportSnapshot(archive.archiveId);
     return { snapshotStatus: updated.snapshotStatus, pdfStatus: updated.pdfStatus };
