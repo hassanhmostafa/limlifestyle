@@ -12,14 +12,15 @@ const r = { id: 9, allEvents: 0, includeIdentity: 0 } as any;
 let conditions: any[];
 function databaseMock() {
   conditions = [];
-  // Queue: profiles, distinct visits, grants, visit rows, audit write.
+  // Queue: profiles, distinct visits, aggregate counts, grants, visit rows, audit write.
   const results: any[][] = [
     [
       { eventCode: "a", name: "A" },
       { eventCode: "b", name: "B" },
     ],
     [{ eventCode: "a" }, { eventCode: "b" }],
-    [{ eventCode: "a" }],
+    [{ eventCode: "a", total: 2, completed: 1 }, { eventCode: "b", total: 1, completed: 0 }],
+    [{ eventCode: "a"}],
     [],
   ];
   function query() {
@@ -35,6 +36,7 @@ function databaseMock() {
       },
       orderBy: () => q,
       limit: () => q,
+      groupBy: () => q,
     };
     return q;
   }
@@ -70,6 +72,22 @@ describe("database event isolation", () => {
     expect(query.sql).toContain("`event_participant_sessions`.`eventCode` = ?");
     expect(query.params).toEqual(["a", "true", 13]);
     expect(db.insert).toHaveBeenCalled();
+  });
+  it("keeps date and visit-code search inside the authorized event query", async () => {
+    databaseMock();
+    await researchPage(r, "a", 0, 25, "view", {
+      from: "2026-01-01", to: "2026-01-31", code: "VISIT-9",
+    });
+    const query = sqlText(conditions.at(-1));
+    expect(query.sql).toContain("`event_participant_sessions`.`createdAt` >= ?");
+    expect(query.sql).toContain("`event_participant_sessions`.`code` like ?");
+    expect(query.params).toContain("%VISIT-9%");
+  });
+  it("rejects identity search without the distinct full-report privilege", async () => {
+    const db = databaseMock();
+    await expect(researchPage(r, "a", 0, 25, "view", { identity: "055" }))
+      .rejects.toThrow("يتطلب صلاحية أرشيف التقارير");
+    expect(db.insert).not.toHaveBeenCalled();
   });
   it("all-events permission includes known events across tracks", async () => {
     databaseMock();

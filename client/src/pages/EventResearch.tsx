@@ -10,6 +10,7 @@ import { nursingCatalog } from "@shared/eventNursing";
 import EventPrintReport from "@/components/EventPrintReport";
 import EventPdfButton from "@/components/EventPdfButton";
 import type { DashboardReading } from "@/components/BodyCompositionReport";
+import { eventReportFilename, EVENT_REPORT_TEMPLATE_VERSION } from "@shared/eventReportArchive";
 const button =
   "rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white disabled:opacity-40";
 const input = "w-full rounded-xl border border-emerald-100 p-3";
@@ -52,6 +53,7 @@ export default function EventResearch() {
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   const [visitCode, setVisitCode] = useState(""); const [identity, setIdentity] = useState("");
   const [history, setHistory] = useState<number[]>([]);
+  const [archiveAfter, setArchiveAfter] = useState(0); const [archiveHistory, setArchiveHistory] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [archive, setArchive] = useState<any>(null);
   const data = trpc.eventResearch.data.useQuery(
@@ -59,9 +61,10 @@ export default function EventResearch() {
     { enabled: Boolean(me.data && eventCode), retry: false }
   );
   const archives = trpc.eventResearch.archives.useQuery(
-    { eventCode, after: 0, limit: 25 },
+    { eventCode, after: archiveAfter, limit: 25 },
     { enabled: Boolean(me.data?.reportArchiveAccess && eventCode), retry: false }
   );
+  const exportFilters = { from: from || undefined, to: to || undefined, code: visitCode || undefined, identity: identity || undefined };
   const exportXlsx = trpc.eventResearch.exportXlsx.useMutation({
     onSuccess: result => {
       downloadBase64(result.filename, result.base64, result.mimeType);
@@ -98,7 +101,7 @@ export default function EventResearch() {
     onSuccess: () => {
       utils.eventResearch.me.setData(undefined, undefined);
       utils.eventResearch.data.invalidate();
-      window.location.assign("/events/research");
+      window.location.assign("/research");
     },
     onError: e => setMessage(e.message),
   });
@@ -121,7 +124,7 @@ export default function EventResearch() {
           eventCode,
           after: cursor,
           limit: 50,
-          purpose: "export",
+          purpose: "export", ...exportFilters,
         });
         records.push(...p.records);
         if (p.nextCursor === null) break;
@@ -239,7 +242,7 @@ export default function EventResearch() {
                   onChange={e => {
                     setEventCode(e.target.value);
                     setAfter(0);
-                    setHistory([]);
+                    setHistory([]); setArchiveAfter(0); setArchiveHistory([]);
                   }}
                 >
                   {!me.data.events.length && (
@@ -247,7 +250,7 @@ export default function EventResearch() {
                   )}
                   {visibleEvents.map(e => (
                     <option value={e.eventCode} key={e.eventCode}>
-                      {e.name} · {e.startsOn ?? e.eventCode}
+                      {e.name} · {e.startsOn ?? e.eventCode} · {e.completed}/{e.total} مكتملة
                     </option>
                   ))}
                 </select>
@@ -303,7 +306,7 @@ export default function EventResearch() {
                   {me.data.events.map(event => <label key={event.eventCode} className="flex gap-2 text-sm"><input type="checkbox" checked={selectedCodes.includes(event.eventCode)} onChange={e => setSelectedCodes(current => e.target.checked ? [...current, event.eventCode] : current.filter(code => code !== event.eventCode))} />{event.name} <span dir="ltr">({event.eventCode})</span></label>)}
                 </div>
                 <label className="flex gap-2 text-sm"><input type="checkbox" checked={latestOnly} onChange={e => setLatestOnly(e.target.checked)} />أحدث زيارة فقط لكل مشارك (الافتراضي: كل الزيارات)</label>
-                <div className="flex flex-wrap gap-3"><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsx.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly })}>{exportXlsx.isPending ? "جارٍ تجهيز Excel…" : "تنزيل Excel موحّد"}</button><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsxZip.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly })}>{exportXlsxZip.isPending ? "جارٍ تجهيز ZIP…" : "تنزيل ملفات Excel منفصلة (ZIP)"}</button></div>
+                <div className="flex flex-wrap gap-3"><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsx.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly, filters: exportFilters })}>{exportXlsx.isPending ? "جارٍ تجهيز Excel…" : "تنزيل Excel موحّد"}</button><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsxZip.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly, filters: exportFilters })}>{exportXlsxZip.isPending ? "جارٍ تجهيز ZIP…" : "تنزيل ملفات Excel منفصلة (ZIP)"}</button></div>
               </fieldset>
             </section>
             <section className="space-y-4 rounded-3xl bg-white p-5">
@@ -330,7 +333,7 @@ export default function EventResearch() {
                       {columns.includes("age") && <td className="p-3">{r.age ?? "—"}</td>}
                       {columns.includes("sex") && <td className="p-3">{r.sex === "male" ? "ذكر" : r.sex === "female" ? "أنثى" : "—"}</td>}
                       {columns.includes("questionnaire") && <td className="p-3">{r.questionnaireVersion}</td>}
-                      <td className="p-3"><details><summary className="cursor-pointer underline">عرض</summary><pre dir="ltr" className="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-50 p-3 text-xs">{JSON.stringify(r, null, 2)}</pre></details></td>
+                      <td className="p-3">{r.archiveId && me.data.reportArchiveAccess ? <button className="ml-3 underline" onClick={() => void utils.eventResearch.archiveSnapshot.fetch({ archiveId: r.archiveId! }).then(setArchive).catch(error => setMessage(error instanceof Error ? error.message : "تعذر فتح النسخة المؤرشفة"))}>التقرير المؤرشف</button> : null}<details><summary className="cursor-pointer underline">عرض</summary><pre dir="ltr" className="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-50 p-3 text-xs">{JSON.stringify(r, null, 2)}</pre></details></td>
                     </tr>)}
                   </tbody></table>
                 </div>
@@ -365,7 +368,7 @@ export default function EventResearch() {
               </div>
               {archives.isLoading ? <p>جارٍ تحميل الأرشيف…</p> : archives.error ? <p role="alert">تعذر تحميل الأرشيف.</p> : !archives.data?.archives.length ? <p>لا توجد تقارير مؤرشفة لهذه الفعالية.</p> : <div className="space-y-3">
                 {archives.data.archives.map(item => <article key={item.archiveId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 p-4">
-                  <div><b>نسخة التقرير {item.reportRevision}</b><p className="text-xs text-slate-500">اللقطة: {item.snapshotStatus} · PDF: {item.pdfStatus}</p></div>
+                  <div><b>زيارة {item.sessionId} · رمز {item.participantCode} · نسخة التقرير {item.reportRevision}</b><p className="text-xs text-slate-500">اللقطة: {item.snapshotStatus} · PDF: {item.pdfStatus}</p></div>
                   <div className="flex flex-wrap gap-3">
                     <button className="underline" onClick={() => void utils.eventResearch.archiveSnapshot.fetch({ archiveId: item.archiveId }).then(setArchive).catch(error => setMessage(error instanceof Error ? error.message : "تعذر فتح النسخة المؤرشفة"))}>فتح النسخة المؤرشفة</button>
                     {item.pdfStatus === "archived" ? <a className="underline" href={`/api/research/reports/${item.archiveId}/original.pdf`}>تنزيل PDF الأصلي</a> : <span className="text-xs text-slate-500">ملف PDF غير محفوظ بعد</span>}
@@ -373,6 +376,7 @@ export default function EventResearch() {
                   </div>
                 </article>)}
               </div>}
+              {archives.data?.archives.length ? <div className="flex gap-3"><button className={button} disabled={!archiveHistory.length || archives.isFetching} onClick={() => { setArchiveAfter(archiveHistory.at(-1)!); setArchiveHistory(archiveHistory.slice(0, -1)); }}>السابق</button><button className={button} disabled={!archives.data.nextCursor || archives.isFetching} onClick={() => { setArchiveHistory([...archiveHistory, archiveAfter]); setArchiveAfter(archives.data!.nextCursor!); }}>التالي</button></div> : null}
               {archive?.snapshot && <ArchivedSnapshot snapshot={archive.snapshot} />}
             </section>}
           </>
@@ -384,6 +388,8 @@ export default function EventResearch() {
 
 /** Reuses the participant report renderer with saved inputs only; no AI or live visit data is read. */
 function ArchivedSnapshot({ snapshot }: { snapshot: any }) {
+  const generatedAt = useMemo(() => new Date().toISOString(), [snapshot.reportRevision, snapshot.archivedAt]);
+  const metadata = snapshot.metadata ?? { participantId: "Plegacy", visitId: snapshot.participant.code, visitDate: snapshot.archivedAt, reportRevision: snapshot.reportRevision, questionnaireVersion: "legacy", scoringVersion: "legacy", templateVersion: "legacy" };
   return <section className="space-y-4 rounded-2xl border-2 border-emerald-200 bg-[#f7fbf9] p-4" data-final-report data-pdf-report>
     <div><h3 className="font-bold">إعادة إنشاء التقرير من النسخة المؤرشفة</h3><p className="text-sm text-slate-600">لقطة ثابتة؛ لا يعيد النظام حساب التوصيات أو يستدعي الذكاء الاصطناعي.</p></div>
     <EventPrintReport
@@ -393,7 +399,8 @@ function ArchivedSnapshot({ snapshot }: { snapshot: any }) {
       lifestyleEnabled={snapshot.lifestyleEnabled}
       care={snapshot.care}
       frozenLifestyleReport={snapshot.lifestyleReport}
+      provenance={{ generatedAt, templateVersion: EVENT_REPORT_TEMPLATE_VERSION, reportRevision: snapshot.reportRevision }}
     />
-    <div data-pdf-hide><EventPdfButton filename={`lim-${snapshot.participant.code}-visit-${snapshot.care.approvedRecordNo || "report"}-${snapshot.archivedAt.slice(0, 10)}-r${snapshot.reportRevision}-regenerated.pdf`} label="تنزيل التقرير المعاد إنشاؤه" /></div>
+    <div data-pdf-hide><EventPdfButton filename={eventReportFilename(metadata, true)} label="تنزيل التقرير المعاد إنشاؤه" /></div>
   </section>;
 }

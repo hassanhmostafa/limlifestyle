@@ -37,6 +37,7 @@ vi.mock("./eventCareDb", () => ({
   writeSettings: vi.fn(),
 }));
 vi.mock("./db", () => ({
+  getDb: vi.fn(),
   getEventReadingByRecordNo: vi.fn(),
   getUserByPhone: vi.fn(),
   getEventParticipantSessionByTokenHash: vi.fn(),
@@ -122,6 +123,13 @@ beforeEach(() => {
     session as never
   );
   vi.mocked(db.getEventReadingByRecordNo).mockResolvedValue([]);
+  const emptyArchiveQuery: any = {
+    from: () => emptyArchiveQuery,
+    where: () => emptyArchiveQuery,
+    orderBy: () => emptyArchiveQuery,
+    limit: async () => [],
+  };
+  vi.mocked(db.getDb).mockResolvedValue({ select: () => emptyArchiveQuery } as never);
   vi.mocked(db.updateEventParticipantSession).mockResolvedValue({
     ...session,
     reportCompletedAt: new Date(),

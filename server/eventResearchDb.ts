@@ -14,7 +14,10 @@ import {
 import { getDb, getEventReadingByRecordNo } from "./db";
 import { EVENT_CODE } from "./eventCareDb";
 import { researchRecord } from "./lib/eventResearchData";
-export type Researcher = typeof researchers.$inferSelect;
+import { readEmbeddedArchivedReportSnapshot } from "./eventReportArchive";
+// Keep the historical row shape compatible with deployments where the
+// additive archive privilege was introduced after existing researcher rows.
+export type Researcher = typeof researchers.$inferSelect & { reportArchiveAccess: number };
 export type ResearchPermissions = {
   allEvents: boolean;
   eventCodes: string[];
@@ -32,7 +35,7 @@ async function database() {
 }
 export async function researchEvents() {
   const db = await database();
-  const [profiles, codes] = await Promise.all([
+  const [profiles, codes, counts] = await Promise.all([
     db
       .select({
         eventCode: eventProfiles.eventCode,
@@ -43,6 +46,7 @@ export async function researchEvents() {
       })
       .from(eventProfiles),
     db.selectDistinct({ eventCode: visits.eventCode }).from(visits),
+    db.select({ eventCode: visits.eventCode, total: sql<number>`count(*)`, completed: sql<number>`sum(case when ${visits.reportCompletedAt} is not null then 1 else 0 end)` }).from(visits).groupBy(visits.eventCode),
   ]);
   const map = new Map(profiles.map(p => [p.eventCode, p]));
   for (const c of [...codes, { eventCode: EVENT_CODE }])
@@ -54,7 +58,8 @@ export async function researchEvents() {
         endsOn: null,
         organizer: "",
       });
-  return Array.from(map.values()).sort((a, b) =>
+  const countMap = new Map(counts.map(row => [row.eventCode, { total: Number(row.total), completed: Number(row.completed ?? 0) }]));
+  return Array.from(map.values()).map(event => ({ ...event, ...(countMap.get(event.eventCode) ?? { total: 0, completed: 0 }) })).sort((a, b) =>
     a.eventCode.localeCompare(b.eventCode)
   );
 }
@@ -247,7 +252,9 @@ export async function researcherBySession(tokenHash: string) {
         eq(sessions.credentialVersion, researchers.credentialVersion)
       )
     );
-  return r?.researcher;
+  // Drizzle's nested relation inference can lag behind additive columns; the
+  // database row is the same researchers table used by the direct lookups.
+  return r?.researcher as Researcher | undefined;
 }
 export async function endResearchSession(tokenHash: string) {
   const db = await database();
@@ -295,6 +302,8 @@ export async function reportArchivePage(
       id: eventReportArchives.id,
       archiveId: eventReportArchives.archiveId,
       eventCode: eventReportArchives.eventCode,
+      sessionId: eventReportArchives.sessionId,
+      participantCode: visits.code,
       reportRevision: eventReportArchives.reportRevision,
       snapshotStatus: eventReportArchives.snapshotStatus,
       pdfStatus: eventReportArchives.pdfStatus,
@@ -303,6 +312,7 @@ export async function reportArchivePage(
       retentionUntil: eventReportArchives.retentionUntil,
     })
     .from(eventReportArchives)
+    .innerJoin(visits, eq(visits.id, eventReportArchives.sessionId))
     .where(
       and(
         eq(eventReportArchives.eventCode, eventCode),
@@ -387,10 +397,16 @@ export async function researchPage(
       advice: eventCare.advice,
       doctorName: eventCare.doctorName,
       approvedAt: eventCare.approvedAt,
+      revision: eventCare.revision,
+      archiveId: eventReportArchives.archiveId,
+      archiveSessionId: eventReportArchives.sessionId,
+      snapshotPayload: eventReportArchives.snapshotPayload,
+      snapshotSha256: eventReportArchives.snapshotSha256,
     })
     .from(visits)
     .leftJoin(users, eq(users.id, visits.userId))
     .leftJoin(eventCare, eq(eventCare.sessionId, visits.id))
+    .leftJoin(eventReportArchives, and(eq(eventReportArchives.sessionId, visits.id), eq(eventReportArchives.reportRevision, eventCare.revision)))
     .where(
       and(
         eq(visits.eventCode, eventCode),
@@ -403,14 +419,15 @@ export async function researchPage(
     .limit(limit + 1);
   const page = rows.slice(0, limit);
   const records = await Promise.all(
-    page.map(async row =>
-      researchRecord(
-        row,
-        row.recordNo
-          ? await getEventReadingByRecordNo(row.userId, row.recordNo)
-          : []
-      )
-    )
+    page.map(async row => {
+      const frozen = row.archiveId ? readEmbeddedArchivedReportSnapshot({ archiveId: row.archiveId, sessionId: row.archiveSessionId!, reportRevision: row.revision!, snapshotPayload: row.snapshotPayload, snapshotSha256: row.snapshotSha256! }) : undefined;
+      return researchRecord(row, row.recordNo ? await getEventReadingByRecordNo(row.userId, row.recordNo) : [], {
+        frozenLifestyleReport: frozen?.lifestyleReport ?? null,
+        finalAdvice: r.reportArchiveAccess === 1 ? frozen?.care.advice ?? row.advice ?? null : null,
+        archiveId: row.archiveId ?? null,
+        frozenMetadata: frozen?.metadata ?? null,
+      });
+    })
   );
   // Failure to record access must prevent returning data.
   await db
@@ -428,18 +445,27 @@ export async function researchPage(
 export async function researchExport(
   r: Researcher,
   eventCodes: string[],
-  latestPerParticipant: boolean
+  latestPerParticipant: boolean,
+  filters: { from?: string; to?: string; code?: string; identity?: string } = {}
 ) {
   const selected = Array.from(new Set(eventCodes));
   if (!selected.length || selected.length > 50)
     throw new TRPCError({ code: "BAD_REQUEST", message: "اختر من 1 إلى 50 فعالية" });
   await Promise.all(selected.map(eventCode => requireResearchEvent(r, eventCode)));
   const db = await database();
+  if (filters.identity && r.reportArchiveAccess !== 1) throw new TRPCError({ code: "FORBIDDEN", message: "البحث بالاسم أو الجوال يتطلب صلاحية أرشيف التقارير" });
+  const conditions = [
+    filters.from ? gte(visits.createdAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
+    filters.to ? lte(visits.createdAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
+    filters.code ? like(visits.code, `%${filters.code}%`) : undefined,
+    filters.identity ? or(like(visits.displayName, `%${filters.identity}%`), like(users.phone, `%${filters.identity}%`)) : undefined,
+  ].filter(Boolean) as any[];
   const rows = await db
     .select({
       id: visits.id,
       eventCode: visits.eventCode,
       userId: visits.userId,
+      code: visits.code,
       age: visits.age,
       sex: visits.sex,
       city: visits.city,
@@ -455,10 +481,17 @@ export async function researchExport(
       nursingCompletedAt: eventCare.nursingCompletedAt,
       approvedAt: eventCare.approvedAt,
       advice: eventCare.advice,
+      revision: eventCare.revision,
+      archiveId: eventReportArchives.archiveId,
+      archiveSessionId: eventReportArchives.sessionId,
+      snapshotPayload: eventReportArchives.snapshotPayload,
+      snapshotSha256: eventReportArchives.snapshotSha256,
     })
     .from(visits)
+    .leftJoin(users, eq(users.id, visits.userId))
     .leftJoin(eventCare, eq(eventCare.sessionId, visits.id))
-    .where(and(inArray(visits.eventCode, selected), eq(visits.consent, "true")))
+    .leftJoin(eventReportArchives, and(eq(eventReportArchives.sessionId, visits.id), eq(eventReportArchives.reportRevision, eventCare.revision)))
+    .where(and(inArray(visits.eventCode, selected), eq(visits.consent, "true"), ...conditions))
     .orderBy(desc(visits.createdAt), desc(visits.id))
     .limit(10_001);
   if (rows.length > 10_000)
@@ -467,10 +500,15 @@ export async function researchExport(
     ? rows.filter((row, index, all) => all.findIndex(other => other.userId === row.userId) === index)
     : rows;
   const records = await Promise.all(
-    kept.map(async row => researchRecord(
-      row,
-      row.recordNo ? await getEventReadingByRecordNo(row.userId, row.recordNo) : []
-    ))
+    kept.map(async row => {
+      const frozen = row.archiveId ? readEmbeddedArchivedReportSnapshot({ archiveId: row.archiveId, sessionId: row.archiveSessionId!, reportRevision: row.revision!, snapshotPayload: row.snapshotPayload, snapshotSha256: row.snapshotSha256! }) : undefined;
+      return researchRecord(row, row.recordNo ? await getEventReadingByRecordNo(row.userId, row.recordNo) : [], {
+        frozenLifestyleReport: frozen?.lifestyleReport ?? null,
+        finalAdvice: r.reportArchiveAccess === 1 ? frozen?.care.advice ?? row.advice ?? null : null,
+        archiveId: row.archiveId ?? null,
+        frozenMetadata: frozen?.metadata ?? null,
+      });
+    })
   );
   await Promise.all(selected.map(eventCode => db.insert(audit).values({
     actorId: r.id,

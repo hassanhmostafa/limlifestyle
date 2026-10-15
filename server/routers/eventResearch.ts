@@ -39,6 +39,10 @@ const username = z
     /^[a-z0-9._-]{3,80}$/,
     "اسم المستخدم: 3–80 حرفًا إنجليزيًا أو رقمًا أو . أو _ أو -"
   );
+const researchFilters = z.object({
+  from: z.string().date().optional(), to: z.string().date().optional(),
+  code: z.string().trim().max(64).optional(), identity: z.string().trim().max(100).optional(),
+}).default({});
 const assignment = z.object({
   id: z.number().int().positive().optional(),
   name: z.string().trim().min(1).max(255),
@@ -178,13 +182,13 @@ export const eventResearchRouter = router({
   exportXlsx: researcherProcedure
     .input(z.object({
       eventCodes: z.array(z.string().min(1).max(64)).min(1).max(50),
-      latestPerParticipant: z.boolean().default(false),
+      latestPerParticipant: z.boolean().default(false), filters: researchFilters,
     }).refine(input => new Set(input.eventCodes).size === input.eventCodes.length, "لا تكرر الفعاليات"))
     .mutation(async ({ ctx, input }) => {
       const records = await store.researchExport(
         ctx.researcher,
         input.eventCodes,
-        input.latestPerParticipant
+        input.latestPerParticipant, input.filters
       );
       const workbook = buildResearchWorkbook(records);
       return {
@@ -197,10 +201,10 @@ export const eventResearchRouter = router({
   exportXlsxZip: researcherProcedure
     .input(z.object({
       eventCodes: z.array(z.string().min(1).max(64)).min(1).max(50),
-      latestPerParticipant: z.boolean().default(false),
+      latestPerParticipant: z.boolean().default(false), filters: researchFilters,
     }).refine(input => new Set(input.eventCodes).size === input.eventCodes.length, "لا تكرر الفعاليات"))
     .mutation(async ({ ctx, input }) => {
-      const records = await store.researchExport(ctx.researcher, input.eventCodes, input.latestPerParticipant);
+      const records = await store.researchExport(ctx.researcher, input.eventCodes, input.latestPerParticipant, input.filters);
       const archive = await buildResearchWorkbookZip(records, input.eventCodes);
       return {
         filename: `lim-research-by-event-${new Date().toISOString().slice(0, 10)}.zip`,

@@ -27,6 +27,8 @@ export default function EventPdfButton({
   onPreparedPdf,
 }: { filename?: string; shareable?: boolean; label?: string; className?: string; onPreparedPdf?: (file: File) => void | Promise<void> }) {
   const wrapper = useRef<HTMLDivElement>(null);
+  const preparedCallback = useRef(onPreparedPdf);
+  preparedCallback.current = onPreparedPdf;
   const cached = useRef<{ file: File; signature: string } | null>(null);
   const [preparing, setPreparing] = useState(shareable);
   const [busy, setBusy] = useState(false);
@@ -59,7 +61,7 @@ export default function EventPdfButton({
           cached.current = { file, signature: next };
           // Non-blocking: sharing/downloading remains usable if archival storage
           // is temporarily unavailable. The next rendered report retries it.
-          void onPreparedPdf?.(file);
+          void Promise.resolve(preparedCallback.current?.(file)).catch(() => {});
           setReady(true);
           setError("");
         } catch {

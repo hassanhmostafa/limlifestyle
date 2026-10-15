@@ -109,13 +109,18 @@ describe("research access boundaries", () => {
       purpose: "export",
       after: 20,
       limit: 50,
+      from: "2026-01-01",
+      to: "2026-01-31",
+      code: "VISIT-7",
+      identity: "allowed-only",
     });
     expect(store.researchPage).toHaveBeenCalledWith(
       r,
       "event-b",
       20,
       50,
-      "export"
+      "export",
+      { from: "2026-01-01", to: "2026-01-31", code: "VISIT-7", identity: "allowed-only" }
     );
     await expect(
       c.data({ eventCode: "event-b", limit: 1000 })
@@ -129,7 +134,7 @@ describe("research access boundaries", () => {
     vi.mocked(store.researcherBySession).mockResolvedValue(r);
     vi.mocked(store.researchExport).mockResolvedValue([]);
     const result = await eventResearchRouter.createCaller(context(null, `lim_event_research=${token}`)).exportXlsx({ eventCodes: ["event-a", "event-b"], latestPerParticipant: false });
-    expect(store.researchExport).toHaveBeenCalledWith(r, ["event-a", "event-b"], false);
+    expect(store.researchExport).toHaveBeenCalledWith(r, ["event-a", "event-b"], false, {});
     expect(result.filename).toMatch(/^lim-research-.*\.xlsx$/);
   });
   it("returns only public identity, not credential fields", async () => {

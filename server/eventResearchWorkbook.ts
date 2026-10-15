@@ -32,8 +32,16 @@ export function buildResearchWorkbook(records: Record<string, unknown>[]) {
       `${test.name} — ${field.label}`,
       field.unit ?? "",
     ])),
-    ["x18-v1", "readings.*.machineMetrics.*", "نتائج جهاز تحليل الجسم", "فارغ = لم يُسجل، وليس صفرًا"],
-    ["provenance", "eventCode / createdAt / questionnaireVersion", "الفعالية وتاريخ الزيارة وإصدار الاستبيان", "كل صف = زيارة، لا يُدمج تكرار المشارك تلقائيًا"],
+    ["scores", "lifestyleScore", "المؤشر العام لنمط الحياة", "0–100؛ فارغ = استبيان غير مكتمل وليس صفرًا"],
+    ["scores", "lifestyleDomains.(nutrition|activity|sleep|mood|connection|substances)", "درجات مجالات نمط الحياة", "0–10؛ فارغ = استبيان غير مكتمل"],
+    ["scores", "lifestyleBand / scoreProvenance", "تسمية النطاق ومصدر الدرجة", "frozen-approved = لقطة التقرير المعتمد؛ current-unarchived = حساب العرض الحالي"],
+    ["x18-v1", "readings.*.weight / height / bmi", "الوزن والطول ومؤشر كتلة الجسم", "kg / cm / kg/m²"],
+    ["x18-v1", "readings.*.(sbp|dbp|hr)", "ضغط الدم والنبض", "mmHg / mmHg / bpm"],
+    ["x18-v1", "readings.*.machineMetrics.(fat|fatFree|skeletalMuscle|muscle|protein|bone|mineral)", "قياسات تركيب الجسم من X18", "kg ما لم يذكر المفتاح Rate كنسبة %"],
+    ["x18-v1", "readings.*.machineMetrics.(waterRate|waterICW|waterECW|vfal|whr|bmr|bodyAge|bodyScore)", "مؤشرات X18 الإضافية", "% / L / L / level / ratio / kcal/day / years / vendor score"],
+    ["x18-v1", "readings.*.machineMetrics.(muscleLeftArm|muscleRightArm|muscleLeftLeg|muscleRightLeg|muscleTrunk|fatLeftArm|fatRightArm|fatLeftLeg|fatRightLeg|fatTrunk)", "التوزيع القطاعي للعضلات والدهون", "kg؛ المفاتيح المنتهية بـ Rate هي %"],
+    ["provenance", "eventCode / visitId / participantCode / createdAt / questionnaireVersion / scoringVersion / templateVersion / reportRevision", "الفعالية والزيارة وإصدارات اللقطة", "كل صف = زيارة؛ رمز المشارك لا يكشف الاسم أو الجوال"],
+    ["provenance", "finalAdvice", "نص التوصية المعتمدة", "يظهر فقط لمن يحمل صلاحية التقارير الكاملة"],
   ];
   const workbook = XLSX.utils.book_new();
   const recordsSheet = XLSX.utils.aoa_to_sheet(data);

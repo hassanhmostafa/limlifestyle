@@ -10,6 +10,7 @@ import type { EventAnswers } from "@/lib/eventLifestyle";
 import type { Measurements } from "@shared/eventCare";
 import { nursingCatalog } from "@shared/eventNursing";
 import { lifestyleReport } from "@shared/eventLifestyleInsights";
+import { eventReportDate, type EventReportProvenance } from "@shared/eventReportArchive";
 
 type Care = {
   advice: string | null;
@@ -20,7 +21,7 @@ type Care = {
   nurseNotes?: string | null;
 };
 
-function PrintHeading({ participant }: { participant: EventParticipantIdentity & { code: string } }) {
+function PrintHeading({ participant, provenance }: { participant: EventParticipantIdentity & { code: string }; provenance?: EventReportProvenance }) {
   return (
     <header className="lim-print-heading" data-pdf-keep>
       <LimLogo />
@@ -28,7 +29,7 @@ function PrintHeading({ participant }: { participant: EventParticipantIdentity &
         <h1>تقرير رحلتك الصحية</h1>
         <p>{participant.firstName || "المشارك"} · <bdi>{participant.code}</bdi></p>
       </div>
-      <span>فعاليات LIM</span>
+      <span>{provenance ? <><b>أُعيد توليده · {eventReportDate(provenance.generatedAt)}</b><br /><small dir="ltr">{provenance.templateVersion} · r{provenance.reportRevision}</small></> : "فعاليات LIM"}</span>
     </header>
   );
 }
@@ -87,6 +88,7 @@ export default function EventPrintReport({
   lifestyleEnabled,
   care,
   frozenLifestyleReport,
+  provenance,
 }: {
   participant: EventParticipantIdentity & { code: string };
   readings: DashboardReading[];
@@ -94,18 +96,19 @@ export default function EventPrintReport({
   lifestyleEnabled: boolean;
   care: Care;
   frozenLifestyleReport?: ReturnType<typeof lifestyleReport>;
+  provenance?: EventReportProvenance;
 }) {
   return (
     <article data-print-report data-lifestyle-enabled={lifestyleEnabled ? "true" : "false"} className="lim-print-report" dir="rtl" aria-hidden="true">
       {lifestyleEnabled && (
         <section className="lim-print-logical-page lim-print-questionnaire-page" data-pdf-logical-page="questionnaire">
-          <PrintHeading participant={participant} />
+          <PrintHeading participant={participant} provenance={provenance} />
           <AdvicePanel care={care} />
           <EventLifestyleCharts answers={answers} compact frozenReport={frozenLifestyleReport} />
         </section>
       )}
       <section className="lim-print-logical-page lim-print-body-page" data-pdf-logical-page="body">
-        {!lifestyleEnabled && <PrintHeading participant={participant} />}
+        {!lifestyleEnabled && <PrintHeading participant={participant} provenance={provenance} />}
         {!lifestyleEnabled && <AdvicePanel care={care} />}
         <EventBodyResults readings={readings} participant={participant} />
         <NursingPanel care={care} />

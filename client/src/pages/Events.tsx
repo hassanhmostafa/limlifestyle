@@ -2,7 +2,7 @@ import { EventOtpVerification } from "@/components/EventOtpVerification";
 import EventPdfButton from "@/components/EventPdfButton";
 import EventPrintReport from "@/components/EventPrintReport";
 import LimLogo from "@/components/LimLogo";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Activity,
@@ -39,6 +39,8 @@ import EventLifestyleCharts from "@/components/EventLifestyleCharts";
 import { Link } from "wouter";
 import { EVENT_CONSENT_VERSION } from "@shared/eventConsent";
 import { resolveAutomaticCareStatus } from "@/lib/eventCareStatus";
+import type { lifestyleReport } from "@shared/eventLifestyleInsights";
+import { eventReportFilename, EVENT_REPORT_TEMPLATE_VERSION, EVENT_REPORT_SCORING_VERSION } from "@shared/eventReportArchive";
 
 type Registration = {
   firstName: string;
@@ -164,6 +166,47 @@ export default function Events() {
     onError: (eventError) => setError(eventError.message),
   });
   const archivePdf = trpc.events.archivePdf.useMutation();
+  const archiveView = trpc.events.reportArchive.useQuery({ accessToken: accessToken ?? "", reportRevision: care?.reportRevision }, {
+    enabled: Boolean(accessToken && screen === "report" && care?.approvedAt),
+    retry: false, refetchOnWindowFocus: false,
+  });
+  const retryArchive = trpc.events.retryReportArchive.useMutation();
+  const [archiveFile, setArchiveFile] = useState<File | null>(null);
+  const [archiveMessage, setArchiveMessage] = useState("");
+  const [retryingArchive, setRetryingArchive] = useState(false);
+  const archiveBindingId = useRef(archiveView.data?.binding.archiveId);
+  archiveBindingId.current = archiveView.data?.binding.archiveId;
+  useEffect(() => { setArchiveFile(null); setArchiveMessage(""); }, [archiveView.data?.binding.archiveId]);
+  async function savePreparedArchive(file: File) {
+    setArchiveFile(file);
+    const binding = archiveView.data?.binding;
+    if (!accessToken || !binding?.originEligible || binding.pdfStatus === "archived") return;
+    setArchiveMessage("جارٍ حفظ نسخة التقرير الأصلية…");
+    try {
+      await archivePdf.mutateAsync({ accessToken, pdfBase64: await pdfBase64(file),
+        archiveId: binding.archiveId, reportRevision: binding.reportRevision, snapshotSha256: binding.snapshotSha256 });
+      if (archiveBindingId.current !== binding.archiveId) return;
+      setArchiveMessage("حُفظت نسخة التقرير الأصلية.");
+      await archiveView.refetch();
+    } catch {
+      if (archiveBindingId.current !== binding.archiveId) return;
+      setArchiveMessage("تعذر حفظ الأصل. يمكنك إعادة المحاولة بنفس الملف دون إعادة توليد التوصيات.");
+    }
+  }
+  async function retryOriginalArchive() {
+    if (!accessToken) return;
+    setRetryingArchive(true);
+    try {
+      if (!archiveView.data) { await archiveView.refetch(); return; }
+      if (archiveView.data.binding.snapshotStatus !== "archived") {
+        const retried = await retryArchive.mutateAsync({ accessToken });
+        if (retried.snapshotStatus !== "archived") throw new Error("snapshot-storage-failed");
+      }
+      if (archiveFile) await savePreparedArchive(archiveFile);
+      await archiveView.refetch();
+    } catch { setArchiveMessage("تعذر حفظ الأرشيف حاليًا. الملف والتوصيات المعتمدة لم تتغير."); }
+    finally { setRetryingArchive(false); }
+  }
 
   const apiSession = sessionQuery.data;
   const session: StoredSession | null = apiSession && accessToken ? {
@@ -181,6 +224,21 @@ export default function Events() {
     reportCompletedAt: apiSession.reportCompletedAt,
   } : null;
   const physicalReadings = resultQuery.data?.readings ?? [];
+  const frozen = archiveView.data?.snapshot;
+  const finalSession = session && frozen ? { ...session, ...frozen.participant, answers: frozen.answers as EventAnswers } : session;
+  const finalReadings: DashboardReading[] = frozen ? frozen.readings.map((reading, index) => ({ ...reading, id: reading.id ?? index + 1, recordedAt: reading.recordedAt ?? frozen.archivedAt, weight: reading.weight == null ? null : String(reading.weight), height: reading.height == null ? null : String(reading.height), bmi: reading.bmi == null ? null : String(reading.bmi) })) : physicalReadings;
+  const finalCare = frozen ? frozen.care : care;
+  const finalFilename = archiveView.data?.filename ?? (apiSession ? eventReportFilename({
+    participantId: apiSession.participantId, visitId: apiSession.visitId,
+    visitDate: new Date(apiSession.createdAt).toISOString(), reportRevision: care?.reportRevision ?? 1,
+    questionnaireVersion: String(apiSession.answers?._questionnaireVersion ?? "legacy"),
+    scoringVersion: EVENT_REPORT_SCORING_VERSION, templateVersion: EVENT_REPORT_TEMPLATE_VERSION,
+  }) : undefined);
+  const archiveStatus = archiveMessage || (archiveView.isFetching ? "جارٍ التحقق من نسخة التقرير…"
+    : archiveView.isError ? "تعذر التحقق من الأرشيف. أعد المحاولة."
+    : archiveView.data?.binding.pdfStatus === "archived" ? "حُفظت نسخة التقرير الأصلية."
+    : archiveView.data?.binding.originEligible ? "نسخة التقرير الأصلية بانتظار الحفظ."
+    : "لا توجد نسخة PDF أصلية مؤرشفة لهذه الزيارة القديمة.");
   const hasResult = physicalReadings.length > 0;
   const automaticCareStatus = resolveAutomaticCareStatus(care, hasResult, recommendations.isPending);
 
@@ -259,14 +317,14 @@ export default function Events() {
       {screen === "lifestyle" && session && <LifestyleView answers={answers} sectionIndex={lifestyleIndex} setSectionIndex={setLifestyleIndex} onBack={() => go("journey")} onSave={() => saveLifestyle.mutate({ accessToken: session.token, answers: { ...answers, _questionnaireVersion: EVENT_LIFESTYLE_VERSION } })} saving={saveLifestyle.isPending} />}
       {screen === "device" && session && <DeviceView session={session} readings={physicalReadings} loading={resultQuery.isLoading} onBack={() => go("journey")} onRefresh={() => resultQuery.refetch()} onViewConsultation={() => go(care?.nursingEnabled && !care.nursingCompletedAt ? "nursing" : "queue")} />}
       {(screen === "queue" || screen === "nursing") && session && <section className="space-y-5 p-5"><BackButton onClick={() => go("journey")} /><div className="rounded-3xl bg-[#123f37] p-6 text-white"><h1 className="text-2xl font-bold">{screen === "nursing" ? "محطة التمريض" : care?.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "الاستشارة الطبية"}</h1><p className="my-4 leading-7">{care?.approvedAt ? care.consultationMode === "automatic" ? "اكتملت التوصيات التثقيفية؛ يمكنك الاطلاع على التقرير الآن." : "اعتمد الطبيب تقريرك؛ يمكنك الاطلاع عليه الآن." : screen === "nursing" ? care?.nursingCompletedAt ? care?.consultationMode === "automatic" ? automaticCareStatus.message : "تم اعتماد قياساتك، توجّه إلى الطبيب." : "توجّه إلى محطة التمريض وقدّم رمزك للفريق لإدخال القياسات." : care?.consultationMode === "automatic" ? automaticCareStatus.message : "قدّم رمزك للطبيب لمراجعة نتائجك وإضافة النصائح. يظهر التقرير بعد اعتماد الطبيب."}</p><p dir="ltr">{session.code}</p>{session.deviceUserId && <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3"><QRCodeSVG value={session.deviceUserId} size={180} includeMargin /></div>}</div><Button onClick={() => { void Promise.all([careQuery.refetch(), sessionQuery.refetch(), resultQuery.refetch()]); }}>تحديث الحالة</Button>{screen === "nursing" && care?.nursingCompletedAt && <PrimaryButton onClick={() => go("queue")}>{care?.consultationMode === "automatic" ? "متابعة حالة التقرير" : "متابعة إلى الطبيب"}</PrimaryButton>}{care?.consultationMode === "automatic" && !care.approvedAt && automaticCareStatus.canRetry && <Button disabled={recommendations.isPending} onClick={() => { setError(""); recommendations.mutate({ accessToken: session.token }); }}>{automaticCareStatus.kind === "ready" ? "إعداد التوصيات" : "إعادة محاولة إعداد التوصيات"}</Button>}{care?.approvedAt && <PrimaryButton onClick={() => go("report")}>عرض التقرير النهائي</PrimaryButton>}{careQuery.error && <p role="alert">تعذر تحديث الحالة، حاول مرة أخرى.</p>}</section>}
-      {screen === "report" && session && (care?.approvedAt ? <div data-final-report data-pdf-report>
-        <EventPrintReport participant={session} readings={physicalReadings} answers={session.answers} lifestyleEnabled={lifestyleEnabled} care={care} />
+      {screen === "report" && session && (care?.approvedAt && finalSession && finalCare ? <div key={archiveView.data?.binding.archiveId ?? `${session.code}:${care.reportRevision}`} data-final-report data-pdf-report>
+        <EventPrintReport participant={finalSession} readings={finalReadings} answers={finalSession.answers} lifestyleEnabled={frozen?.lifestyleEnabled ?? lifestyleEnabled} care={finalCare} frozenLifestyleReport={frozen?.lifestyleReport ?? undefined} />
         <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">{care.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "نصائح الطبيب"}</h2><div data-doctor-advice dir="rtl" lang="ar" className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-right leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]">{care.advice}</div>{care.consultationMode !== "automatic" && <p className="text-sm">اعتمدها: {care.doctorName}</p>}{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
-        <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} onPreparedPdf={async file => {
-          if (!care.archive) return;
-          try { await archivePdf.mutateAsync({ accessToken: session.token, pdfBase64: await pdfBase64(file), archiveId: care.archive.archiveId, reportRevision: care.archive.reportRevision, snapshotSha256: care.archive.snapshotSha256 }); }
-          catch { setError("تعذر حفظ نسخة التقرير المؤرشفة. أعد تجهيز التقرير للمحاولة دون تغيير التقرير المعتمد."); }
-        }} />
+        <ReportView lifestyleEnabled={frozen?.lifestyleEnabled ?? lifestyleEnabled} session={finalSession} readings={finalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} onPreparedPdf={savePreparedArchive}
+          frozenLifestyleReport={frozen?.lifestyleReport ?? undefined} filename={finalFilename}
+          archiveStatus={archiveStatus} archiveBusy={archivePdf.isPending || retryingArchive}
+          archiveRetry={archiveView.isError || (archiveView.data?.binding.originEligible && archiveView.data.binding.pdfStatus !== "archived") || archiveView.data?.binding.snapshotStatus === "failed" ? retryOriginalArchive : undefined}
+          archiveRetryDisabled={!archiveView.isError && !archiveFile} pdfEnabled={!archiveView.isLoading} />
       </div> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}
     </div>
@@ -337,7 +395,7 @@ function DeviceView({ session, readings, loading, onBack, onRefresh, onViewConsu
   </section>;
 }
 
-function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, onFinish, onPreparedPdf }: { lifestyleEnabled: boolean; session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void; onPreparedPdf: (file: File) => Promise<void> }) {
+function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, onFinish, onPreparedPdf, frozenLifestyleReport, filename, archiveStatus, archiveRetry, archiveBusy, archiveRetryDisabled, pdfEnabled }: { lifestyleEnabled: boolean; session: StoredSession; readings: DashboardReading[]; finishing: boolean; onBack: () => void; onFinish: () => void; onPreparedPdf: (file: File) => Promise<void>; frozenLifestyleReport?: ReturnType<typeof lifestyleReport>; filename?: string; archiveStatus: string; archiveRetry?: () => void; archiveBusy: boolean; archiveRetryDisabled: boolean; pdfEnabled: boolean }) {
   return <section className="px-5 pb-14 pt-6 print:px-0">
     <div className="print:hidden"><BackButton onClick={onBack} /></div>
     <div className="rounded-[28px] border border-[#dce9e5] bg-white p-5">
@@ -345,12 +403,16 @@ function ReportView({ lifestyleEnabled, session, readings, finishing, onBack, on
       <h1 className="mt-1 text-2xl font-black">{session.firstName || "المشارك"}</h1>
       <p dir="ltr" className="mt-1 text-xs text-[#708a84]">{session.code}</p>
     </div>
-    {lifestyleEnabled && <div className="mt-6"><EventLifestyleCharts answers={session.answers} /></div>}
+    {lifestyleEnabled && <div className="mt-6"><EventLifestyleCharts answers={session.answers} frozenReport={frozenLifestyleReport} /></div>}
     {/* This deliberately shares the exact same parent width as DeviceView.
         It prevents the report's extra padded card from reflowing the anatomy stage. */}
     {readings.length > 0 && <div className="mt-7"><EventBodyResults readings={readings} participant={session} /></div>}
     <p className="mt-6 text-xs leading-5 text-[#7c918c]">هذا التقرير يعرض نتائج التقييم والقياسات كما سُجلت، ولا يُعد تشخيصًا طبيًا.</p>
-    <div className="mt-5"><EventPdfButton filename={`lim-final-${session.code}.pdf`} shareable onPreparedPdf={onPreparedPdf} className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white" /></div>
+    <div className="mt-5" data-pdf-hide>
+      <p role="status" className="mb-2 text-sm text-[#55746a]">{archiveStatus}</p>
+      {archiveRetry && <button type="button" className="mb-3 underline" disabled={archiveBusy || archiveRetryDisabled} onClick={archiveRetry}>{archiveBusy ? "جارٍ حفظ الأرشيف…" : "إعادة محاولة حفظ النسخة الأصلية"}</button>}
+      {pdfEnabled && <EventPdfButton filename={filename ?? `LIM-Plegacy-V${session.code}-undated-r1.pdf`} shareable onPreparedPdf={onPreparedPdf} className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white" />}
+    </div>
     <PrimaryButton disabled={finishing || Boolean(session.reportCompletedAt)} onClick={onFinish} className="mt-4 print:hidden">{finishing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />}{session.reportCompletedAt ? "اكتملت الرحلة" : "إنهاء الرحلة"}</PrimaryButton>
   </section>;
 }

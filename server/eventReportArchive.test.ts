@@ -47,4 +47,18 @@ describe("Events multi-event XLSX export", () => {
     const first = await zip.file("LIM-event-a-research.xlsx")!.async("nodebuffer");
     expect(XLSX.read(first, { type: "buffer" }).SheetNames).toContain("Dictionary");
   });
+  it("flattens frozen scores and readings into typed analytic cells", () => {
+    const bytes = buildResearchWorkbook([{
+      eventCode: "event-a", visitId: 4, lifestyleScore: 71,
+      lifestyleDomains: { activity: 6.5 },
+      readings: [{ weight: 72.4, machineMetrics: { skeletalMuscle: 28.1 } }],
+    }]);
+    const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
+    const sheet = workbook.Sheets.Visits;
+    const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false });
+    expect(rows[0]).toContain("lifestyleDomains.activity");
+    expect(rows[1][rows[0].indexOf("lifestyleScore")]).toBe("71");
+    expect(rows[1][rows[0].indexOf("readings.1.machineMetrics.skeletalMuscle")]).toBe("28.1");
+    expect(workbook.Sheets.Dictionary["A1"].v).toBe("version");
+  });
 });

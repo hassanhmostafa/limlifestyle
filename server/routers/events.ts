@@ -24,8 +24,11 @@ import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
 import {
   archiveApprovedEventReportSnapshot,
   eventReportArchiveForSession,
+  readArchivedReportSnapshot,
+  retryArchivedReportSnapshot,
   storeParticipantReportPdf,
 } from "../eventReportArchive";
+import { eventReportFilename } from "../../shared/eventReportArchive";
 
 const EVENT_CODE = "lim-events";
 const eventTokenInput = z.object({ accessToken: z.string().min(32).max(256) });
@@ -156,6 +159,9 @@ export const eventsRouter = router({
     const track = session.trackId ? await requireTrack(session.trackId, false) : null;
     return {
       code: session.code,
+      participantId: `P-${session.userId}`,
+      visitId: session.id,
+      createdAt: session.createdAt,
       trackId: session.trackId,
       questionnaireIds: session.questionnaireIds ?? ["lifestyle"],
       trackName: track?.name ?? null,
@@ -204,9 +210,10 @@ export const eventsRouter = router({
   care: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
     const care = await readCare(session.id);
-    const archive = care.approvedAt ? await eventReportArchiveForSession(session.id) : undefined;
+    const archive = care.approvedAt ? await eventReportArchiveForSession(session.id, care.revision) : undefined;
     return {
       nursingEnabled: Boolean(care.nursingEnabled),
+      reportRevision: care.revision,
       consultationMode: care.consultationMode,
       nursingCompletedAt: care.nursingCompletedAt,
       approvedAt: care.approvedAt,
@@ -220,6 +227,41 @@ export const eventsRouter = router({
       nurseNotes: care.nursingCompletedAt ? care.nurseNotes : null,
       archive: archive ? { archiveId: archive.archiveId, reportRevision: archive.reportRevision, snapshotSha256: archive.snapshotSha256, pdfStatus: archive.pdfStatus, snapshotStatus: archive.snapshotStatus } : null,
     };
+  }),
+
+  /** Returns only this participant's frozen current approval, without storage keys. */
+  reportArchive: publicProcedure.input(eventTokenInput.extend({ reportRevision: z.number().int().nonnegative().optional() })).query(async ({ input }) => {
+    const session = await requireEventSession(input.accessToken);
+    const care = await readCare(session.id);
+    if (!care.approvedAt) return null;
+    if (input.reportRevision !== undefined && input.reportRevision !== care.revision)
+      throw new TRPCError({ code: "CONFLICT", message: "تغير إصدار التقرير. حدّث الحالة ثم أعد المحاولة." });
+    const archive = await eventReportArchiveForSession(session.id, care.revision);
+    if (!archive) return null;
+    const saved = await readArchivedReportSnapshot(archive.archiveId);
+    if (!saved) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "تعذر استرجاع نسخة التقرير الثابتة. أعد المحاولة." });
+    return {
+      snapshot: saved.snapshot,
+      binding: {
+        archiveId: archive.archiveId,
+        reportRevision: archive.reportRevision,
+        snapshotSha256: archive.snapshotSha256,
+        originEligible: Boolean(archive.originEligible),
+        pdfStatus: archive.pdfStatus,
+        snapshotStatus: archive.snapshotStatus,
+      },
+      filename: saved.snapshot.metadata ? eventReportFilename(saved.snapshot.metadata)
+        : `LIM-Plegacy-V${session.id}-undated-r${archive.reportRevision}.pdf`,
+    };
+  }),
+  retryReportArchive: publicProcedure.input(eventTokenInput).mutation(async ({ input }) => {
+    const session = await requireEventSession(input.accessToken);
+    const care = await readCare(session.id);
+    if (!care.approvedAt) throw new TRPCError({ code: "FORBIDDEN" });
+    const archive = await eventReportArchiveForSession(session.id, care.revision);
+    if (!archive) throw new TRPCError({ code: "NOT_FOUND", message: "لا توجد نسخة أصلية محفوظة لهذه الزيارة." });
+    const updated = await retryArchivedReportSnapshot(archive.archiveId);
+    return { snapshotStatus: updated.snapshotStatus, pdfStatus: updated.pdfStatus };
   }),
 
   /** Receives only the participant's already-rendered final PDF over their opaque session. */

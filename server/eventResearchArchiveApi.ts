@@ -2,7 +2,8 @@ import type { Request, Response } from "express";
 import { parse } from "cookie";
 import { hashApiKey } from "./lib/apiSecurity";
 import { researcherBySession, authorizeReportArchive, auditReportArchiveAccess } from "./eventResearchDb";
-import { readArchivedReportPdf } from "./eventReportArchive";
+import { readArchivedReportPdf, readArchivedReportSnapshot } from "./eventReportArchive";
+import { eventReportFilename } from "../shared/eventReportArchive";
 
 const RESEARCH_COOKIE = "lim_event_research";
 
@@ -36,9 +37,13 @@ export async function handleArchivedReportPdf(request: Request, response: Respon
       return;
     }
     await auditReportArchiveAccess(researcher, authorized.eventCode, "archive_pdf");
+    const savedSnapshot = await readArchivedReportSnapshot(authorized.archiveId);
+    const filename = savedSnapshot?.snapshot.metadata
+      ? eventReportFilename(savedSnapshot.snapshot.metadata)
+      : `LIM-Plegacy-V${authorized.sessionId}-undated-r${authorized.reportRevision}.pdf`;
     response.setHeader("Content-Type", "application/pdf");
     response.setHeader("Content-Length", String(report.pdf.length));
-    response.setHeader("Content-Disposition", `attachment; filename="lim-report-${archiveId}.pdf"`);
+    response.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     response.setHeader("Cache-Control", "private, no-store, max-age=0");
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.status(200).end(report.pdf);
