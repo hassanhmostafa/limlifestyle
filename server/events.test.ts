@@ -11,6 +11,13 @@ import * as tracks from "./eventTracksDb";
 vi.mock("./eventTracksDb", () => ({ selectRegistrationTrack: vi.fn(), requireTrack: vi.fn(), listTracks: vi.fn() }));
 import { createCareSnapshot, readCare } from "./eventCareDb";
 vi.mock("./eventCareDb", () => ({ readCare: vi.fn(), createCareSnapshot: vi.fn() }));
+import { storeParticipantReportPdf } from "./eventReportArchive";
+vi.mock("./eventReportArchive", async importOriginal => ({
+  ...await importOriginal<typeof import("./eventReportArchive")>(),
+  storeParticipantReportPdf: vi.fn(),
+}));
+import { scheduleArchivedResearchPdfDelivery } from "./researchPdfDelivery";
+vi.mock("./researchPdfDelivery", () => ({ scheduleArchivedResearchPdfDelivery: vi.fn() }));
 
 vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
@@ -253,5 +260,69 @@ describe("standalone Events completion milestones", () => {
     const caller = appRouter.createCaller(anonymousContext);
     await expect(caller.events.completeReport({ accessToken: "z".repeat(43) }))
       .rejects.toThrow("Complete the consultation");
+  });
+});
+
+describe("independent Research PDF handoff boundary", () => {
+  const archiveId = "d3f3f6a0-70fe-49c1-8691-0fc7202c86fe";
+  const snapshotSha256 = "a".repeat(64);
+  const encodedPdf = Buffer.from("%PDF-1.4\nsynthetic delivery fixture\n%%EOF").toString("base64");
+
+  beforeEach(() => {
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
+    vi.mocked(readCare).mockResolvedValue({ approvedAt: new Date(), revision: 4 } as never);
+  });
+
+  it("keeps the archived participant response and exact PDF bytes when Research scheduling fails", async () => {
+    vi.mocked(storeParticipantReportPdf).mockResolvedValue({
+      archiveId,
+      pdfStatus: "archived",
+      pdfArchivedNow: true,
+    } as never);
+    vi.mocked(scheduleArchivedResearchPdfDelivery).mockImplementation(() => {
+      throw new Error("synthetic Research endpoint outage");
+    });
+
+    const result = await appRouter.createCaller(anonymousContext).events.archivePdf({
+      accessToken: "z".repeat(43),
+      archiveId,
+      reportRevision: 4,
+      snapshotSha256,
+      pdfBase64: encodedPdf,
+    });
+
+    expect(result).toEqual({ status: "archived" });
+    expect(storeParticipantReportPdf).toHaveBeenCalledWith(
+      eventSession.id,
+      Buffer.from(encodedPdf, "base64"),
+      { archiveId, reportRevision: 4, snapshotSha256 },
+    );
+    expect(scheduleArchivedResearchPdfDelivery).toHaveBeenCalledWith(archiveId);
+  });
+
+  it("does not schedule Research before the original PDF is durably archived", async () => {
+    vi.mocked(storeParticipantReportPdf).mockResolvedValue({
+      archiveId,
+      pdfStatus: "uploading",
+      pdfArchivedNow: false,
+    } as never);
+
+    await expect(appRouter.createCaller(anonymousContext).events.archivePdf({
+      accessToken: "z".repeat(43), archiveId, reportRevision: 4, snapshotSha256, pdfBase64: encodedPdf,
+    })).resolves.toEqual({ status: "uploading" });
+    expect(scheduleArchivedResearchPdfDelivery).not.toHaveBeenCalled();
+  });
+
+  it("does not duplicate a Research handoff when the same immutable original was already archived", async () => {
+    vi.mocked(storeParticipantReportPdf).mockResolvedValue({
+      archiveId,
+      pdfStatus: "archived",
+      pdfArchivedNow: false,
+    } as never);
+
+    await expect(appRouter.createCaller(anonymousContext).events.archivePdf({
+      accessToken: "z".repeat(43), archiveId, reportRevision: 4, snapshotSha256, pdfBase64: encodedPdf,
+    })).resolves.toEqual({ status: "archived" });
+    expect(scheduleArchivedResearchPdfDelivery).not.toHaveBeenCalled();
   });
 });

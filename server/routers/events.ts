@@ -30,6 +30,7 @@ import {
   storeParticipantReportPdf,
 } from "../eventReportArchive";
 import { eventReportFilename } from "../../shared/eventReportArchive";
+import { scheduleArchivedResearchPdfDelivery } from "../researchPdfDelivery";
 
 const EVENT_CODE = "lim-events";
 const eventTokenInput = z.object({ accessToken: z.string().min(32).max(256) });
@@ -292,6 +293,16 @@ export const eventsRouter = router({
       }
       try {
         const archived = await storeParticipantReportPdf(session.id, pdf, { archiveId: input.archiveId, reportRevision: input.reportRevision, snapshotSha256: input.snapshotSha256 });
+        // The independent Research receiver is strictly downstream of a durable
+        // LIM archive. It is never allowed to change this participant response,
+        // sharing, report completion, or the operational archive itself.
+        if (archived.pdfStatus === "archived" && archived.pdfArchivedNow) {
+          try {
+            scheduleArchivedResearchPdfDelivery(archived.archiveId);
+          } catch {
+            console.warn("[Research delivery] Unable to schedule archived PDF handoff.");
+          }
+        }
         return { status: archived.pdfStatus };
       } catch {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر حفظ نسخة التقرير المؤرشفة" });

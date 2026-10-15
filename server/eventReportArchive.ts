@@ -16,6 +16,10 @@ export const EVENT_REPORT_PDF_CLAIM_LEASE_MS = 5 * 60 * 1000;
 const ARCHIVE_KEY_CONTEXT = "lim-event-report-archive-v1";
 
 type ArchiveStatus = "pending" | "uploading" | "archived" | "failed";
+type StoredParticipantReportPdf = typeof eventReportArchives.$inferSelect & {
+  /** True only for the invocation that completed the original PDF archive. */
+  pdfArchivedNow: boolean;
+};
 export type EventReportSnapshot = {
   schemaVersion: 1;
   archivedAt: string;
@@ -102,6 +106,13 @@ export function decryptArchiveBytes(
 
 function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
+}
+
+/** Drizzle/MySQL returns an affected-row header; keep tests tolerant of minimal mocks. */
+function affectedRows(result: unknown) {
+  const header = Array.isArray(result) ? result[0] : result;
+  const value = (header as { affectedRows?: unknown } | undefined)?.affectedRows;
+  return typeof value === "number" ? value : undefined;
 }
 
 export function isPdfClaimLeaseExpired(value: Date | null | undefined, now = new Date()) {
@@ -318,7 +329,7 @@ export async function retryArchivedReportSnapshot(archiveId: string) {
   return updated!;
 }
 
-export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Array, expected: { archiveId: string; reportRevision: number; snapshotSha256: string }) {
+export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Array, expected: { archiveId: string; reportRevision: number; snapshotSha256: string }): Promise<StoredParticipantReportPdf> {
   const bytes = Buffer.from(pdf);
   if (!bytes.length || bytes.length > EVENT_REPORT_ARCHIVE_MAX_PDF_BYTES || !bytes.subarray(0, 5).equals(Buffer.from("%PDF-")))
     throw new Error("Invalid final report PDF.");
@@ -334,8 +345,8 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
     .limit(1);
   if (!archive) throw new Error("The prepared report is stale; prepare the current final report again.");
   if (!archive.originEligible) throw new Error("This historical report has no original PDF capture.");
-  if (archive.pdfStatus === "archived") return archive;
-  if (archive.pdfStatus === "uploading" && !isPdfClaimLeaseExpired(archive.pdfLeaseExpiresAt)) return archive;
+  if (archive.pdfStatus === "archived") return { ...archive, pdfArchivedNow: false };
+  if (archive.pdfStatus === "uploading" && !isPdfClaimLeaseExpired(archive.pdfLeaseExpiresAt)) return { ...archive, pdfArchivedNow: false };
 
   const key = `private/event-report-archive/v1/${crypto.randomUUID()}.bin`;
   const hash = sha256(bytes);
@@ -367,7 +378,8 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       )
     ));
   const [claimed] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, archive.id)).limit(1);
-  if (!claimed || claimed.pdfClaimToken !== claimToken || claimed.pdfKey !== key || claimed.pdfStatus !== "uploading") return claimed ?? archive;
+  if (!claimed || claimed.pdfClaimToken !== claimToken || claimed.pdfKey !== key || claimed.pdfStatus !== "uploading")
+    return { ...(claimed ?? archive), pdfArchivedNow: false };
   try {
     await storagePut(
       key,
@@ -384,7 +396,7 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       .where(and(eq(eventReportArchives.id, archive.id), eq(eventReportArchives.pdfKey, key), eq(eventReportArchives.pdfClaimToken, claimToken), eq(eventReportArchives.pdfStatus, "uploading")));
     throw new Error("The original PDF could not be stored. Retry the same prepared file.");
   }
-  await db
+  const finalization = await db
     .update(eventReportArchives)
     .set({
       pdfStatus: "archived" as ArchiveStatus,
@@ -401,7 +413,13 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       gte(eventReportArchives.pdfLeaseExpiresAt, new Date())
     ));
   const [saved] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, archive.id)).limit(1);
-  return saved!;
+  const rowsFinalized = affectedRows(finalization);
+  return {
+    ...saved!,
+    // In production the update result proves this claim completed the state
+    // transition. Minimal test doubles may omit an affected-row header.
+    pdfArchivedNow: saved?.pdfStatus === "archived" && (rowsFinalized === undefined || rowsFinalized > 0),
+  };
 }
 
 export async function readArchivedReportPdf(archiveId: string) {
