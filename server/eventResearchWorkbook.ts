@@ -1,8 +1,7 @@
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { flattenResearchRecord } from "../shared/eventResearchExport";
-import { eventLifestyleSections, EVENT_LIFESTYLE_VERSION } from "../shared/eventLifestyle";
-import { nursingCatalog } from "../shared/eventNursing";
+import { buildResearchDictionary } from "./eventResearchDictionary";
 
 function safeCell(value: unknown) {
   if (value === null || value === undefined) return "";
@@ -17,31 +16,7 @@ export function buildResearchWorkbook(records: Record<string, unknown>[]) {
   const flattened = records.map(row => flattenResearchRecord(row));
   const columns = Array.from(new Set(flattened.flatMap(row => Object.keys(row)))).sort();
   const data = [columns, ...flattened.map(row => columns.map(column => safeCell(row[column])))];
-  const dictionary = [
-    ["version", "variable", "Arabic label / meaning", "coding / unit"],
-    [EVENT_LIFESTYLE_VERSION, "answers.*", "إجابات الاستبيان", "فارغ = لم يُسجل؛ مفاتيح الاستبيان في الصفوف التالية"],
-    ...eventLifestyleSections.flatMap(section => section.questions.map(question => [
-      EVENT_LIFESTYLE_VERSION,
-      `answers.${question.id}`,
-      question.text,
-      question.options?.map(option => `${option.value}=${option.label}`).join(" | ") ?? question.suffix ?? "رقم",
-    ])),
-    ...nursingCatalog.flatMap(test => test.fields.map(field => [
-      "nursing-v1",
-      `measurements.${test.id}.${field.key}`,
-      `${test.name} — ${field.label}`,
-      field.unit ?? "",
-    ])),
-    ["scores", "lifestyleScore", "المؤشر العام لنمط الحياة", "0–100؛ فارغ = استبيان غير مكتمل وليس صفرًا"],
-    ["scores", "lifestyleDomains.(nutrition|activity|sleep|mood|connection|substances)", "درجات مجالات نمط الحياة", "0–10؛ فارغ = الاستبيان غير مفعّل أو غير مكتمل"],
-    ["scores", "lifestyleBand / scoreProvenance", "تسمية النطاق ومصدر الدرجة", "frozen-approved = لقطة التقرير المعتمد؛ current-unarchived = حساب العرض الحالي"],
-    ["clinical", "clinical.weight / clinical.bmi / clinical.waist / clinical.glucose", "الوزن، BMI، محيط الخصر، سكر الدم", "kg / kg/m² / cm / mg/dL؛ فارغ = لا توجد قراءة"],
-    ["x18-v1", "readings.*.weight / height / bmi", "الوزن والطول ومؤشر كتلة الجسم كما وردت من X18", "kg / cm / kg/m² عند توفرها"],
-    ["x18-v1", "readings.*.(sbp|dbp|hr)", "ضغط الدم والنبض كما وردت من X18", "mmHg / mmHg / bpm عند توفرها"],
-    ["x18-v1", "readings.*.machineMetrics.*", "مفاتيح القياسات المعتمدة من حمولة X18", "قيمة رقمية من الجهاز؛ راجع دليل الجهاز للوحدة الخاصة بكل مفتاح"],
-    ["provenance", "eventCode / visitId / participantCode / createdAt / questionnaireVersion / scoringVersion / templateVersion / reportRevision", "الفعالية والزيارة وإصدارات اللقطة", "كل صف = زيارة؛ رمز المشارك لا يكشف الاسم أو الجوال"],
-    ["provenance", "finalAdvice", "نص التوصية المعتمدة", "يظهر فقط لمن يحمل صلاحية التقارير الكاملة"],
-  ];
+  const dictionary = buildResearchDictionary(columns, records);
   const workbook = XLSX.utils.book_new();
   const recordsSheet = XLSX.utils.aoa_to_sheet(data);
   recordsSheet["!freeze"] = { xSplit: 0, ySplit: 1 };

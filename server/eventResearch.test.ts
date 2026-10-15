@@ -3,6 +3,8 @@ import { eventResearchRouter } from "./routers/eventResearch";
 import * as store from "./eventResearchDb";
 import { researchRecord } from "./lib/eventResearchData";
 import { researchCsv } from "../shared/eventResearchExport";
+import { EVENT_LIFESTYLE_VERSION, eventLifestyleSections, type EventAnswers } from "../shared/eventLifestyle";
+import { lifestyleReport } from "../shared/eventLifestyleInsights";
 vi.mock("./eventResearchDb", () => ({
   listResearchers: vi.fn(),
   researchEvents: vi.fn(),
@@ -217,7 +219,7 @@ describe("raw data projection and export", () => {
       weight: 70,
       fatRate: 20,
     });
-    expect(record.answers).toEqual({ fruit: "2" });
+    expect(record.answers).toEqual({ fruit: 2 });
   });
   it("never includes identity or free text in the researcher projection", () => {
     const record = researchRecord(row, readings);
@@ -240,6 +242,31 @@ describe("raw data projection and export", () => {
     expect(record.readings[0].machineMetrics).toEqual({ weight: 70.4 });
     expect(record.lifestyleScore).toBeNull();
     expect(record.lifestyleDomains).toEqual({});
+  });
+  it("keeps vendor category and range text and chooses the newest available clinical metric", () => {
+    const record = researchRecord({ ...row, questionnaireIds: ["lifestyle"] }, [
+      { source: "x18", sbp: "120", machineMetrics: { bodyShape: "standard", bmi_s: "18.5–24.9", fatRate: "20" } },
+      { source: "x18", weight: "70.4", bmi: "25.1" },
+      { source: "x18", weight: "69", bmi: "24.5" },
+    ]);
+    expect(record.readings[0].machineMetrics).toMatchObject({ bodyShape: "standard", bmi_s: "18.5–24.9", fatRate: 20 });
+    expect(record.clinical).toMatchObject({ weight: 70.4, bmi: 25.1 });
+    expect(record.answers.fruit).toBe(2);
+  });
+  it("exports numeric choice codes without changing completeness or the computed score", () => {
+    const answers: EventAnswers = { _questionnaireVersion: EVENT_LIFESTYLE_VERSION };
+    for (const section of eventLifestyleSections) for (const question of section.questions) {
+      answers[question.id] = question.type === "multi" ? [] :
+        question.type === "number" ? question.min ?? 0 :
+        question.type === "slider" ? 8 : question.options?.[0]?.value ?? "";
+    }
+    Object.assign(answers, { priority1: "nutrition", priority2: "activity", priority3: "sleep" });
+    const record = researchRecord({ ...row, questionnaireIds: ["lifestyle"], answers }, []);
+    expect(record.lifestyleScore).toEqual(expect.any(Number));
+    expect(record.lifestyleScore).toBe(lifestyleReport(answers).score.overall);
+    expect(record.answers.fruit).toBe(0);
+    expect(record.answers.priority1).toBe("nutrition");
+    expect(record.questionnaireVersion).toBe(EVENT_LIFESTYLE_VERSION);
   });
   it("flattens questionnaire and nursing values and blocks CSV formulas", () => {
     const csv = researchCsv([

@@ -23,7 +23,7 @@ export function finiteResearchNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-function normalizedAnswers(answers: Record<string, unknown>) {
+function normalizedAnswers(answers: Record<string, unknown>, numericChoices = true) {
   const questions = lifestyleSectionsForAnswers(answers as EventAnswers).flatMap(section => section.questions);
   const byId = new Map(questions.map(question => [question.id, question]));
   return Object.fromEntries(Object.entries(answers).flatMap(([key, value]) => {
@@ -33,7 +33,11 @@ function normalizedAnswers(answers: Record<string, unknown>) {
       const numeric = finiteResearchNumber(value);
       return numeric === undefined ? [] : [[key, numeric]];
     }
-    // Choices are already allowlisted by the shared questionnaire declaration.
+    // Numeric choice codes are analytic values; named choices remain text.
+    if (numericChoices && question.options?.some(option => option.value === String(value)) &&
+      question.options.every(option => finiteResearchNumber(option.value) !== undefined)) {
+      return [[key, finiteResearchNumber(value)!]];
+    }
     return [[key, value]];
   }));
 }
@@ -57,20 +61,28 @@ function normalizedMeasurements(measurements: unknown) {
 
 function normalizedMachineMetrics(metrics: unknown) {
   if (!metrics || typeof metrics !== "object" || Array.isArray(metrics)) return {};
-  return Object.fromEntries(Object.entries(metrics as Record<string, unknown>).flatMap(([key, value]) => {
+  return Object.fromEntries(Object.entries(metrics as Record<string, unknown>).flatMap<[string, string | number]>(([key, value]) => {
     if (!metricKeys.has(key)) return [];
     const numeric = finiteResearchNumber(value);
-    return numeric === undefined ? [] : [[key, numeric]];
+    if (numeric !== undefined) return [[key, numeric]];
+    // Vendor ranges/statuses and body-shape labels are valid raw fields too.
+    return typeof value === "string" && value.trim() ? [[key, value]] : [];
   }));
 }
 
 function clinicalProjection(readings: any[], measurements: Record<string, any>) {
-  const latest = readings.at(-1) ?? {};
-  const machine = normalizedMachineMetrics(latest.machineMetrics);
+  // The database returns newest first; a later BP packet may omit body metrics.
+  const latestMetric = (key: string) => {
+    for (const reading of readings) {
+      const numeric = finiteResearchNumber(reading[key]) ?? finiteResearchNumber(reading.machineMetrics?.[key]);
+      if (numeric !== undefined) return numeric;
+    }
+    return undefined;
+  };
   const nursing = measurements as Record<string, Record<string, unknown>>;
   return {
-    weight: finiteResearchNumber(latest.weight) ?? finiteResearchNumber(machine.weight) ?? finiteResearchNumber(nursing.weight?.value),
-    bmi: finiteResearchNumber(latest.bmi) ?? finiteResearchNumber(machine.bmi),
+    weight: latestMetric("weight") ?? finiteResearchNumber(nursing.weight?.value),
+    bmi: latestMetric("bmi"),
     waist: finiteResearchNumber(nursing.waist?.value),
     glucose: finiteResearchNumber(nursing.blood_glucose?.value),
   };
@@ -86,7 +98,7 @@ export function researchRecord(
   const answerProjection = normalizedAnswers(answers);
   const lifestyleEnabled = (row.questionnaireIds ?? ["lifestyle"]).includes("lifestyle");
   const hasFrozenReport = Object.prototype.hasOwnProperty.call(options, "frozenLifestyleReport");
-  const report = hasFrozenReport ? options.frozenLifestyleReport : (lifestyleEnabled ? lifestyleReport(answerProjection as any) : null);
+  const report = hasFrozenReport ? options.frozenLifestyleReport : (lifestyleEnabled ? lifestyleReport(normalizedAnswers(answers, false) as any) : null);
   const complete = Boolean(report?.complete);
   const measurementProjection = normalizedMeasurements(row.measurements);
   const readingProjection = readings.map(reading => ({
@@ -112,7 +124,7 @@ export function researchRecord(
     trackId: row.trackId,
     createdAt: row.createdAt,
     questionnaireIds: row.questionnaireIds,
-    questionnaireVersion: options.frozenMetadata?.questionnaireVersion ?? answers._questionnaireVersion ?? "legacy",
+    questionnaireVersion: options.frozenMetadata?.questionnaireVersion ?? (lifestyleEnabled ? answers._questionnaireVersion ?? "legacy" : "none"),
     scoringVersion: options.frozenMetadata?.scoringVersion ?? (hasFrozenReport ? "frozen-archive" : "current-unarchived"),
     templateVersion: options.frozenMetadata?.templateVersion ?? (hasFrozenReport ? "frozen-archive" : "current-unarchived"),
     reportRevision: options.frozenMetadata?.reportRevision ?? row.revision ?? null,
