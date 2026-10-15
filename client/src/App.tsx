@@ -45,6 +45,7 @@ function Router() {
       <Route path={"/login"} component={Login} />
       <Route path={"/kiosk-login"} component={KioskLogin} />
       <Route path={"/kiosk-qr"} component={KioskQR} />
+      <Route path={"/research"} component={EventResearch} />
       <Route path={"/events/research"} component={EventResearch} />
       <Route path={"/events/team"} component={EventTeam} />
       <Route path={"/events/care-admin"} component={EventCareAdmin} />

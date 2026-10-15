@@ -23,12 +23,12 @@ export async function handleArchivedReportPdf(request: Request, response: Respon
     return;
   }
   const token = researcherToken(request);
-  const researcher = token ? await researcherBySession(hashApiKey(token)) : undefined;
-  if (!researcher) {
-    response.status(401).json({ error: "Research authentication required" });
-    return;
-  }
   try {
+    const researcher = token ? await researcherBySession(hashApiKey(token)) : undefined;
+    if (!researcher) {
+      response.status(401).json({ error: "Research authentication required" });
+      return;
+    }
     const authorized = await authorizeReportArchive(researcher, archiveId);
     const report = await readArchivedReportPdf(authorized.archiveId);
     if (!report) {
