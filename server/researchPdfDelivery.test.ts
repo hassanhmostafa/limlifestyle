@@ -1,40 +1,48 @@
 import crypto from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
+  RESEARCH_PDF_DELIVERY_CONTRACT,
+  RESEARCH_PDF_DELIVERY_PATH,
   deliverArchivedResearchPdf,
   researchPdfDeliveryCanonicalMetadata,
-  researchPdfDeliveryCanonicalReceipt,
+  researchPdfDeliveryCanonicalRequest,
   researchPdfDeliveryConfig,
-  researchPdfDeliveryIdempotencyKey,
-  researchPdfDeliveryReceiptSignature,
+  researchPdfDeliveryMetadataBase64Url,
   researchPdfDeliverySignature,
   type ResearchPdfDeliveryMetadata,
 } from "./researchPdfDelivery";
 
 const bytes = Buffer.from("%PDF-1.4\nsynthetic Research delivery only\n%%EOF");
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
+const signingKey = Buffer.from("0123456789abcdef0123456789abcdef", "utf8");
 const metadata: ResearchPdfDeliveryMetadata = {
+  contractVersion: 1,
+  sourceSystem: "lim-lifestyle",
   archiveId: "0c1ae2e9-b4b8-4e2d-8210-5a2c695d19fb",
-  reportRevision: 7,
-  pdfSha256: sha256,
+  revision: 7,
   eventCode: "research-fixture-event",
   templateVersion: "lim-a4-test-2026-10-15",
-  pdfBytes: bytes.length,
+  size: bytes.length,
+  pdfSha256: sha256,
 };
 const enabledEnv = {
   LIM_RESEARCH_PDF_DELIVERY_ENABLED: "true",
-  LIM_RESEARCH_PDF_DELIVERY_URL: "https://research.invalid/internal/imports/original-pdf",
-  LIM_RESEARCH_PDF_DELIVERY_HMAC_SECRET: "s".repeat(48),
+  LIM_RESEARCH_PDF_DELIVERY_URL: "https://research.invalid/api/integrations/lim/reports",
+  LIM_RESEARCH_KEY_ID: "lim_research_test_01",
+  LIM_RESEARCH_HMAC_KEY_BASE64: signingKey.toString("base64"),
   LIM_RESEARCH_PDF_DELIVERY_TIMEOUT_MS: "900",
 };
+const fixedNow = new Date("2026-10-15T19:44:00.000Z");
+const fixedTimestamp = Math.floor(fixedNow.getTime() / 1_000);
+const fixedNonce = "11111111-1111-4111-8111-111111111111";
 
 function archivedPdf() {
   return {
     archive: {
       archiveId: metadata.archiveId,
-      reportRevision: metadata.reportRevision,
+      reportRevision: metadata.revision,
       pdfSha256: metadata.pdfSha256,
-      pdfBytes: metadata.pdfBytes,
+      pdfBytes: metadata.size,
       pdfStatus: "archived",
       eventCode: metadata.eventCode,
     },
@@ -48,26 +56,8 @@ function archivedSnapshot() {
   } as any;
 }
 
-function acceptedReceipt() {
-  return { ...metadata, accepted: true as const, importId: "research-import-synthetic-001" };
-}
-
-function acceptedResponse() {
-  const receipt = acceptedReceipt();
-  return new Response(JSON.stringify(receipt), {
-    status: 202,
-    headers: {
-      "content-type": "application/json",
-      "x-lim-research-receipt-signature": researchPdfDeliveryReceiptSignature(
-        receipt,
-        enabledEnv.LIM_RESEARCH_PDF_DELIVERY_HMAC_SECRET,
-      ),
-    },
-  });
-}
-
-describe("independent Research PDF delivery contract", () => {
-  it("is disabled unless an explicit TLS endpoint and server secret are configured", async () => {
+describe("independent Research PDF delivery contract v1", () => {
+  it("is disabled unless the exact TLS endpoint, ASCII key id, and 32-byte decoded key are configured", async () => {
     const readPdf = vi.fn();
     expect(researchPdfDeliveryConfig({})).toBeUndefined();
     await expect(deliverArchivedResearchPdf(metadata.archiveId, { env: {}, readPdf })).resolves.toEqual({
@@ -76,92 +66,68 @@ describe("independent Research PDF delivery contract", () => {
       reason: "disabled",
     });
     expect(readPdf).not.toHaveBeenCalled();
-    expect(researchPdfDeliveryConfig({
-      ...enabledEnv,
-      LIM_RESEARCH_PDF_DELIVERY_URL: "http://research.invalid/plain-text",
-    })).toBeUndefined();
+    expect(researchPdfDeliveryConfig({ ...enabledEnv, LIM_RESEARCH_PDF_DELIVERY_URL: "http://research.invalid/api/integrations/lim/reports" })).toBeUndefined();
+    expect(researchPdfDeliveryConfig({ ...enabledEnv, LIM_RESEARCH_PDF_DELIVERY_URL: "https://research.invalid/not-the-contract-path" })).toBeUndefined();
+    expect(researchPdfDeliveryConfig({ ...enabledEnv, LIM_RESEARCH_KEY_ID: "invalid key id" })).toBeUndefined();
+    expect(researchPdfDeliveryConfig({ ...enabledEnv, LIM_RESEARCH_HMAC_KEY_BASE64: Buffer.from("short").toString("base64") })).toBeUndefined();
   });
 
-  it("posts exactly the archived bytes with hash-bound metadata, HMAC, and a stable idempotency key", async () => {
-    const fetchImpl = vi.fn(async () => acceptedResponse()) as unknown as typeof fetch;
+  it("posts exactly the archived bytes and the final LF-free canonical HMAC headers", async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 202 })) as unknown as typeof fetch;
     const result = await deliverArchivedResearchPdf(metadata.archiveId, {
       env: enabledEnv,
       fetchImpl,
       readPdf: vi.fn().mockResolvedValue(archivedPdf()),
       readSnapshot: vi.fn().mockResolvedValue(archivedSnapshot()),
+      now: () => fixedNow,
+      nonce: () => fixedNonce,
     });
 
-    expect(result).toEqual({
-      attempted: true,
-      delivered: true,
-      idempotencyKey: researchPdfDeliveryIdempotencyKey(metadata),
-      responseStatus: 202,
-      importId: "research-import-synthetic-001",
-    });
+    expect(result).toEqual({ attempted: true, delivered: true, responseStatus: 202 });
     const [url, init] = vi.mocked(fetchImpl).mock.calls[0]!;
+    const metadataJson = '{"contractVersion":1,"sourceSystem":"lim-lifestyle","archiveId":"0c1ae2e9-b4b8-4e2d-8210-5a2c695d19fb","revision":7,"eventCode":"research-fixture-event","templateVersion":"lim-a4-test-2026-10-15","size":47,"pdfSha256":"' + sha256 + '"}';
+    const metadataBase64Url = Buffer.from(metadataJson, "utf8").toString("base64url");
+    const canonical = [
+      "LIM_RESEARCH_REQUEST_V1", "POST", "/api/integrations/lim/reports",
+      "lim_research_test_01", String(fixedTimestamp), fixedNonce, metadataBase64Url, sha256,
+    ].join("\n");
+
     expect(url).toBe(enabledEnv.LIM_RESEARCH_PDF_DELIVERY_URL);
     expect(Buffer.from(init?.body as Uint8Array)).toEqual(bytes);
-    expect(init?.headers).toMatchObject({
+    expect(init?.headers).toEqual({
       "Content-Type": "application/pdf",
-      "Accept": "application/json",
-      "Idempotency-Key": researchPdfDeliveryIdempotencyKey(metadata),
-      "X-LIM-Research-Archive-Id": metadata.archiveId,
-      "X-LIM-Research-Report-Revision": "7",
-      "X-LIM-Research-PDF-SHA256": metadata.pdfSha256,
-      "X-LIM-Research-Event-Code": metadata.eventCode,
-      "X-LIM-Research-Template-Version": metadata.templateVersion,
-      "X-LIM-Research-PDF-Bytes": String(bytes.length),
-      "X-LIM-Research-Signature": researchPdfDeliverySignature(metadata, enabledEnv.LIM_RESEARCH_PDF_DELIVERY_HMAC_SECRET),
+      "X-LIM-Key-Id": "lim_research_test_01",
+      "X-LIM-Timestamp": String(fixedTimestamp),
+      "X-LIM-Nonce": fixedNonce,
+      "X-LIM-Metadata": metadataBase64Url,
+      "X-LIM-Signature": crypto.createHmac("sha256", signingKey).update(canonical, "utf8").digest("hex"),
     });
+    expect(researchPdfDeliveryCanonicalMetadata(metadata)).toBe(metadataJson);
+    expect(researchPdfDeliveryMetadataBase64Url(metadata)).toBe(metadataBase64Url);
+    expect(researchPdfDeliveryCanonicalRequest({ keyId: "lim_research_test_01", timestamp: fixedTimestamp, nonce: fixedNonce, metadataBase64Url, pdfSha256: sha256 })).toBe(canonical);
+    expect(researchPdfDeliverySignature(canonical, signingKey)).toBe(crypto.createHmac("sha256", signingKey).update(canonical, "utf8").digest("hex"));
+    expect(canonical.endsWith("\n")).toBe(false);
   });
 
-  it("accepts only a signed JSON receipt with the exact original metadata", async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
-      ...acceptedReceipt(), pdfSha256: "0".repeat(64),
-    }), {
-      status: 202,
-      headers: { "content-type": "application/json", "x-lim-research-receipt-signature": "invalid" },
-    })) as unknown as typeof fetch;
-    await expect(deliverArchivedResearchPdf(metadata.archiveId, {
-      env: enabledEnv, fetchImpl,
-      readPdf: vi.fn().mockResolvedValue(archivedPdf()),
-      readSnapshot: vi.fn().mockResolvedValue(archivedSnapshot()),
-    })).rejects.toThrow("receipt");
-  });
-
-  it("never sends altered bytes or an unarchived PDF to Research", async () => {
+  it("never sends altered bytes or an unarchived PDF", async () => {
     const fetchImpl = vi.fn() as unknown as typeof fetch;
     await expect(deliverArchivedResearchPdf(metadata.archiveId, {
-      env: enabledEnv,
-      fetchImpl,
+      env: enabledEnv, fetchImpl,
       readPdf: vi.fn().mockResolvedValue({ ...archivedPdf(), pdf: Buffer.from("%PDF-1.4\naltered") }),
       readSnapshot: vi.fn().mockResolvedValue(archivedSnapshot()),
     })).rejects.toThrow("integrity");
     expect(fetchImpl).not.toHaveBeenCalled();
 
     await expect(deliverArchivedResearchPdf(metadata.archiveId, {
-      env: enabledEnv,
-      fetchImpl,
+      env: enabledEnv, fetchImpl,
       readPdf: vi.fn().mockResolvedValue({ ...archivedPdf(), archive: { ...archivedPdf().archive, pdfStatus: "uploading" } }),
       readSnapshot: vi.fn(),
     })).resolves.toEqual({ attempted: false, delivered: false, reason: "not_archived" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("binds repeated accepted deliveries to the same canonical identity without sharing a secret", () => {
-    expect(researchPdfDeliveryIdempotencyKey(metadata)).toBe(
-      `${metadata.archiveId}:7:${metadata.pdfSha256}`,
-    );
-    expect(researchPdfDeliveryCanonicalMetadata(metadata)).toContain('"version":"1"');
-    expect(researchPdfDeliverySignature(metadata, "s".repeat(48))).toBe(
-      researchPdfDeliverySignature({ ...metadata }, "s".repeat(48)),
-    );
-    expect(researchPdfDeliverySignature(metadata, "s".repeat(48))).not.toBe(
-      researchPdfDeliverySignature({ ...metadata, reportRevision: 8 }, "s".repeat(48)),
-    );
-    const receipt = acceptedReceipt();
-    expect(researchPdfDeliveryCanonicalReceipt(receipt)).toBe(
-      '{"accepted":true,"archiveId":"0c1ae2e9-b4b8-4e2d-8210-5a2c695d19fb","eventCode":"research-fixture-event","importId":"research-import-synthetic-001","pdfBytes":47,"pdfSha256":"' + sha256 + '","reportRevision":7,"templateVersion":"lim-a4-test-2026-10-15","version":"1"}',
-    );
+  it("pins the final protocol and route constants", () => {
+    expect(RESEARCH_PDF_DELIVERY_CONTRACT).toBe("LIM_RESEARCH_REQUEST_V1");
+    expect(RESEARCH_PDF_DELIVERY_PATH).toBe("/api/integrations/lim/reports");
   });
 });

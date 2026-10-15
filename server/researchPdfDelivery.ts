@@ -4,32 +4,35 @@ import {
   readArchivedReportSnapshot,
 } from "./eventReportArchive";
 
-export const RESEARCH_PDF_DELIVERY_VERSION = "1";
+export const RESEARCH_PDF_DELIVERY_CONTRACT = "LIM_RESEARCH_REQUEST_V1";
+export const RESEARCH_PDF_DELIVERY_PATH = "/api/integrations/lim/reports";
+export const RESEARCH_PDF_DELIVERY_MAX_BYTES = 15 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 5_000;
 const MAX_TIMEOUT_MS = 10_000;
 
+/** Exact JSON object signed after UTF-8 + unpadded base64url encoding. */
 export type ResearchPdfDeliveryMetadata = {
+  contractVersion: 1;
+  sourceSystem: "lim-lifestyle";
   archiveId: string;
-  reportRevision: number;
-  pdfSha256: string;
+  revision: number;
   eventCode: string;
   templateVersion: string;
-  pdfBytes: number;
-};
-
-/** The receiver must persist this receipt before returning HTTP 2xx. */
-export type ResearchPdfDeliveryReceipt = ResearchPdfDeliveryMetadata & {
-  accepted: true;
-  importId: string;
+  size: number;
+  pdfSha256: string;
+  participantReference?: string;
+  assessmentReference?: string;
 };
 
 export type ResearchPdfDeliveryResult =
   | { attempted: false; delivered: false; reason: "disabled" | "not_archived" }
-  | { attempted: true; delivered: true; idempotencyKey: string; responseStatus: number; importId: string };
+  | { attempted: true; delivered: true; responseStatus: number };
 
 type DeliveryConfig = {
   url: string;
-  hmacSecret: string;
+  keyId: string;
+  /** Decoded binary HMAC key; the base64 transport representation is never used as text. */
+  signingKey: Buffer;
   timeoutMs: number;
 };
 
@@ -38,19 +41,29 @@ type DeliveryDependencies = {
   fetchImpl?: typeof fetch;
   readPdf?: typeof readArchivedReportPdf;
   readSnapshot?: typeof readArchivedReportSnapshot;
+  now?: () => Date;
+  nonce?: () => string;
 };
 
+function decodedHmacKey(value: string | undefined) {
+  if (!value || !/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 !== 0) return undefined;
+  const decoded = Buffer.from(value, "base64");
+  // Reject non-canonical/ambiguous encodings; at least 32 random bytes are required.
+  if (decoded.length < 32 || decoded.toString("base64") !== value) return undefined;
+  return decoded;
+}
+
 /**
- * Deliberately disabled until the independent Research receiver contract and
- * protected server-to-server credentials are configured. This module has no
- * client import, no database query other than an already archived LIM object,
- * and no fallback to Research or LIM operational records.
+ * Deliberately disabled until the independent Research endpoint and protected
+ * server-only credentials are configured. It has no client import, no Research
+ * database access, and no fallback to Research or LIM operational records.
  */
 export function researchPdfDeliveryConfig(env: NodeJS.ProcessEnv = process.env): DeliveryConfig | undefined {
   if (env.LIM_RESEARCH_PDF_DELIVERY_ENABLED !== "true") return undefined;
   const urlValue = env.LIM_RESEARCH_PDF_DELIVERY_URL?.trim();
-  const hmacSecret = env.LIM_RESEARCH_PDF_DELIVERY_HMAC_SECRET;
-  if (!urlValue || !hmacSecret || hmacSecret.length < 32) return undefined;
+  const keyId = env.LIM_RESEARCH_KEY_ID?.trim();
+  const signingKey = decodedHmacKey(env.LIM_RESEARCH_HMAC_KEY_BASE64);
+  if (!urlValue || !keyId || !signingKey || !/^[A-Za-z0-9_-]{1,64}$/.test(keyId)) return undefined;
 
   let url: URL;
   try {
@@ -58,95 +71,68 @@ export function researchPdfDeliveryConfig(env: NodeJS.ProcessEnv = process.env):
   } catch {
     return undefined;
   }
-  // Research PDFs must never be posted to a clear-text or browser-local URL.
-  if (url.protocol !== "https:") return undefined;
+  // The final receiver contract permits only this TLS endpoint; query/hash
+  // values are rejected so they cannot silently alter the signed route.
+  if (url.protocol !== "https:" || url.pathname !== RESEARCH_PDF_DELIVERY_PATH || url.search || url.hash) return undefined;
 
   const requestedTimeout = Number(env.LIM_RESEARCH_PDF_DELIVERY_TIMEOUT_MS);
   const timeoutMs = Number.isFinite(requestedTimeout)
     ? Math.max(500, Math.min(MAX_TIMEOUT_MS, Math.trunc(requestedTimeout)))
     : DEFAULT_TIMEOUT_MS;
-  return { url: url.toString(), hmacSecret, timeoutMs };
+  return { url: url.toString(), keyId, signingKey, timeoutMs };
 }
 
-export function researchPdfDeliveryIdempotencyKey(metadata: ResearchPdfDeliveryMetadata) {
-  return `${metadata.archiveId}:${metadata.reportRevision}:${metadata.pdfSha256}`;
-}
-
-/** Stable, binary-independent message covered by the HMAC and receiver idempotency. */
+/** Property insertion order below is the final wire order for JSON.stringify. */
 export function researchPdfDeliveryCanonicalMetadata(metadata: ResearchPdfDeliveryMetadata) {
   return JSON.stringify({
+    contractVersion: metadata.contractVersion,
+    sourceSystem: metadata.sourceSystem,
     archiveId: metadata.archiveId,
+    revision: metadata.revision,
     eventCode: metadata.eventCode,
-    pdfBytes: metadata.pdfBytes,
-    pdfSha256: metadata.pdfSha256,
-    reportRevision: metadata.reportRevision,
     templateVersion: metadata.templateVersion,
-    version: RESEARCH_PDF_DELIVERY_VERSION,
+    size: metadata.size,
+    pdfSha256: metadata.pdfSha256,
+    ...(metadata.participantReference === undefined ? {} : { participantReference: metadata.participantReference }),
+    ...(metadata.assessmentReference === undefined ? {} : { assessmentReference: metadata.assessmentReference }),
   });
 }
 
-export function researchPdfDeliverySignature(metadata: ResearchPdfDeliveryMetadata, hmacSecret: string) {
-  return hmacBase64Url(researchPdfDeliveryCanonicalMetadata(metadata), hmacSecret);
+export function researchPdfDeliveryMetadataBase64Url(metadata: ResearchPdfDeliveryMetadata) {
+  return Buffer.from(researchPdfDeliveryCanonicalMetadata(metadata), "utf8").toString("base64url");
 }
 
-/** Stable, receiver-issued acknowledgement covered by the same server-only secret. */
-export function researchPdfDeliveryCanonicalReceipt(receipt: ResearchPdfDeliveryReceipt) {
-  return JSON.stringify({
-    accepted: receipt.accepted,
-    archiveId: receipt.archiveId,
-    eventCode: receipt.eventCode,
-    importId: receipt.importId,
-    pdfBytes: receipt.pdfBytes,
-    pdfSha256: receipt.pdfSha256,
-    reportRevision: receipt.reportRevision,
-    templateVersion: receipt.templateVersion,
-    version: RESEARCH_PDF_DELIVERY_VERSION,
-  });
+/** The final LF-separated request string has no terminal LF. */
+export function researchPdfDeliveryCanonicalRequest(input: {
+  keyId: string;
+  timestamp: number;
+  nonce: string;
+  metadataBase64Url: string;
+  pdfSha256: string;
+}) {
+  return [
+    RESEARCH_PDF_DELIVERY_CONTRACT,
+    "POST",
+    RESEARCH_PDF_DELIVERY_PATH,
+    input.keyId,
+    String(input.timestamp),
+    input.nonce,
+    input.metadataBase64Url,
+    input.pdfSha256,
+  ].join("\n");
 }
 
-export function researchPdfDeliveryReceiptSignature(receipt: ResearchPdfDeliveryReceipt, hmacSecret: string) {
-  return hmacBase64Url(researchPdfDeliveryCanonicalReceipt(receipt), hmacSecret);
-}
-
-function hmacBase64Url(message: string, hmacSecret: string) {
-  return crypto
-    .createHmac("sha256", hmacSecret)
-    .update(message, "utf8")
-    .digest("base64url");
+/** Lowercase hexadecimal HMAC-SHA-256, keyed with decoded base64 key bytes. */
+export function researchPdfDeliverySignature(canonicalRequest: string, signingKey: Buffer) {
+  return crypto.createHmac("sha256", signingKey).update(canonicalRequest, "utf8").digest("hex");
 }
 
 function bytesSha256(bytes: Uint8Array) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-function receiptMatchesMetadata(value: unknown, metadata: ResearchPdfDeliveryMetadata): value is ResearchPdfDeliveryReceipt {
-  if (!value || typeof value !== "object") return false;
-  const receipt = value as Partial<ResearchPdfDeliveryReceipt>;
-  return receipt.accepted === true
-    && typeof receipt.importId === "string" && receipt.importId.length > 0 && receipt.importId.length <= 160
-    && receipt.archiveId === metadata.archiveId
-    && receipt.reportRevision === metadata.reportRevision
-    && receipt.pdfSha256 === metadata.pdfSha256
-    && receipt.eventCode === metadata.eventCode
-    && receipt.templateVersion === metadata.templateVersion
-    && receipt.pdfBytes === metadata.pdfBytes;
-}
-
-async function verifiedResearchReceipt(response: Response, metadata: ResearchPdfDeliveryMetadata, hmacSecret: string, timeoutMs: number) {
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-  if (!contentType.startsWith("application/json")) throw new Error("Research delivery receipt content type is invalid.");
-  const parsed = await new Promise<unknown>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Research delivery receipt timed out.")), timeoutMs);
-    void response.json().then(resolve, reject).finally(() => clearTimeout(timer));
-  });
-  if (!receiptMatchesMetadata(parsed, metadata)) throw new Error("Research delivery receipt does not match the archived PDF.");
-  const signature = response.headers.get("x-lim-research-receipt-signature");
-  const expected = researchPdfDeliveryReceiptSignature(parsed, hmacSecret);
-  const actualBytes = signature ? Buffer.from(signature) : Buffer.alloc(0);
-  const expectedBytes = Buffer.from(expected);
-  if (actualBytes.length !== expectedBytes.length || !crypto.timingSafeEqual(actualBytes, expectedBytes))
-    throw new Error("Research delivery receipt signature is invalid.");
-  return parsed;
+function validUuidV4(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 /**
@@ -170,15 +156,13 @@ export async function deliverArchivedResearchPdf(
   }
 
   // The source archive reader has already verified the encrypted object SHA.
-  // Recalculate here before crossing the project boundary as a defense-in-depth
-  // check, without reading any participant/session table.
+  // Recalculate before crossing the project boundary, without reading any
+  // participant/session table or any Research database.
   const pdf = Buffer.from(report.pdf);
-  if (bytesSha256(pdf) !== report.archive.pdfSha256) {
-    throw new Error("Research delivery source PDF integrity check failed.");
-  }
-  if (report.archive.pdfBytes !== null && report.archive.pdfBytes !== undefined && Number(report.archive.pdfBytes) !== pdf.length) {
+  if (pdf.length > RESEARCH_PDF_DELIVERY_MAX_BYTES) throw new Error("Research delivery PDF exceeds the contract size limit.");
+  if (bytesSha256(pdf) !== report.archive.pdfSha256) throw new Error("Research delivery source PDF integrity check failed.");
+  if (report.archive.pdfBytes !== null && report.archive.pdfBytes !== undefined && Number(report.archive.pdfBytes) !== pdf.length)
     throw new Error("Research delivery source PDF size check failed.");
-  }
 
   const snapshot = await readSnapshot(archiveId);
   // Template provenance is frozen with the approved report. Do not substitute
@@ -187,36 +171,44 @@ export async function deliverArchivedResearchPdf(
   if (!templateVersion) throw new Error("Research delivery template provenance is unavailable.");
 
   const metadata: ResearchPdfDeliveryMetadata = {
+    contractVersion: 1,
+    sourceSystem: "lim-lifestyle",
     archiveId: report.archive.archiveId,
-    reportRevision: report.archive.reportRevision,
-    pdfSha256: report.archive.pdfSha256,
+    revision: report.archive.reportRevision,
     eventCode: report.archive.eventCode,
     templateVersion,
-    pdfBytes: pdf.length,
+    size: pdf.length,
+    pdfSha256: report.archive.pdfSha256,
   };
-  const idempotencyKey = researchPdfDeliveryIdempotencyKey(metadata);
+  const metadataBase64Url = researchPdfDeliveryMetadataBase64Url(metadata);
+  const timestamp = Math.floor((dependencies.now?.() ?? new Date()).getTime() / 1_000);
+  const nonce = dependencies.nonce?.() ?? crypto.randomUUID();
+  if (!validUuidV4(nonce)) throw new Error("Research delivery nonce is invalid.");
+  const canonicalRequest = researchPdfDeliveryCanonicalRequest({
+    keyId: config.keyId,
+    timestamp,
+    nonce,
+    metadataBase64Url,
+    pdfSha256: metadata.pdfSha256,
+  });
+
   const response = await fetchImpl(config.url, {
     method: "POST",
     signal: AbortSignal.timeout(config.timeoutMs),
     headers: {
       "Content-Type": "application/pdf",
-      "Accept": "application/json",
-      "Content-Length": String(pdf.length),
-      "Idempotency-Key": idempotencyKey,
-      "X-LIM-Research-Delivery-Version": RESEARCH_PDF_DELIVERY_VERSION,
-      "X-LIM-Research-Archive-Id": metadata.archiveId,
-      "X-LIM-Research-Report-Revision": String(metadata.reportRevision),
-      "X-LIM-Research-PDF-SHA256": metadata.pdfSha256,
-      "X-LIM-Research-Event-Code": metadata.eventCode,
-      "X-LIM-Research-Template-Version": metadata.templateVersion,
-      "X-LIM-Research-PDF-Bytes": String(metadata.pdfBytes),
-      "X-LIM-Research-Signature": researchPdfDeliverySignature(metadata, config.hmacSecret),
+      "X-LIM-Key-Id": config.keyId,
+      "X-LIM-Timestamp": String(timestamp),
+      "X-LIM-Nonce": nonce,
+      "X-LIM-Metadata": metadataBase64Url,
+      "X-LIM-Signature": researchPdfDeliverySignature(canonicalRequest, config.signingKey),
     },
     body: pdf,
   });
+  // Research receipt format is intentionally not enforced until the receiver
+  // publishes its final receipt contract. A non-2xx is a failed handoff.
   if (!response.ok) throw new Error(`Research delivery rejected the archived PDF (${response.status}).`);
-  const receipt = await verifiedResearchReceipt(response, metadata, config.hmacSecret, config.timeoutMs);
-  return { attempted: true, delivered: true, idempotencyKey, responseStatus: response.status, importId: receipt.importId };
+  return { attempted: true, delivered: true, responseStatus: response.status };
 }
 
 /**
