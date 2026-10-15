@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, like, lte, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   eventResearchers as researchers,
@@ -349,11 +349,19 @@ export async function researchPage(
   eventCode: string,
   after: number,
   limit: number,
-  purpose: "view" | "export"
+  purpose: "view" | "export",
+  filters: { from?: string; to?: string; code?: string; identity?: string } = {}
 ) {
   // Scope is enforced here as well as at the router; never filter a global result on the client.
   await requireResearchEvent(r, eventCode);
   const db = await database();
+  if (filters.identity && r.reportArchiveAccess !== 1) throw new TRPCError({ code: "FORBIDDEN", message: "البحث بالاسم أو الجوال يتطلب صلاحية أرشيف التقارير" });
+  const conditions = [
+    filters.from ? gte(visits.createdAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
+    filters.to ? lte(visits.createdAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
+    filters.code ? like(visits.code, `%${filters.code}%`) : undefined,
+    filters.identity ? or(like(visits.displayName, `%${filters.identity}%`), like(users.phone, `%${filters.identity}%`)) : undefined,
+  ].filter(Boolean) as any[];
   const rows = await db
     .select({
       id: visits.id,
@@ -387,7 +395,8 @@ export async function researchPage(
       and(
         eq(visits.eventCode, eventCode),
         eq(visits.consent, "true"),
-        gt(visits.id, after)
+        gt(visits.id, after),
+        ...conditions
       )
     )
     .orderBy(visits.id)

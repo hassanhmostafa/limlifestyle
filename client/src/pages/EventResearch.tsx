@@ -49,11 +49,13 @@ export default function EventResearch() {
   const [latestOnly, setLatestOnly] = useState(false);
   const [columns, setColumns] = useState(["visit", "participant", "date", "status", "age", "sex", "questionnaire"]);
   const [after, setAfter] = useState(0);
+  const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  const [visitCode, setVisitCode] = useState(""); const [identity, setIdentity] = useState("");
   const [history, setHistory] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [archive, setArchive] = useState<any>(null);
   const data = trpc.eventResearch.data.useQuery(
-    { eventCode, after, limit: 25, purpose: "view" },
+    { eventCode, after, limit: 25, purpose: "view", from: from || undefined, to: to || undefined, code: visitCode || undefined, identity: identity || undefined },
     { enabled: Boolean(me.data && eventCode), retry: false }
   );
   const archives = trpc.eventResearch.archives.useQuery(
@@ -306,6 +308,7 @@ export default function EventResearch() {
             </section>
             <section className="space-y-4 rounded-3xl bg-white p-5">
               <h2 className="text-xl font-bold">الزيارات والبيانات الخام</h2>
+              <div className="grid gap-2 sm:grid-cols-4"><input className={input} type="date" value={from} onChange={e => {setFrom(e.target.value);setAfter(0)}} aria-label="من تاريخ"/><input className={input} type="date" value={to} onChange={e => {setTo(e.target.value);setAfter(0)}} aria-label="إلى تاريخ"/><input className={input} value={visitCode} onChange={e => {setVisitCode(e.target.value);setAfter(0)}} placeholder="رمز الزيارة"/>{me.data.reportArchiveAccess && <input className={input} value={identity} onChange={e => {setIdentity(e.target.value);setAfter(0)}} placeholder="اسم أو جوال (صلاحية خاصة)"/>}</div>
               <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-2xl bg-slate-50 p-3 text-sm">
                 <legend className="px-1 font-bold">الأعمدة الظاهرة</legend>
                 {visitColumns.map(([id, label]) => <label key={id} className="flex gap-1.5"><input type="checkbox" checked={columns.includes(id)} onChange={e => setColumns(current => e.target.checked ? [...current, id] : current.filter(column => column !== id))} />{label}</label>)}
@@ -391,6 +394,6 @@ function ArchivedSnapshot({ snapshot }: { snapshot: any }) {
       care={snapshot.care}
       frozenLifestyleReport={snapshot.lifestyleReport}
     />
-    <div data-pdf-hide><EventPdfButton filename={`lim-archived-${snapshot.participant.code}.pdf`} label="تنزيل التقرير المعاد إنشاؤه" /></div>
+    <div data-pdf-hide><EventPdfButton filename={`lim-${snapshot.participant.code}-visit-${snapshot.care.approvedRecordNo || "report"}-${snapshot.archivedAt.slice(0, 10)}-r${snapshot.reportRevision}-regenerated.pdf`} label="تنزيل التقرير المعاد إنشاؤه" /></div>
   </section>;
 }

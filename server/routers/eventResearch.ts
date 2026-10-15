@@ -133,6 +133,8 @@ export const eventResearchRouter = router({
         after: z.number().int().nonnegative().default(0),
         limit: z.number().int().min(1).max(50).default(25),
         purpose: z.enum(["view", "export"]).default("view"),
+        from: z.string().date().optional(), to: z.string().date().optional(),
+        code: z.string().trim().max(64).optional(), identity: z.string().trim().max(100).optional(),
       })
     )
     .query(({ ctx, input }) =>
@@ -141,7 +143,7 @@ export const eventResearchRouter = router({
         input.eventCode,
         input.after,
         input.limit,
-        input.purpose
+        input.purpose, { from: input.from, to: input.to, code: input.code, identity: input.identity }
       )
     ),
   archives: researcherProcedure
