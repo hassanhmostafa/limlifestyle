@@ -416,7 +416,7 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
         model: null,
       });
       if (published) {
-        try { await archiveApprovedEventReportSnapshot(sessionId); } catch { /* retried when the final report is read */ }
+        try { await archiveApprovedEventReportSnapshot(sessionId, true); } catch { /* retried when the final report is read */ }
         return { state: "generated", mode: "automatic" };
       }
       return { state: "input_changed" };
@@ -433,7 +433,7 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
       model: selected.model,
     });
     if (published) {
-      try { await archiveApprovedEventReportSnapshot(sessionId); } catch { /* retried when the final report is read */ }
+      try { await archiveApprovedEventReportSnapshot(sessionId, true); } catch { /* retried when the final report is read */ }
       return { state: "generated", mode: "automatic" };
     }
     return { state: "input_changed" };

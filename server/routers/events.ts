@@ -23,6 +23,7 @@ import { hashApiKey } from "../lib/apiSecurity";
 import { normalizeSaudiMobilePhone, toMachineUserId } from "../lib/phone";
 import {
   archiveApprovedEventReportSnapshot,
+  eventReportArchiveForSession,
   storeParticipantReportPdf,
 } from "../eventReportArchive";
 
@@ -203,14 +204,7 @@ export const eventsRouter = router({
   care: publicProcedure.input(eventTokenInput).query(async ({ input }) => {
     const session = await requireEventSession(input.accessToken);
     const care = await readCare(session.id);
-    if (care.approvedAt) {
-      try {
-        await archiveApprovedEventReportSnapshot(session.id);
-      } catch {
-        // Archive retry is intentionally non-blocking for the participant's
-        // approved report; no report input is recalculated or changed here.
-      }
-    }
+    const archive = care.approvedAt ? await eventReportArchiveForSession(session.id) : undefined;
     return {
       nursingEnabled: Boolean(care.nursingEnabled),
       consultationMode: care.consultationMode,
@@ -224,12 +218,13 @@ export const eventsRouter = router({
       doctorName: care.approvedAt ? care.doctorName : null,
       measurements: care.nursingCompletedAt ? care.measurements : {},
       nurseNotes: care.nursingCompletedAt ? care.nurseNotes : null,
+      archive: archive ? { archiveId: archive.archiveId, reportRevision: archive.reportRevision, snapshotSha256: archive.snapshotSha256, pdfStatus: archive.pdfStatus, snapshotStatus: archive.snapshotStatus } : null,
     };
   }),
 
   /** Receives only the participant's already-rendered final PDF over their opaque session. */
   archivePdf: publicProcedure
-    .input(eventTokenInput.extend({ pdfBase64: z.string().min(8).max(14_000_000) }))
+    .input(eventTokenInput.extend({ pdfBase64: z.string().min(8).max(14_000_000), archiveId: z.string().uuid(), reportRevision: z.number().int().min(1), snapshotSha256: z.string().length(64) }))
     .mutation(async ({ input }) => {
       const session = await requireEventSession(input.accessToken);
       const care = await readCare(session.id);
@@ -243,8 +238,7 @@ export const eventsRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "ملف التقرير غير صالح" });
       }
       try {
-        await archiveApprovedEventReportSnapshot(session.id);
-        const archived = await storeParticipantReportPdf(session.id, pdf);
+        const archived = await storeParticipantReportPdf(session.id, pdf, { archiveId: input.archiveId, reportRevision: input.reportRevision, snapshotSha256: input.snapshotSha256 });
         return { status: archived.pdfStatus };
       } catch {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر حفظ نسخة التقرير المؤرشفة" });

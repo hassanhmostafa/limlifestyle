@@ -263,8 +263,9 @@ export default function Events() {
         <EventPrintReport participant={session} readings={physicalReadings} answers={session.answers} lifestyleEnabled={lifestyleEnabled} care={care} />
         <section className="space-y-4 px-5 pt-6"><h2 className="text-xl font-bold">{care.consultationMode === "automatic" ? "توصيات لنمط حياة صحي" : "نصائح الطبيب"}</h2><div data-doctor-advice dir="rtl" lang="ar" className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-right leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]">{care.advice}</div>{care.consultationMode !== "automatic" && <p className="text-sm">اعتمدها: {care.doctorName}</p>}{care.nursingCompletedAt && <><h2 className="font-bold">قياسات التمريض</h2><EventCareSummary measurements={care.measurements} notes={care.nurseNotes} /></>}</section>
         <ReportView lifestyleEnabled={lifestyleEnabled} session={session} readings={physicalReadings} finishing={completeReport.isPending} onBack={() => go("journey")} onFinish={() => completeReport.mutate({ accessToken: session.token })} onPreparedPdf={async file => {
-          try { await archivePdf.mutateAsync({ accessToken: session.token, pdfBase64: await pdfBase64(file) }); }
-          catch { /* The report remains usable; the next preparation retries archival. */ }
+          if (!care.archive) return;
+          try { await archivePdf.mutateAsync({ accessToken: session.token, pdfBase64: await pdfBase64(file), archiveId: care.archive.archiveId, reportRevision: care.archive.reportRevision, snapshotSha256: care.archive.snapshotSha256 }); }
+          catch { setError("تعذر حفظ نسخة التقرير المؤرشفة. أعد تجهيز التقرير للمحاولة دون تغيير التقرير المعتمد."); }
         }} />
       </div> : <section className="p-5"><BackButton onClick={() => go("journey")} /><p>التقرير النهائي بانتظار اعتماد الطبيب.</p></section>)}
       {error && screen !== "register" && <p role="alert" className="mx-5 mb-8 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-bold text-[#a43f30]">{error}</p>}

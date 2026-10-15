@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 import {
   decryptArchiveBytes,
   encryptArchiveBytes,
   EVENT_REPORT_ARCHIVE_MAX_PDF_BYTES,
 } from "./eventReportArchive";
 import { buildResearchWorkbook } from "./eventResearchWorkbook";
+import { buildResearchWorkbookZip } from "./eventResearchWorkbook";
 
 const priorKey = process.env.EVENT_REPORT_ARCHIVE_KEY;
 afterEach(() => { process.env.EVENT_REPORT_ARCHIVE_KEY = priorKey; });
@@ -34,5 +36,15 @@ describe("Events multi-event XLSX export", () => {
     expect(rows[0]).toContain("finalAdvice");
     expect(rows[1][rows[0].indexOf("finalAdvice")]).toBe("'=SUM(A1:A2)");
     expect(rows[1][rows[0].indexOf("missing")]).toBe("");
+  });
+  it("creates one dictionary-bearing workbook per selected event in the ZIP", async () => {
+    const zip = await JSZip.loadAsync(await buildResearchWorkbookZip([
+      { eventCode: "event-a", visitId: 1 }, { eventCode: "event-b", visitId: 2 },
+    ], ["event-a", "event-b"]));
+    expect(Object.keys(zip.files).sort()).toEqual([
+      "LIM-event-a-research.xlsx", "LIM-event-b-research.xlsx",
+    ]);
+    const first = await zip.file("LIM-event-a-research.xlsx")!.async("nodebuffer");
+    expect(XLSX.read(first, { type: "buffer" }).SheetNames).toContain("Dictionary");
   });
 });

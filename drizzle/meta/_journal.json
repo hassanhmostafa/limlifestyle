@@ -148,6 +148,13 @@
       "when": 1792151760000,
       "tag": "0020_event_report_archive",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1792152300000,
+      "tag": "0021_event_report_archive_durability",
+      "breakpoints": true
     }
   ]
 }

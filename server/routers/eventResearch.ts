@@ -13,7 +13,7 @@ import {
 import { hashApiKey } from "../lib/apiSecurity";
 import * as store from "../eventResearchDb";
 import { readArchivedReportSnapshot } from "../eventReportArchive";
-import { buildResearchWorkbook } from "../eventResearchWorkbook";
+import { buildResearchWorkbook, buildResearchWorkbookZip } from "../eventResearchWorkbook";
 const COOKIE = "lim_event_research";
 const readToken = (headers: { cookie?: string }) => {
   const t = parse(headers.cookie ?? "")[COOKIE];
@@ -181,6 +181,21 @@ export const eventResearchRouter = router({
         filename: `lim-research-${new Date().toISOString().slice(0, 10)}.xlsx`,
         mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         base64: workbook.toString("base64"),
+        rowCount: records.length,
+      };
+    }),
+  exportXlsxZip: researcherProcedure
+    .input(z.object({
+      eventCodes: z.array(z.string().min(1).max(64)).min(1).max(50),
+      latestPerParticipant: z.boolean().default(false),
+    }).refine(input => new Set(input.eventCodes).size === input.eventCodes.length, "لا تكرر الفعاليات"))
+    .mutation(async ({ ctx, input }) => {
+      const records = await store.researchExport(ctx.researcher, input.eventCodes, input.latestPerParticipant);
+      const archive = await buildResearchWorkbookZip(records, input.eventCodes);
+      return {
+        filename: `lim-research-by-event-${new Date().toISOString().slice(0, 10)}.zip`,
+        mimeType: "application/zip",
+        base64: archive.toString("base64"),
         rowCount: records.length,
       };
     }),

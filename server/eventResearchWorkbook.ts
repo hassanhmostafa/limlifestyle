@@ -1,10 +1,12 @@
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 import { flattenResearchRecord } from "../shared/eventResearchExport";
 import { eventLifestyleSections, EVENT_LIFESTYLE_VERSION } from "../shared/eventLifestyle";
 import { nursingCatalog } from "../shared/eventNursing";
 
 function safeCell(value: unknown) {
   if (value === null || value === undefined) return "";
+  if (typeof value === "number" || typeof value === "boolean") return value;
   const text = value instanceof Date ? value.toISOString() : String(value);
   // Keep untrusted user/device values as text so spreadsheet applications do
   // not evaluate them as formulas when a researcher opens the workbook.
@@ -43,4 +45,18 @@ export function buildResearchWorkbook(records: Record<string, unknown>[]) {
   dictionarySheet["!cols"] = [{ wch: 20 }, { wch: 42 }, { wch: 50 }, { wch: 58 }];
   XLSX.utils.book_append_sheet(workbook, dictionarySheet, "Dictionary");
   return Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer", compression: true }));
+}
+
+function safeFileComponent(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "event";
+}
+
+/** Separate workbooks deliberately retain the same Dictionary sheet in every file. */
+export async function buildResearchWorkbookZip(records: Record<string, unknown>[], eventCodes: string[]) {
+  const zip = new JSZip();
+  for (const eventCode of eventCodes) {
+    const selected = records.filter(record => record.eventCode === eventCode);
+    zip.file(`LIM-${safeFileComponent(eventCode)}-research.xlsx`, buildResearchWorkbook(selected));
+  }
+  return Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } }));
 }

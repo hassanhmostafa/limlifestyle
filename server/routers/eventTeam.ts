@@ -324,7 +324,7 @@ export const eventTeamRouter = router({
       );
       if (input.finalize) {
         try {
-          await archiveApprovedEventReportSnapshot(session.id);
+          await archiveApprovedEventReportSnapshot(session.id, true);
         } catch {
           // The approval remains authoritative. Subsequent final-report reads
           // retry archive creation rather than losing the visit report.

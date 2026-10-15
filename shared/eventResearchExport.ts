@@ -13,7 +13,14 @@ export function flattenResearchRecord(
         output,
         flattenResearchRecord(value as Record<string, unknown>, path)
       );
-    else output[path] = value;
+    else if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        const itemPath = `${path}.${index + 1}`;
+        if (item && typeof item === "object") Object.assign(output, flattenResearchRecord(item as Record<string, unknown>, itemPath));
+        else output[itemPath] = item;
+      });
+      if (!value.length) output[path] = "";
+    } else output[path] = value;
   }
   return output;
 }

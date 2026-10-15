@@ -13,6 +13,10 @@ import type { DashboardReading } from "@/components/BodyCompositionReport";
 const button =
   "rounded-xl bg-[#123f37] px-5 py-3 font-bold text-white disabled:opacity-40";
 const input = "w-full rounded-xl border border-emerald-100 p-3";
+const visitColumns = [
+  ["visit", "رقم الزيارة"], ["participant", "رمز المشارك"], ["date", "التاريخ"],
+  ["status", "حالة التقرير"], ["age", "العمر"], ["sex", "الجنس"], ["questionnaire", "نسخة الاستبيان"],
+] as const;
 function download(name: string, body: string, type: string) {
   const url = URL.createObjectURL(new Blob([body], { type }));
   const a = document.createElement("a");
@@ -43,6 +47,7 @@ export default function EventResearch() {
   const [eventFilter, setEventFilter] = useState("");
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [latestOnly, setLatestOnly] = useState(false);
+  const [columns, setColumns] = useState(["visit", "participant", "date", "status", "age", "sex", "questionnaire"]);
   const [after, setAfter] = useState(0);
   const [history, setHistory] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
@@ -59,6 +64,13 @@ export default function EventResearch() {
     onSuccess: result => {
       downloadBase64(result.filename, result.base64, result.mimeType);
       setMessage(`تم تنزيل ملف Excel يحتوي على ${result.rowCount} زيارة`);
+    },
+    onError: error => setMessage(error.message),
+  });
+  const exportXlsxZip = trpc.eventResearch.exportXlsxZip.useMutation({
+    onSuccess: result => {
+      downloadBase64(result.filename, result.base64, result.mimeType);
+      setMessage(`تم تنزيل ملف ZIP يحتوي على ${result.rowCount} زيارة`);
     },
     onError: error => setMessage(error.message),
   });
@@ -285,11 +297,15 @@ export default function EventResearch() {
                   {me.data.events.map(event => <label key={event.eventCode} className="flex gap-2 text-sm"><input type="checkbox" checked={selectedCodes.includes(event.eventCode)} onChange={e => setSelectedCodes(current => e.target.checked ? [...current, event.eventCode] : current.filter(code => code !== event.eventCode))} />{event.name} <span dir="ltr">({event.eventCode})</span></label>)}
                 </div>
                 <label className="flex gap-2 text-sm"><input type="checkbox" checked={latestOnly} onChange={e => setLatestOnly(e.target.checked)} />أحدث زيارة فقط لكل مشارك (الافتراضي: كل الزيارات)</label>
-                <button className={button} disabled={!selectedCodes.length || exportXlsx.isPending} onClick={() => exportXlsx.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly })}>{exportXlsx.isPending ? "جارٍ تجهيز Excel…" : "تنزيل Excel للفعاليات المحددة"}</button>
+                <div className="flex flex-wrap gap-3"><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsx.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly })}>{exportXlsx.isPending ? "جارٍ تجهيز Excel…" : "تنزيل Excel موحّد"}</button><button className={button} disabled={!selectedCodes.length || exportXlsx.isPending || exportXlsxZip.isPending} onClick={() => exportXlsxZip.mutate({ eventCodes: selectedCodes, latestPerParticipant: latestOnly })}>{exportXlsxZip.isPending ? "جارٍ تجهيز ZIP…" : "تنزيل ملفات Excel منفصلة (ZIP)"}</button></div>
               </fieldset>
             </section>
             <section className="space-y-4 rounded-3xl bg-white p-5">
               <h2 className="text-xl font-bold">الزيارات والبيانات الخام</h2>
+              <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-2xl bg-slate-50 p-3 text-sm">
+                <legend className="px-1 font-bold">الأعمدة الظاهرة</legend>
+                {visitColumns.map(([id, label]) => <label key={id} className="flex gap-1.5"><input type="checkbox" checked={columns.includes(id)} onChange={e => setColumns(current => e.target.checked ? [...current, id] : current.filter(column => column !== id))} />{label}</label>)}
+              </fieldset>
               {data.isFetching ? (
                 <p>جارٍ تحميل البيانات…</p>
               ) : data.error ? (
@@ -297,49 +313,19 @@ export default function EventResearch() {
               ) : !data.data?.records.length ? (
                 <p>لا توجد زيارات في هذه الصفحة.</p>
               ) : (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {data.data.records.map(r => (
-                    <article
-                      key={r.id}
-                      className="min-w-0 space-y-3 rounded-2xl border border-emerald-100 p-4"
-                    >
-                      <div className="flex flex-wrap justify-between gap-2">
-                        <h3 className="font-bold">الزيارة {r.id}</h3>
-                        <span>{r.participantId}</span>
-                      </div>
-                      <dl className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <dt className="text-slate-500">العمر</dt>
-                          <dd>{r.age ?? "—"}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-slate-500">الجنس</dt>
-                          <dd>
-                            {r.sex === "male"
-                              ? "ذكر"
-                              : r.sex === "female"
-                                ? "أنثى"
-                                : "—"}
-                          </dd>
-                        </div>
-                        <div className="col-span-2">
-                          <dt className="text-slate-500">نسخة الاستبيان</dt>
-                          <dd>{r.questionnaireVersion}</dd>
-                        </div>
-                      </dl>
-                      <details>
-                        <summary className="cursor-pointer font-bold underline">
-                          عرض البيانات
-                        </summary>
-                        <pre
-                          dir="ltr"
-                          className="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-50 p-3 text-xs"
-                        >
-                          {JSON.stringify(r, null, 2)}
-                        </pre>
-                      </details>
-                    </article>
-                  ))}
+                <div className="overflow-x-auto rounded-2xl border border-emerald-100">
+                  <table className="w-full min-w-[680px] text-right text-sm"><thead className="bg-[#edf7f3]"><tr>{visitColumns.filter(([id]) => columns.includes(id)).map(([id, label]) => <th key={id} className="whitespace-nowrap p-3 font-bold">{label}</th>)}<th className="p-3">تفاصيل</th></tr></thead><tbody>
+                    {data.data.records.map(r => <tr key={r.id} className="border-t border-emerald-50">
+                      {columns.includes("visit") && <td className="p-3">{r.id}</td>}
+                      {columns.includes("participant") && <td className="p-3"><bdi>{r.participantId}</bdi></td>}
+                      {columns.includes("date") && <td className="whitespace-nowrap p-3">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-CA") : "—"}</td>}
+                      {columns.includes("status") && <td className="p-3">{r.approvedAt ? "مكتمل" : r.nursingCompletedAt ? "بانتظار التقرير" : "قيد الإجراء"}</td>}
+                      {columns.includes("age") && <td className="p-3">{r.age ?? "—"}</td>}
+                      {columns.includes("sex") && <td className="p-3">{r.sex === "male" ? "ذكر" : r.sex === "female" ? "أنثى" : "—"}</td>}
+                      {columns.includes("questionnaire") && <td className="p-3">{r.questionnaireVersion}</td>}
+                      <td className="p-3"><details><summary className="cursor-pointer underline">عرض</summary><pre dir="ltr" className="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-50 p-3 text-xs">{JSON.stringify(r, null, 2)}</pre></details></td>
+                    </tr>)}
+                  </tbody></table>
                 </div>
               )}
               <div className="flex gap-3">
