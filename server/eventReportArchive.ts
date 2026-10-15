@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
 import {
   eventCare,
   eventParticipantSessions,
@@ -447,6 +447,41 @@ export async function eventReportArchiveForSession(sessionId: number, reportRevi
     .where(and(eq(eventReportArchives.sessionId, sessionId), reportRevision === undefined ? undefined : eq(eventReportArchives.reportRevision, reportRevision)))
     .orderBy(sql`${eventReportArchives.reportRevision} desc`).limit(1);
   return archive;
+}
+
+/**
+ * Read-only cursor page for a future independent Research reconciliation worker.
+ * It intentionally exposes only opaque archive delivery metadata, never PDF
+ * bytes, encrypted payloads, participant identity, snapshot data, or storage keys.
+ * No delivery status is persisted here: that would require an explicitly approved
+ * outbox outside the operational LIM schema.
+ */
+export async function archivedReportPdfReconciliationPage(afterId = 0, limit = 25) {
+  const db = await database();
+  const boundedAfter = Math.max(0, Math.trunc(afterId) || 0);
+  const boundedLimit = Math.max(1, Math.min(100, Math.trunc(limit) || 25));
+  const rows = await db
+    .select({
+      id: eventReportArchives.id,
+      archiveId: eventReportArchives.archiveId,
+      eventCode: eventReportArchives.eventCode,
+      reportRevision: eventReportArchives.reportRevision,
+      pdfSha256: eventReportArchives.pdfSha256,
+      pdfBytes: eventReportArchives.pdfBytes,
+      pdfArchivedAt: eventReportArchives.pdfArchivedAt,
+    })
+    .from(eventReportArchives)
+    .where(and(
+      eq(eventReportArchives.pdfStatus, "archived"),
+      gt(eventReportArchives.id, boundedAfter),
+    ))
+    .orderBy(eventReportArchives.id)
+    .limit(boundedLimit + 1);
+  const archives = rows.slice(0, boundedLimit);
+  return {
+    archives,
+    nextCursor: rows.length > boundedLimit ? archives.at(-1)!.id : null,
+  };
 }
 
 export async function archiveSummary() {
