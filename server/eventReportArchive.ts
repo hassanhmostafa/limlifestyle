@@ -7,6 +7,7 @@ import {
 } from "../drizzle/schema";
 import { getDb, getEventReadingByRecordNo } from "./db";
 import { storageGet, storagePut } from "./storage";
+import { lifestyleReport } from "../shared/eventLifestyleInsights";
 
 export const EVENT_REPORT_ARCHIVE_ENCRYPTION_VERSION = "aes-256-gcm-hkdf-v1";
 export const EVENT_REPORT_ARCHIVE_MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -25,6 +26,7 @@ export type EventReportSnapshot = {
     sex: "male" | "female" | null;
   };
   lifestyleEnabled: boolean;
+  lifestyleReport: ReturnType<typeof lifestyleReport> | null;
   answers: Record<string, string | number | string[]>;
   readings: Array<{
     source: string;
@@ -167,6 +169,7 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
       sex: session.sex,
     },
     lifestyleEnabled: (session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle"),
+    lifestyleReport: (session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle") ? lifestyleReport(session.answers ?? {}) : null,
     answers: session.answers ?? {},
     readings: readings.map(reportReading),
     care: {

@@ -12,7 +12,7 @@ import {
 } from "../lib/eventStaffAuth";
 import { hashApiKey } from "../lib/apiSecurity";
 import * as store from "../eventResearchDb";
-import { readArchivedReportSnapshot } from "../eventReportArchive";
+import { readArchivedReportSnapshot, retryArchivedReportSnapshot } from "../eventReportArchive";
 import { buildResearchWorkbook, buildResearchWorkbookZip } from "../eventResearchWorkbook";
 const COOKIE = "lim_event_research";
 const readToken = (headers: { cookie?: string }) => {
@@ -164,6 +164,14 @@ export const eventResearchRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "نسخة التقرير غير متاحة" });
       await store.auditReportArchiveAccess(ctx.researcher, archive.eventCode, "archive_snapshot");
       return { archive: archived.archive, snapshot: archived.snapshot };
+    }),
+  retryArchiveStorage: researcherProcedure
+    .input(z.object({ archiveId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const archive = await store.authorizeReportArchive(ctx.researcher, input.archiveId);
+      const retried = await retryArchivedReportSnapshot(archive.archiveId);
+      await store.auditReportArchiveAccess(ctx.researcher, archive.eventCode, "archive_snapshot");
+      return { archive: retried };
     }),
   exportXlsx: researcherProcedure
     .input(z.object({

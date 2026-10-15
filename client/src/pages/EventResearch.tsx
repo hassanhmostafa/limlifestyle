@@ -74,6 +74,10 @@ export default function EventResearch() {
     },
     onError: error => setMessage(error.message),
   });
+  const retryArchiveStorage = trpc.eventResearch.retryArchiveStorage.useMutation({
+    onSuccess: async () => { setMessage("أُعيدت محاولة حفظ النسخة الثابتة."); await archives.refetch(); },
+    onError: error => setMessage(error.message),
+  });
   const visibleEvents = useMemo(() => {
     const query = eventFilter.trim().toLocaleLowerCase("ar");
     if (!query || !me.data) return me.data?.events ?? [];
@@ -362,6 +366,7 @@ export default function EventResearch() {
                   <div className="flex flex-wrap gap-3">
                     <button className="underline" onClick={() => void utils.eventResearch.archiveSnapshot.fetch({ archiveId: item.archiveId }).then(setArchive).catch(error => setMessage(error instanceof Error ? error.message : "تعذر فتح النسخة المؤرشفة"))}>فتح النسخة المؤرشفة</button>
                     {item.pdfStatus === "archived" ? <a className="underline" href={`/api/research/reports/${item.archiveId}/original.pdf`}>تنزيل PDF الأصلي</a> : <span className="text-xs text-slate-500">ملف PDF غير محفوظ بعد</span>}
+                    {item.snapshotStatus !== "archived" && <button className="underline" disabled={retryArchiveStorage.isPending} onClick={() => retryArchiveStorage.mutate({ archiveId: item.archiveId })}>إعادة محاولة حفظ النسخة</button>}
                   </div>
                 </article>)}
               </div>}
@@ -384,6 +389,7 @@ function ArchivedSnapshot({ snapshot }: { snapshot: any }) {
       answers={snapshot.answers}
       lifestyleEnabled={snapshot.lifestyleEnabled}
       care={snapshot.care}
+      frozenLifestyleReport={snapshot.lifestyleReport}
     />
     <div data-pdf-hide><EventPdfButton filename={`lim-archived-${snapshot.participant.code}.pdf`} label="تنزيل التقرير المعاد إنشاؤه" /></div>
   </section>;

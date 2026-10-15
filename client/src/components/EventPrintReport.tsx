@@ -9,6 +9,7 @@ import LimLogo from "./LimLogo";
 import type { EventAnswers } from "@/lib/eventLifestyle";
 import type { Measurements } from "@shared/eventCare";
 import { nursingCatalog } from "@shared/eventNursing";
+import { lifestyleReport } from "@shared/eventLifestyleInsights";
 
 type Care = {
   advice: string | null;
@@ -85,12 +86,14 @@ export default function EventPrintReport({
   answers,
   lifestyleEnabled,
   care,
+  frozenLifestyleReport,
 }: {
   participant: EventParticipantIdentity & { code: string };
   readings: DashboardReading[];
   answers: EventAnswers;
   lifestyleEnabled: boolean;
   care: Care;
+  frozenLifestyleReport?: ReturnType<typeof lifestyleReport>;
 }) {
   return (
     <article data-print-report data-lifestyle-enabled={lifestyleEnabled ? "true" : "false"} className="lim-print-report" dir="rtl" aria-hidden="true">
@@ -98,7 +101,7 @@ export default function EventPrintReport({
         <section className="lim-print-logical-page lim-print-questionnaire-page" data-pdf-logical-page="questionnaire">
           <PrintHeading participant={participant} />
           <AdvicePanel care={care} />
-          <EventLifestyleCharts answers={answers} compact />
+          <EventLifestyleCharts answers={answers} compact frozenReport={frozenLifestyleReport} />
         </section>
       )}
       <section className="lim-print-logical-page lim-print-body-page" data-pdf-logical-page="body">

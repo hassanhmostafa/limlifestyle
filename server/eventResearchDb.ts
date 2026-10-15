@@ -451,7 +451,9 @@ export async function researchExport(
     .leftJoin(eventCare, eq(eventCare.sessionId, visits.id))
     .where(and(inArray(visits.eventCode, selected), eq(visits.consent, "true")))
     .orderBy(desc(visits.createdAt), desc(visits.id))
-    .limit(10_000);
+    .limit(10_001);
+  if (rows.length > 10_000)
+    throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "يتجاوز التصدير 10,000 زيارة. ضيّق نطاق الفعاليات أو استخدم أحدث زيارة فقط." });
   const kept = latestPerParticipant
     ? rows.filter((row, index, all) => all.findIndex(other => other.userId === row.userId) === index)
     : rows;

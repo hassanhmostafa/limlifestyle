@@ -166,8 +166,8 @@ function IncompleteLifestyle({ compact }: { compact: boolean }) {
   );
 }
 
-export default function EventLifestyleCharts({ answers, compact = false }: { answers: EventAnswers; compact?: boolean }) {
-  const report = lifestyleReport(answers);
+export default function EventLifestyleCharts({ answers, compact = false, frozenReport }: { answers: EventAnswers; compact?: boolean; frozenReport?: ReturnType<typeof lifestyleReport> }) {
+  const report = frozenReport ?? lifestyleReport(answers);
   if (!report.complete) return <IncompleteLifestyle compact={compact} />;
 
   const importance = clampScore(answers.importance);
