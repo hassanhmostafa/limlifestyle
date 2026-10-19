@@ -24,6 +24,7 @@ describe('event administration',()=>{
       await expect(caller.summary()).rejects.toThrow();
       await expect(caller.start()).rejects.toThrow();
       await expect(caller.otpDiagnostics()).rejects.toThrow();
+      await expect(caller.researchSourceDiagnostics()).rejects.toThrow();
     }
     expect(store.updateEventProfile).not.toHaveBeenCalled();
     expect(store.eventReportPage).not.toHaveBeenCalled();
@@ -83,5 +84,13 @@ describe('event administration',()=>{
     expect(csv).toContain('"\'=HYPERLINK(""test"")"');
     expect(csv).toContain('"\'+966500000000"');
     expect(csv).toContain('"line1\nline2"');
+  });
+  it('allows only the super admin to read redacted research runtime diagnostics', async()=>{
+    const result = await admin.researchSourceDiagnostics();
+    expect(result.diagnosticVersion).toBe('lim-source-runtime-v1');
+    expect(Object.values(result.presence).every(v=>typeof v==='boolean')).toBe(true);
+    expect(Object.values(result.checks).every(v=>typeof v==='boolean')).toBe(true);
+    expect(store.readEventProfile).not.toHaveBeenCalled();
+    expect(store.eventReportPage).not.toHaveBeenCalled();
   });
 });

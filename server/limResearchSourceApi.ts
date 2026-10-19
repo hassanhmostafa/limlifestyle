@@ -14,6 +14,35 @@ export const LIM_RESEARCH_SOURCE_MAX_PAGE_SIZE = 50;
 export const LIM_RESEARCH_SOURCE_MAX_RESPONSE_BYTES = 15 * 1024 * 1024;
 const MAX_CLOCK_SKEW_SECONDS = 300;
 
+type SourceDecision = "configuration_invalid" | "key_id_mismatch" | "timestamp_invalid" | "nonce_invalid" | "signature_invalid" | "metadata_invalid" | "query_mismatch" | "accepted" | "archive_unavailable";
+let lastListDecision: { checkedAt: string; decision: SourceDecision } | null = null;
+function recordListDecision(decision: SourceDecision, at: Date) {
+  lastListDecision = { checkedAt: at.toISOString(), decision };
+}
+
+/** Only exposed through the existing super-admin procedure; never returns key material. */
+export function limResearchSourceDiagnostics(env: NodeJS.ProcessEnv = process.env) {
+  return {
+    diagnosticVersion: "lim-source-runtime-v1" as const,
+    checkedAt: new Date().toISOString(),
+    presence: {
+      enabled: Boolean(env.LIM_RESEARCH_SOURCE_ENABLED),
+      eventCode: Boolean(env.LIM_RESEARCH_SOURCE_EVENT_CODE),
+      keyId: Boolean(env.LIM_RESEARCH_SOURCE_KEY_ID),
+      hmac: Boolean(env.LIM_RESEARCH_SOURCE_HMAC_SECRET_BASE64),
+    },
+    checks: {
+      enabledExactlyTrue: env.LIM_RESEARCH_SOURCE_ENABLED === "true",
+      eventCodeMatches: env.LIM_RESEARCH_SOURCE_EVENT_CODE?.trim() === "lim-events",
+      keyIdMatches: env.LIM_RESEARCH_SOURCE_KEY_ID?.trim() === "lim-research-live-20261018",
+      hmacFormatValid: Boolean(decodedHmacKey(env.LIM_RESEARCH_SOURCE_HMAC_SECRET_BASE64)),
+    },
+    configValid: Boolean(limResearchSourceConfig(env)),
+    // Process-local observation only. No requests, headers, identifiers or PDF data are retained.
+    lastListDecision: lastListDecision ? { ...lastListDecision } : null,
+  };
+}
+
 type SourceConfig = {
   keyId: string;
   signingKey: Buffer;
@@ -202,17 +231,18 @@ function hasNoQuery(req: Request) {
   return Object.keys(req.query ?? {}).length === 0;
 }
 
-function requestAuth(req: Request, path: string, config: SourceConfig, now: Date) {
+function requestAuth(req: Request, path: string, config: SourceConfig, now: Date, onReject?: (reason: SourceDecision) => void) {
   const keyId = req.get("x-lim-source-key-id") ?? "";
   const timestampText = req.get("x-lim-source-timestamp") ?? "";
   const timestamp = Number(timestampText);
   const nonce = req.get("x-lim-source-nonce") ?? "";
   const metadataBase64Url = req.get("x-lim-source-metadata") ?? "";
   const signature = req.get("x-lim-source-signature");
-  if (keyId !== config.keyId || !Number.isInteger(timestamp) || Math.abs(Math.floor(now.getTime() / 1_000) - timestamp) > MAX_CLOCK_SKEW_SECONDS || !validUuidV4(nonce))
-    return undefined;
+  if (keyId !== config.keyId) { onReject?.("key_id_mismatch"); return undefined; }
+  if (!Number.isInteger(timestamp) || Math.abs(Math.floor(now.getTime() / 1_000) - timestamp) > MAX_CLOCK_SKEW_SECONDS) { onReject?.("timestamp_invalid"); return undefined; }
+  if (!validUuidV4(nonce)) { onReject?.("nonce_invalid"); return undefined; }
   const canonical = limResearchSourceCanonicalRequest({ method: "GET", path, keyId, timestamp, nonce, metadataBase64Url });
-  if (!equalHex(signature, hmacHex(canonical, config.signingKey))) return undefined;
+  if (!equalHex(signature, hmacHex(canonical, config.signingKey))) { onReject?.("signature_invalid"); return undefined; }
   return { nonce, metadata: decodeBase64UrlJson(metadataBase64Url) };
 }
 
@@ -240,13 +270,15 @@ export function createLimResearchSourceHandlers(dependencies: SourceDependencies
 
   return {
     list: async (req: Request, res: Response) => {
+      const checkedAt = now();
       const config = limResearchSourceConfig(dependencies.env);
-      if (!config) return reject(res);
-      const auth = requestAuth(req, LIM_RESEARCH_SOURCE_LIST_PATH, config, now());
-      if (!auth || !validListMetadata(auth.metadata, config.eventCode)) return reject(res);
+      if (!config) { recordListDecision("configuration_invalid", checkedAt); return reject(res); }
+      const auth = requestAuth(req, LIM_RESEARCH_SOURCE_LIST_PATH, config, checkedAt, reason => recordListDecision(reason, checkedAt));
+      if (!auth) return reject(res);
+      if (!validListMetadata(auth.metadata, config.eventCode)) { recordListDecision("metadata_invalid", checkedAt); return reject(res); }
       try {
         const metadata = auth.metadata;
-        if (!listQueryMatchesSignedMetadata(req, metadata)) return reject(res);
+        if (!listQueryMatchesSignedMetadata(req, metadata)) { recordListDecision("query_mismatch", checkedAt); return reject(res); }
         const afterId = decodeCursor(metadata.cursor, config.eventCode);
         const limit = metadata.limit ?? LIM_RESEARCH_SOURCE_MAX_PAGE_SIZE;
         const page = await listPage(config.eventCode, afterId, limit);
@@ -267,8 +299,10 @@ export function createLimResearchSourceHandlers(dependencies: SourceDependencies
           });
         }
         const body = Buffer.from(JSON.stringify({ contractVersion: 1, eventCode: config.eventCode, items, nextCursor: encodeCursor(config.eventCode, page.nextCursor) }), "utf8");
+        recordListDecision("accepted", checkedAt);
         signedResponse(res, auth.nonce, 200, { contractVersion: 1, purpose: "discover", eventCode: config.eventCode }, body, config.signingKey, "application/json");
       } catch {
+        recordListDecision("archive_unavailable", checkedAt);
         res.status(503).json({ error: "source_unavailable" });
       }
     },

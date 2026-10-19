@@ -7,6 +7,7 @@ import {
   limResearchSourceCanonicalRequest,
   limResearchSourceCanonicalResponse,
   limResearchSourceConfig,
+  limResearchSourceDiagnostics,
 } from "./limResearchSourceApi";
 
 const signingKey = Buffer.from("0123456789abcdef0123456789abcdef", "utf8");
@@ -23,6 +24,34 @@ const environment = {
   LIM_RESEARCH_SOURCE_HMAC_SECRET_BASE64: signingKey.toString("base64"),
   LIM_RESEARCH_SOURCE_EVENT_CODE: eventCode,
 };
+
+describe('private research runtime diagnostics', () => {
+  it('reports configuration errors without returning secret values or fingerprints', () => {
+    const result = limResearchSourceDiagnostics({ ...environment, LIM_RESEARCH_SOURCE_ENABLED: ' true' });
+    expect(result.presence).toEqual({ enabled: true, eventCode: true, keyId: true, hmac: true });
+    expect(result.configValid).toBe(false);
+    expect(result.checks.enabledExactlyTrue).toBe(false);
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain(environment.LIM_RESEARCH_SOURCE_HMAC_SECRET_BASE64);
+    expect(serialized).not.toContain(keyId);
+    expect(serialized).not.toContain(eventCode);
+    expect(serialized).not.toContain('fingerprint');
+    expect(limResearchSourceDiagnostics({ ...environment, LIM_RESEARCH_SOURCE_HMAC_SECRET_BASE64: 'invalid' }).checks.hmacFormatValid).toBe(false);
+  });
+  it('keeps the public rejection generic while the private observation distinguishes signature failure', async () => {
+    const req = request(LIM_RESEARCH_SOURCE_LIST_PATH, listMetadata());
+    const original = req.get;
+    req.get = (name: string) => name.toLowerCase() === 'x-lim-source-signature' ? '0'.repeat(64) : original(name);
+    const { res, sent } = response();
+    const listPage = vi.fn();
+    await createLimResearchSourceHandlers({ env: environment, now: () => fixedNow, listPage }).list(req, res);
+    expect(sent.status).toBe(404);
+    expect(JSON.parse(sent.body!.toString())).toEqual({ error: 'not_found' });
+    expect(sent.headers).toEqual({});
+    expect(listPage).not.toHaveBeenCalled();
+    expect(limResearchSourceDiagnostics(environment).lastListDecision).toEqual({ checkedAt: fixedNow.toISOString(), decision: 'signature_invalid' });
+  });
+});
 
 function b64(value: unknown) {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");

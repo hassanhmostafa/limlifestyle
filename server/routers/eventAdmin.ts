@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, superAdminProcedure } from '../_core/trpc';
 import * as store from '../eventAdminDb';
 import { getOurSmsDiagnostics } from '../lib/oursmsDiagnostics';
+import { limResearchSourceDiagnostics } from '../limResearchSourceApi';
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=> {
   const d = new Date(v+'T00:00:00Z'); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10)===v;
 }, 'تاريخ غير صحيح');
@@ -46,4 +47,5 @@ export const eventAdminRouter = router({
    * account balance, phone number, or provider response body.
    */
   otpDiagnostics: superAdminProcedure.query(() => getOurSmsDiagnostics()),
+  researchSourceDiagnostics: superAdminProcedure.query(() => limResearchSourceDiagnostics()),
 });

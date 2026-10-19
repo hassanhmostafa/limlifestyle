@@ -14,6 +14,7 @@ export default function EventAdminPanel(){
   const profile=trpc.eventAdmin.profile.useQuery(undefined,{retry:false,refetchOnWindowFocus:false});
   const summary=trpc.eventAdmin.summary.useQuery(undefined,{retry:false});
   const otpDiagnostics=trpc.eventAdmin.otpDiagnostics.useQuery(undefined,{enabled:false,retry:false});
+  const researchDiagnostics=trpc.eventAdmin.researchSourceDiagnostics.useQuery(undefined,{enabled:false,retry:false,refetchOnWindowFocus:false});
   const utils=trpc.useUtils();
   const [form,setForm]=useState({name:'',startsOn:'',endsOn:'',location:'',organizer:'',questionnaireIds:['lifestyle'] as 'lifestyle'[]});
   const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);const [exporting,setExporting]=useState(false);
@@ -88,6 +89,20 @@ export default function EventAdminPanel(){
         <p>تفعيل OTP: {otpDiagnostics.data.enabled?'نعم':'لا'} · اسم المرسل: {otpDiagnostics.data.senderConfigured?'مضبوط':'ناقص'} · صيغة الإرسال: {otpDiagnostics.data.messageFormat} · سر التحقق: {otpDiagnostics.data.secretConfigured?'مضبوط':'ناقص'}</p><p><strong>بصمة آمنة للمقارنة:</strong> <code dir="ltr">{otpDiagnostics.data.keyFingerprint??'—'}</code></p>
         <p><strong>نتيجة OurSMS:</strong> {otpDiagnostics.data.transport==='network_error'?'تعذر الوصول للشبكة':otpDiagnostics.data.balanceHttpStatus===null?'لا يوجد مفتاح':'HTTP '+otpDiagnostics.data.balanceHttpStatus} {otpDiagnostics.data.balanceReachable?'— تم قبول المفتاح':'— لم يتم قبول المفتاح'}</p>
         <p className="text-slate-600">قارن البصمة وحالة HTTP بين المعاينة والموقع المنشور: تطابق البصمة مع 401 يعني أن OurSMS أو شبكة الخادم المنشور ترفض نفس المفتاح؛ اختلاف البصمة يعني أن إعداد secret المنشور مختلف.</p>
+      </div>}
+    </section>
+    <section className={card}>
+      <h2 className="flex items-center gap-2 text-xl font-bold"><ShieldCheck/>فحص ربط قاعدة الباحثين</h2>
+      <p className="text-sm text-slate-600">يعرض حالة إعدادات الخادم الذي يستقبل هذا الطلب وآخر قرار لمسار سحب قائمة التقارير في العملية الحالية فقط. لا يعرض مفاتيح أو بصمات أو بيانات مشاركين، ولا يقرأ تقارير أو يغيّر الإعدادات. قد تختلف العملية بين الطلبات أو تُعاد تشغيلها؛ غياب قرار سابق لا يثبت عدم وصول الطلب.</p>
+      <button type="button" className={button} disabled={researchDiagnostics.isFetching} onClick={()=>void researchDiagnostics.refetch()}>{researchDiagnostics.isFetching?'جارٍ الفحص…':'فحص ربط الباحثين'}</button>
+      {researchDiagnostics.error&&<p role="alert">تعذر قراءة التشخيص. يلزم الدخول كمدير عام.</p>}
+      {researchDiagnostics.data&&<div role="status" className="space-y-2 rounded-2xl bg-[#f3f8f6] p-4 text-sm">
+        <p dir="ltr">{researchDiagnostics.data.diagnosticVersion} · {researchDiagnostics.data.checkedAt}</p>
+        <p>تهيئة المصدر صالحة: {researchDiagnostics.data.configValid?'نعم':'لا'}</p>
+        <p>وجود الإعدادات: التفعيل {researchDiagnostics.data.presence.enabled?'نعم':'لا'} · الفعالية {researchDiagnostics.data.presence.eventCode?'نعم':'لا'} · معرّف المفتاح {researchDiagnostics.data.presence.keyId?'نعم':'لا'} · المفتاح {researchDiagnostics.data.presence.hmac?'نعم':'لا'}</p>
+        <p>التفعيل بالقيمة المطلوبة: {researchDiagnostics.data.checks.enabledExactlyTrue?'نعم':'لا'} · رمز الفعالية مطابق: {researchDiagnostics.data.checks.eventCodeMatches?'نعم':'لا'} · معرّف المفتاح مطابق: {researchDiagnostics.data.checks.keyIdMatches?'نعم':'لا'} · صيغة المفتاح صالحة: {researchDiagnostics.data.checks.hmacFormatValid?'نعم':'لا'}</p>
+        <p>آخر قرار في هذه العملية: <code dir="ltr">{researchDiagnostics.data.lastListDecision?.decision??'لا يوجد قرار مسجل'}</code></p>
+        {researchDiagnostics.data.lastListDecision&&<p dir="ltr">{researchDiagnostics.data.lastListDecision.checkedAt}</p>}
       </div>}
     </section>
     <section data-pdf-report id="event-print-report" className={card}>
