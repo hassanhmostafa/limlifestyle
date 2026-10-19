@@ -1,95 +1,180 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { eventAdminRouter, eventProfileInput, validatePoster } from './routers/eventAdmin';
-import * as store from './eventAdminDb';
-import { listTracks } from './eventTracksDb';
-vi.mock('./eventTracksDb',()=>({listTracks:vi.fn()}));
-import type { TrpcContext } from './_core/context';
-import { eventReportCsv } from '../shared/eventReport';
-vi.mock('./eventAdminDb',()=>({readEventProfile:vi.fn(),updateEventProfile:vi.fn(),eventReportSummary:vi.fn(),eventReportPage:vi.fn()}));
-vi.mock('./lib/oursmsDiagnostics',()=>({getOurSmsDiagnostics:vi.fn()}));
-import { getOurSmsDiagnostics } from './lib/oursmsDiagnostics';
-const ctx=(user:unknown)=>({user,req:{headers:{}},res:{}} as TrpcContext);
-const admin=eventAdminRouter.createCaller(ctx({id:1,role:'admin',adminType:'super'}));
-const profile={name:'اليوم الصحي',startsOn:'2026-09-26',endsOn:'2026-09-27',location:'جدة',organizer:'ليم',questionnaireIds:['lifestyle'] as 'lifestyle'[]};
-const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=';
-beforeEach(()=>vi.clearAllMocks());
-describe('event administration',()=>{
-  it('restricts profile editing, poster, closure and reports to super admin',async()=>{
-    for(const user of [null,{id:2,role:'user'},{id:3,role:'admin',adminType:'kiosk'},{id:4,role:'expert'}]){
-      const caller=eventAdminRouter.createCaller(ctx(user));
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  eventAdminRouter,
+  eventProfileInput,
+  validatePoster,
+} from "./routers/eventAdmin";
+import * as store from "./eventAdminDb";
+import { listTracks } from "./eventTracksDb";
+vi.mock("./eventTracksDb", () => ({ listTracks: vi.fn() }));
+import type { TrpcContext } from "./_core/context";
+import { eventReportCsv } from "../shared/eventReport";
+vi.mock("./eventAdminDb", () => ({
+  readEventProfile: vi.fn(),
+  updateEventProfile: vi.fn(),
+  eventReportSummary: vi.fn(),
+  eventReportPage: vi.fn(),
+}));
+vi.mock("./lib/oursmsDiagnostics", () => ({ getOurSmsDiagnostics: vi.fn() }));
+import { getOurSmsDiagnostics } from "./lib/oursmsDiagnostics";
+const ctx = (user: unknown) =>
+  ({ user, req: { headers: {} }, res: {} }) as TrpcContext;
+const admin = eventAdminRouter.createCaller(
+  ctx({ id: 1, role: "admin", adminType: "super" })
+);
+const profile = {
+  name: "اليوم الصحي",
+  startsOn: "2026-09-26",
+  endsOn: "2026-09-27",
+  location: "جدة",
+  organizer: "ليم",
+  questionnaireIds: ["lifestyle"] as "lifestyle"[],
+};
+const png =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=";
+beforeEach(() => vi.clearAllMocks());
+describe("event administration", () => {
+  it("restricts profile editing, poster, closure and reports to super admin", async () => {
+    for (const user of [
+      null,
+      { id: 2, role: "user" },
+      { id: 3, role: "admin", adminType: "kiosk" },
+      { id: 4, role: "expert" },
+    ]) {
+      const caller = eventAdminRouter.createCaller(ctx(user));
       await expect(caller.save(profile)).rejects.toThrow();
-      await expect(caller.poster({dataUrl:png})).rejects.toThrow();
-      await expect(caller.setClosed({closed:true})).rejects.toThrow();
-      await expect(caller.report({after:0,limit:50})).rejects.toThrow();
+      await expect(caller.poster({ dataUrl: png })).rejects.toThrow();
+      await expect(caller.setClosed({ closed: true })).rejects.toThrow();
+      await expect(caller.report({ after: 0, limit: 50 })).rejects.toThrow();
       await expect(caller.summary()).rejects.toThrow();
       await expect(caller.start()).rejects.toThrow();
       await expect(caller.otpDiagnostics()).rejects.toThrow();
       await expect(caller.researchSourceDiagnostics()).rejects.toThrow();
+      await expect(
+        caller.researchReissueContext({ sessionCode: "LIM-TEST-1" })
+      ).rejects.toThrow();
+      await expect(
+        caller.researchReissuePdf({
+          sessionCode: "LIM-TEST-1",
+          archiveId: "11111111-1111-4111-8111-111111111111",
+          reportRevision: 1,
+          snapshotSha256: "a".repeat(64),
+          pdfBase64: Buffer.from("%PDF-1.4").toString("base64"),
+        })
+      ).rejects.toThrow();
     }
     expect(store.updateEventProfile).not.toHaveBeenCalled();
     expect(store.eventReportPage).not.toHaveBeenCalled();
   });
-  it('starts only a configured event with an active track',async()=>{
-    vi.mocked(store.readEventProfile).mockResolvedValue({...profile,closed:1} as any);
+  it("starts only a configured event with an active track", async () => {
+    vi.mocked(store.readEventProfile).mockResolvedValue({
+      ...profile,
+      closed: 1,
+    } as any);
     vi.mocked(listTracks).mockResolvedValue([]);
     await expect(admin.start()).rejects.toThrow();
     expect(store.updateEventProfile).not.toHaveBeenCalled();
-    vi.mocked(listTracks).mockResolvedValue([{id:1}] as any);
+    vi.mocked(listTracks).mockResolvedValue([{ id: 1 }] as any);
     await admin.start();
     expect(listTracks).toHaveBeenCalledWith(true);
-    expect(store.updateEventProfile).toHaveBeenCalledWith({closed:0});
-    vi.mocked(store.readEventProfile).mockResolvedValue({...profile,name:''} as any);
+    expect(store.updateEventProfile).toHaveBeenCalledWith({ closed: 0 });
+    vi.mocked(store.readEventProfile).mockResolvedValue({
+      ...profile,
+      name: "",
+    } as any);
     await expect(admin.start()).rejects.toThrow();
   });
-  it('validates dates and does not silently activate unimplemented clinical questionnaires',()=>{
-    expect(eventProfileInput.safeParse({...profile,endsOn:'2026-09-25'}).success).toBe(false);
-    expect(eventProfileInput.safeParse({...profile,startsOn:'2026-02-30'}).success).toBe(false);
-    expect(eventProfileInput.safeParse({...profile,questionnaireIds:['diabetes']}).success).toBe(false);
-    expect(eventProfileInput.safeParse({...profile,questionnaireIds:[]}).success).toBe(true);
+  it("validates dates and does not silently activate unimplemented clinical questionnaires", () => {
+    expect(
+      eventProfileInput.safeParse({ ...profile, endsOn: "2026-09-25" }).success
+    ).toBe(false);
+    expect(
+      eventProfileInput.safeParse({ ...profile, startsOn: "2026-02-30" })
+        .success
+    ).toBe(false);
+    expect(
+      eventProfileInput.safeParse({
+        ...profile,
+        questionnaireIds: ["diabetes"],
+      }).success
+    ).toBe(false);
+    expect(
+      eventProfileInput.safeParse({ ...profile, questionnaireIds: [] }).success
+    ).toBe(true);
   });
-  it('updates metadata without overwriting status or poster',async()=>{
+  it("updates metadata without overwriting status or poster", async () => {
     await admin.save(profile);
     expect(store.updateEventProfile).toHaveBeenCalledWith(profile);
-    await admin.poster({dataUrl:png});
-    expect(store.updateEventProfile).toHaveBeenLastCalledWith({poster:png});
-    await admin.setClosed({closed:true});
-    expect(store.updateEventProfile).toHaveBeenLastCalledWith({closed:1});
-    await admin.setClosed({closed:false});
-    expect(store.updateEventProfile).toHaveBeenLastCalledWith({closed:0});
+    await admin.poster({ dataUrl: png });
+    expect(store.updateEventProfile).toHaveBeenLastCalledWith({ poster: png });
+    await admin.setClosed({ closed: true });
+    expect(store.updateEventProfile).toHaveBeenLastCalledWith({ closed: 1 });
+    await admin.setClosed({ closed: false });
+    expect(store.updateEventProfile).toHaveBeenLastCalledWith({ closed: 0 });
   });
-  it('rejects unsafe MIME, mismatched signatures and oversized poster bytes',()=>{
+  it("rejects unsafe MIME, mismatched signatures and oversized poster bytes", () => {
     expect(validatePoster(png)).toBe(png);
-    expect(()=>validatePoster('data:image/svg+xml;base64,PHN2Zz4=')).toThrow();
-    expect(()=>validatePoster('data:image/png;base64,'+Buffer.from('not a real png header').toString('base64'))).toThrow();
-    const huge=Buffer.alloc(2*1024*1024+1);Buffer.from([137,80,78,71,13,10,26,10]).copy(huge);
-    expect(()=>validatePoster('data:image/png;base64,'+huge.toString('base64'))).toThrow();
+    expect(() =>
+      validatePoster("data:image/svg+xml;base64,PHN2Zz4=")
+    ).toThrow();
+    expect(() =>
+      validatePoster(
+        "data:image/png;base64," +
+          Buffer.from("not a real png header").toString("base64")
+      )
+    ).toThrow();
+    const huge = Buffer.alloc(2 * 1024 * 1024 + 1);
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(huge);
+    expect(() =>
+      validatePoster("data:image/png;base64," + huge.toString("base64"))
+    ).toThrow();
   });
-  it('bounds report pages and passes explicit cursor',async()=>{
-    await admin.report({after:50,limit:20});
-    expect(store.eventReportPage).toHaveBeenCalledWith(50,20);
-    await expect(admin.report({after:0,limit:1000})).rejects.toThrow();
+  it("bounds report pages and passes explicit cursor", async () => {
+    await admin.report({ after: 50, limit: 20 });
+    expect(store.eventReportPage).toHaveBeenCalledWith(50, 20);
+    await expect(admin.report({ after: 0, limit: 1000 })).rejects.toThrow();
   });
-  it('returns OurSMS diagnostics only to a super admin',async()=>{
+  it("returns OurSMS diagnostics only to a super admin", async () => {
     vi.mocked(getOurSmsDiagnostics).mockResolvedValue({
-      provider:'OurSMS',enabled:true,senderConfigured:true,secretConfigured:true,keyPresent:true,keyLength:20,keyFingerprint:'sha256:abc123def456',
-      balanceHttpStatus:200,balanceReachable:true,transport:'ok',
+      provider: "OurSMS",
+      enabled: true,
+      senderConfigured: true,
+      secretConfigured: true,
+      keyPresent: true,
+      keyLength: 20,
+      keyFingerprint: "sha256:abc123def456",
+      balanceHttpStatus: 200,
+      balanceReachable: true,
+      transport: "ok",
     });
     await expect(admin.otpDiagnostics()).resolves.toMatchObject({
-      keyLength:20,balanceHttpStatus:200,keyFingerprint:'sha256:abc123def456',
+      keyLength: 20,
+      balanceHttpStatus: 200,
+      keyFingerprint: "sha256:abc123def456",
     });
     expect(getOurSmsDiagnostics).toHaveBeenCalledOnce();
   });
-  it('quotes CSV data and neutralizes spreadsheet formulas',()=>{
-    const csv=eventReportCsv([{name:'=HYPERLINK("test")',phone:'+966500000000',advice:'line1\nline2'}]);
+  it("quotes CSV data and neutralizes spreadsheet formulas", () => {
+    const csv = eventReportCsv([
+      {
+        name: '=HYPERLINK("test")',
+        phone: "+966500000000",
+        advice: "line1\nline2",
+      },
+    ]);
     expect(csv).toContain('"\'=HYPERLINK(""test"")"');
     expect(csv).toContain('"\'+966500000000"');
     expect(csv).toContain('"line1\nline2"');
   });
-  it('allows only the super admin to read redacted research runtime diagnostics', async()=>{
+  it("allows only the super admin to read redacted research runtime diagnostics", async () => {
     const result = await admin.researchSourceDiagnostics();
-    expect(result.diagnosticVersion).toBe('lim-source-runtime-v1');
-    expect(Object.values(result.presence).every(v=>typeof v==='boolean')).toBe(true);
-    expect(Object.values(result.checks).every(v=>typeof v==='boolean')).toBe(true);
+    expect(result.diagnosticVersion).toBe("lim-source-runtime-v1");
+    expect(
+      Object.values(result.presence).every(v => typeof v === "boolean")
+    ).toBe(true);
+    expect(
+      Object.values(result.checks).every(v => typeof v === "boolean")
+    ).toBe(true);
     expect(store.readEventProfile).not.toHaveBeenCalled();
     expect(store.eventReportPage).not.toHaveBeenCalled();
   });
