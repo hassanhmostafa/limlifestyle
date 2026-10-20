@@ -4,11 +4,20 @@ import {
   eventCare,
   eventParticipantSessions,
   eventReportArchives,
+  users,
 } from "../drizzle/schema";
 import { getDb, getEventReadingByRecordNo } from "./db";
 import { storageGet, storagePut } from "./storage";
 import { lifestyleReport } from "../shared/eventLifestyleInsights";
-import { EVENT_REPORT_TEMPLATE_VERSION, EVENT_REPORT_SCORING_VERSION, type EventReportMetadata } from "../shared/eventReportArchive";
+import {
+  EVENT_REPORT_TEMPLATE_VERSION,
+  EVENT_REPORT_SCORING_VERSION,
+  type EventReportMetadata,
+} from "../shared/eventReportArchive";
+import { archivedQuestionnaires } from "../shared/questionnaireArchive";
+import type { ArchivedQuestionnaire } from "../shared/assessmentCompanion";
+import type { AssessmentCompanion } from "../shared/assessmentCompanion";
+import { archivedNursingMeasurements } from "../shared/nursingArchive";
 
 export const EVENT_REPORT_ARCHIVE_ENCRYPTION_VERSION = "aes-256-gcm-hkdf-v1";
 export const EVENT_REPORT_ARCHIVE_MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -31,7 +40,11 @@ export type EventReportSnapshot = {
     firstName: string | null;
     age: number | null;
     sex: "male" | "female" | null;
+    mobile?: string | null;
+    city?: string | null;
   };
+  questionnaires?: ArchivedQuestionnaire[];
+  nursing?: AssessmentCompanion["nursing"];
   lifestyleEnabled: boolean;
   lifestyleReport: ReturnType<typeof lifestyleReport> | null;
   answers: Record<string, string | number | string[]>;
@@ -61,7 +74,8 @@ export type EventReportSnapshot = {
 };
 
 function archiveKey() {
-  const secret = process.env.EVENT_REPORT_ARCHIVE_KEY || process.env.JWT_SECRET || "";
+  const secret =
+    process.env.EVENT_REPORT_ARCHIVE_KEY || process.env.JWT_SECRET || "";
   if (secret.length < 32)
     throw new Error("Event report archive encryption key is unavailable.");
   return Buffer.from(
@@ -75,31 +89,68 @@ function archiveKey() {
   );
 }
 
-function archiveAad(archiveId: string, sessionId: number, reportRevision: number, kind: "snapshot" | "pdf") {
-  return Buffer.from(`${ARCHIVE_KEY_CONTEXT}:${kind}:${archiveId}:${sessionId}:${reportRevision}`, "utf8");
+function archiveAad(
+  archiveId: string,
+  sessionId: number,
+  reportRevision: number,
+  kind: "snapshot" | "pdf"
+) {
+  return Buffer.from(
+    `${ARCHIVE_KEY_CONTEXT}:${kind}:${archiveId}:${sessionId}:${reportRevision}`,
+    "utf8"
+  );
 }
 
 /** Packs IV + authentication tag + ciphertext; the object is opaque without the server secret. */
 export function encryptArchiveBytes(
   bytes: Buffer,
-  context: { archiveId: string; sessionId: number; reportRevision: number; kind: "snapshot" | "pdf" }
+  context: {
+    archiveId: string;
+    sessionId: number;
+    reportRevision: number;
+    kind: "snapshot" | "pdf";
+  }
 ) {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", archiveKey(), iv);
-  cipher.setAAD(archiveAad(context.archiveId, context.sessionId, context.reportRevision, context.kind));
-  return Buffer.concat([iv, cipher.update(bytes), cipher.final(), cipher.getAuthTag()]);
+  cipher.setAAD(
+    archiveAad(
+      context.archiveId,
+      context.sessionId,
+      context.reportRevision,
+      context.kind
+    )
+  );
+  return Buffer.concat([
+    iv,
+    cipher.update(bytes),
+    cipher.final(),
+    cipher.getAuthTag(),
+  ]);
 }
 
 export function decryptArchiveBytes(
   bytes: Buffer,
-  context: { archiveId: string; sessionId: number; reportRevision: number; kind: "snapshot" | "pdf" }
+  context: {
+    archiveId: string;
+    sessionId: number;
+    reportRevision: number;
+    kind: "snapshot" | "pdf";
+  }
 ) {
   if (bytes.length < 29) throw new Error("Archived report object is invalid.");
   const iv = bytes.subarray(0, 12);
   const tag = bytes.subarray(bytes.length - 16);
   const ciphertext = bytes.subarray(12, bytes.length - 16);
   const decipher = crypto.createDecipheriv("aes-256-gcm", archiveKey(), iv);
-  decipher.setAAD(archiveAad(context.archiveId, context.sessionId, context.reportRevision, context.kind));
+  decipher.setAAD(
+    archiveAad(
+      context.archiveId,
+      context.sessionId,
+      context.reportRevision,
+      context.kind
+    )
+  );
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
@@ -111,11 +162,15 @@ function sha256(bytes: Buffer) {
 /** Drizzle/MySQL returns an affected-row header; keep tests tolerant of minimal mocks. */
 function affectedRows(result: unknown) {
   const header = Array.isArray(result) ? result[0] : result;
-  const value = (header as { affectedRows?: unknown } | undefined)?.affectedRows;
+  const value = (header as { affectedRows?: unknown } | undefined)
+    ?.affectedRows;
   return typeof value === "number" ? value : undefined;
 }
 
-export function isPdfClaimLeaseExpired(value: Date | null | undefined, now = new Date()) {
+export function isPdfClaimLeaseExpired(
+  value: Date | null | undefined,
+  now = new Date()
+) {
   return !value || value.getTime() <= now.getTime();
 }
 
@@ -152,12 +207,20 @@ async function database() {
  * for a newly approved revision that recorded explicit archival intent; legacy
  * approvals never gain an original-PDF capture retroactively.
  */
-export async function archiveApprovedEventReportSnapshot(sessionId: number, originEligible = false) {
+export async function archiveApprovedEventReportSnapshot(
+  sessionId: number,
+  originEligible = false
+) {
   const db = await database();
   const [joined] = await db
-    .select({ session: eventParticipantSessions, care: eventCare })
+    .select({
+      session: eventParticipantSessions,
+      care: eventCare,
+      mobile: users.phone,
+    })
     .from(eventParticipantSessions)
     .innerJoin(eventCare, eq(eventCare.sessionId, eventParticipantSessions.id))
+    .leftJoin(users, eq(users.id, eventParticipantSessions.userId))
     .where(eq(eventParticipantSessions.id, sessionId))
     .limit(1);
   if (!joined?.care.approvedAt || !joined.care.approvedRecordNo)
@@ -170,7 +233,9 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
   const approvedRecordNo = care.approvedRecordNo!;
   const reportRevision = care.revision;
   if (originEligible && care.archiveRequestedRevision !== reportRevision)
-    throw new Error("This approved report was not marked for original archive capture.");
+    throw new Error(
+      "This approved report was not marked for original archive capture."
+    );
   const [existing] = await db
     .select()
     .from(eventReportArchives)
@@ -183,7 +248,10 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
     .limit(1);
   if (existing) return existing;
 
-  const readings = await getEventReadingByRecordNo(session.userId, approvedRecordNo);
+  const readings = await getEventReadingByRecordNo(
+    session.userId,
+    approvedRecordNo
+  );
   const snapshot: EventReportSnapshot = {
     schemaVersion: 1,
     archivedAt: new Date().toISOString(),
@@ -194,8 +262,11 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
       visitId: session.id,
       visitDate: session.createdAt.toISOString(),
       reportRevision,
-      questionnaireVersion: (session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle")
-        ? String(session.answers?._questionnaireVersion ?? "legacy") : "none",
+      questionnaireVersion: (
+        session.questionnaireIds ?? ["lifestyle"]
+      ).includes("lifestyle")
+        ? String(session.answers?._questionnaireVersion ?? "legacy")
+        : "none",
       scoringVersion: EVENT_REPORT_SCORING_VERSION,
       templateVersion: EVENT_REPORT_TEMPLATE_VERSION,
     },
@@ -204,9 +275,22 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
       firstName: session.displayName,
       age: session.age,
       sex: session.sex,
+      mobile: joined.mobile ?? null,
+      city: session.city ?? null,
     },
-    lifestyleEnabled: (session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle"),
-    lifestyleReport: (session.questionnaireIds ?? ["lifestyle"]).includes("lifestyle") ? lifestyleReport(session.answers ?? {}) : null,
+    questionnaires: archivedQuestionnaires(
+      session.questionnaireIds ?? ["lifestyle"],
+      session.answers ?? {}
+    ),
+    nursing: archivedNursingMeasurements(care.measurements ?? {}),
+    lifestyleEnabled: (session.questionnaireIds ?? ["lifestyle"]).includes(
+      "lifestyle"
+    ),
+    lifestyleReport: (session.questionnaireIds ?? ["lifestyle"]).includes(
+      "lifestyle"
+    )
+      ? lifestyleReport(session.answers ?? {})
+      : null,
     answers: session.answers ?? {},
     readings: readings.map(reportReading),
     care: {
@@ -223,7 +307,12 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
   const archiveId = crypto.randomUUID();
   const plaintext = Buffer.from(JSON.stringify(snapshot), "utf8");
   const snapshotKey = `private/event-report-archive/v1/${crypto.randomUUID()}.bin`;
-  const encryptedPayload = encryptArchiveBytes(plaintext, { archiveId, sessionId: session.id, reportRevision, kind: "snapshot" });
+  const encryptedPayload = encryptArchiveBytes(plaintext, {
+    archiveId,
+    sessionId: session.id,
+    reportRevision,
+    kind: "snapshot",
+  });
   try {
     const [inserted] = await db
       .insert(eventReportArchives)
@@ -249,17 +338,34 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
       .where(eq(eventReportArchives.id, inserted.id))
       .limit(1);
     try {
-      await storagePut(snapshotKey, encryptedPayload, "application/octet-stream");
-      await db.update(eventReportArchives).set({ snapshotStatus: "archived", lastError: null }).where(eq(eventReportArchives.id, saved!.id));
+      await storagePut(
+        snapshotKey,
+        encryptedPayload,
+        "application/octet-stream"
+      );
+      await db
+        .update(eventReportArchives)
+        .set({ snapshotStatus: "archived", lastError: null })
+        .where(eq(eventReportArchives.id, saved!.id));
     } catch {
-      await db.update(eventReportArchives).set({ snapshotStatus: "failed", lastError: "snapshot-storage-failed" }).where(eq(eventReportArchives.id, saved!.id));
+      await db
+        .update(eventReportArchives)
+        .set({ snapshotStatus: "failed", lastError: "snapshot-storage-failed" })
+        .where(eq(eventReportArchives.id, saved!.id));
     }
-    const [finished] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, saved!.id)).limit(1);
+    const [finished] = await db
+      .select()
+      .from(eventReportArchives)
+      .where(eq(eventReportArchives.id, saved!.id))
+      .limit(1);
     return finished!;
   } catch (error: any) {
     // A parallel finalization can claim the immutable archive first. Its
     // ciphertext remains authoritative; an orphan encrypted object has no URL.
-    if (error?.code === "ER_DUP_ENTRY" || error?.cause?.code === "ER_DUP_ENTRY") {
+    if (
+      error?.code === "ER_DUP_ENTRY" ||
+      error?.cause?.code === "ER_DUP_ENTRY"
+    ) {
       const [duplicate] = await db
         .select()
         .from(eventReportArchives)
@@ -277,19 +383,45 @@ export async function archiveApprovedEventReportSnapshot(sessionId: number, orig
 }
 
 /** Recover an approval-time archive only when its revision-bound intent survived a crash. */
-export async function recoverRequestedEventReportArchive(sessionId: number, reportRevision: number) {
+export async function recoverRequestedEventReportArchive(
+  sessionId: number,
+  reportRevision: number
+) {
   const db = await database();
-  const [care] = await db.select().from(eventCare).where(eq(eventCare.sessionId, sessionId)).limit(1);
-  if (!care?.approvedAt || care.revision !== reportRevision || care.archiveRequestedRevision !== reportRevision)
+  const [care] = await db
+    .select()
+    .from(eventCare)
+    .where(eq(eventCare.sessionId, sessionId))
+    .limit(1);
+  if (
+    !care?.approvedAt ||
+    care.revision !== reportRevision ||
+    care.archiveRequestedRevision !== reportRevision
+  )
     return undefined;
   return archiveApprovedEventReportSnapshot(sessionId, true);
 }
 
 /** Decodes only an already-joined encrypted DTO; never fetches object storage. */
-export function readEmbeddedArchivedReportSnapshot(archive: { archiveId: string; sessionId: number; reportRevision: number; snapshotPayload: string | null; snapshotSha256: string }) {
+export function readEmbeddedArchivedReportSnapshot(archive: {
+  archiveId: string;
+  sessionId: number;
+  reportRevision: number;
+  snapshotPayload: string | null;
+  snapshotSha256: string;
+}) {
   if (!archive.snapshotPayload) return undefined;
-  const plain = decryptArchiveBytes(Buffer.from(archive.snapshotPayload, "base64"), { archiveId: archive.archiveId, sessionId: archive.sessionId, reportRevision: archive.reportRevision, kind: "snapshot" });
-  if (sha256(plain) !== archive.snapshotSha256) throw new Error("Archived report snapshot integrity check failed.");
+  const plain = decryptArchiveBytes(
+    Buffer.from(archive.snapshotPayload, "base64"),
+    {
+      archiveId: archive.archiveId,
+      sessionId: archive.sessionId,
+      reportRevision: archive.reportRevision,
+      kind: "snapshot",
+    }
+  );
+  if (sha256(plain) !== archive.snapshotSha256)
+    throw new Error("Archived report snapshot integrity check failed.");
   return JSON.parse(plain.toString("utf8")) as EventReportSnapshot;
 }
 
@@ -306,53 +438,120 @@ export async function readArchivedReportSnapshot(archiveId: string) {
   if (archive.snapshotStatus !== "archived") return undefined;
   const { url } = await storageGet(archive.snapshotKey);
   const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) throw new Error("Archived report snapshot could not be fetched.");
-  const plain = decryptArchiveBytes(Buffer.from(await response.arrayBuffer()), { archiveId: archive.archiveId, sessionId: archive.sessionId, reportRevision: archive.reportRevision, kind: "snapshot" });
-  if (sha256(plain) !== archive.snapshotSha256) throw new Error("Archived report snapshot integrity check failed.");
-  return { archive, snapshot: JSON.parse(plain.toString("utf8")) as EventReportSnapshot };
+  if (!response.ok)
+    throw new Error("Archived report snapshot could not be fetched.");
+  const plain = decryptArchiveBytes(Buffer.from(await response.arrayBuffer()), {
+    archiveId: archive.archiveId,
+    sessionId: archive.sessionId,
+    reportRevision: archive.reportRevision,
+    kind: "snapshot",
+  });
+  if (sha256(plain) !== archive.snapshotSha256)
+    throw new Error("Archived report snapshot integrity check failed.");
+  return {
+    archive,
+    snapshot: JSON.parse(plain.toString("utf8")) as EventReportSnapshot,
+  };
 }
 
 /** Retries only the encrypted DTO saved at approval; it never rereads visit data. */
 export async function retryArchivedReportSnapshot(archiveId: string) {
   const db = await database();
-  const [archive] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.archiveId, archiveId)).limit(1);
-  if (!archive) throw new Error("Archived report was not found.");
-  if (archive.snapshotStatus === "archived") return archive;
-  if (!archive.snapshotPayload) throw new Error("The immutable snapshot payload is unavailable.");
-  try {
-    await storagePut(archive.snapshotKey, Buffer.from(archive.snapshotPayload, "base64"), "application/octet-stream");
-    await db.update(eventReportArchives).set({ snapshotStatus: "archived", lastError: null }).where(eq(eventReportArchives.id, archive.id));
-  } catch {
-    await db.update(eventReportArchives).set({ snapshotStatus: "failed", lastError: "snapshot-storage-failed" }).where(eq(eventReportArchives.id, archive.id));
-  }
-  const [updated] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, archive.id)).limit(1);
-  return updated!;
-}
-
-export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Array, expected: { archiveId: string; reportRevision: number; snapshotSha256: string }): Promise<StoredParticipantReportPdf> {
-  const bytes = Buffer.from(pdf);
-  if (!bytes.length || bytes.length > EVENT_REPORT_ARCHIVE_MAX_PDF_BYTES || !bytes.subarray(0, 5).equals(Buffer.from("%PDF-")))
-    throw new Error("Invalid final report PDF.");
-  const db = await database();
-  const [approvedCare] = await db.select().from(eventCare)
-    .where(eq(eventCare.sessionId, sessionId)).limit(1);
-  if (!approvedCare?.approvedAt || approvedCare.revision !== expected.reportRevision)
-    throw new Error("The prepared report is stale; prepare the current final report again.");
   const [archive] = await db
     .select()
     .from(eventReportArchives)
-    .where(and(eq(eventReportArchives.sessionId, sessionId), eq(eventReportArchives.archiveId, expected.archiveId), eq(eventReportArchives.reportRevision, expected.reportRevision), eq(eventReportArchives.snapshotSha256, expected.snapshotSha256)))
+    .where(eq(eventReportArchives.archiveId, archiveId))
     .limit(1);
-  if (!archive) throw new Error("The prepared report is stale; prepare the current final report again.");
-  if (!archive.originEligible) throw new Error("This historical report has no original PDF capture.");
-  if (archive.pdfStatus === "archived") return { ...archive, pdfArchivedNow: false };
-  if (archive.pdfStatus === "uploading" && !isPdfClaimLeaseExpired(archive.pdfLeaseExpiresAt)) return { ...archive, pdfArchivedNow: false };
+  if (!archive) throw new Error("Archived report was not found.");
+  if (archive.snapshotStatus === "archived") return archive;
+  if (!archive.snapshotPayload)
+    throw new Error("The immutable snapshot payload is unavailable.");
+  try {
+    await storagePut(
+      archive.snapshotKey,
+      Buffer.from(archive.snapshotPayload, "base64"),
+      "application/octet-stream"
+    );
+    await db
+      .update(eventReportArchives)
+      .set({ snapshotStatus: "archived", lastError: null })
+      .where(eq(eventReportArchives.id, archive.id));
+  } catch {
+    await db
+      .update(eventReportArchives)
+      .set({ snapshotStatus: "failed", lastError: "snapshot-storage-failed" })
+      .where(eq(eventReportArchives.id, archive.id));
+  }
+  const [updated] = await db
+    .select()
+    .from(eventReportArchives)
+    .where(eq(eventReportArchives.id, archive.id))
+    .limit(1);
+  return updated!;
+}
+
+export async function storeParticipantReportPdf(
+  sessionId: number,
+  pdf: Uint8Array,
+  expected: {
+    archiveId: string;
+    reportRevision: number;
+    snapshotSha256: string;
+  }
+): Promise<StoredParticipantReportPdf> {
+  const bytes = Buffer.from(pdf);
+  if (
+    !bytes.length ||
+    bytes.length > EVENT_REPORT_ARCHIVE_MAX_PDF_BYTES ||
+    !bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))
+  )
+    throw new Error("Invalid final report PDF.");
+  const db = await database();
+  const [approvedCare] = await db
+    .select()
+    .from(eventCare)
+    .where(eq(eventCare.sessionId, sessionId))
+    .limit(1);
+  if (
+    !approvedCare?.approvedAt ||
+    approvedCare.revision !== expected.reportRevision
+  )
+    throw new Error(
+      "The prepared report is stale; prepare the current final report again."
+    );
+  const [archive] = await db
+    .select()
+    .from(eventReportArchives)
+    .where(
+      and(
+        eq(eventReportArchives.sessionId, sessionId),
+        eq(eventReportArchives.archiveId, expected.archiveId),
+        eq(eventReportArchives.reportRevision, expected.reportRevision),
+        eq(eventReportArchives.snapshotSha256, expected.snapshotSha256)
+      )
+    )
+    .limit(1);
+  if (!archive)
+    throw new Error(
+      "The prepared report is stale; prepare the current final report again."
+    );
+  if (!archive.originEligible)
+    throw new Error("This historical report has no original PDF capture.");
+  if (archive.pdfStatus === "archived")
+    return { ...archive, pdfArchivedNow: false };
+  if (
+    archive.pdfStatus === "uploading" &&
+    !isPdfClaimLeaseExpired(archive.pdfLeaseExpiresAt)
+  )
+    return { ...archive, pdfArchivedNow: false };
 
   const key = `private/event-report-archive/v1/${crypto.randomUUID()}.bin`;
   const hash = sha256(bytes);
   const claimToken = crypto.randomUUID();
   const now = new Date();
-  const leaseExpiresAt = new Date(now.getTime() + EVENT_REPORT_PDF_CLAIM_LEASE_MS);
+  const leaseExpiresAt = new Date(
+    now.getTime() + EVENT_REPORT_PDF_CLAIM_LEASE_MS
+  );
   // Claim the archive row before writing object storage. The unique temporary
   // key lets a concurrent upload prove it owns this capture, rather than
   // allowing two browser retries to race and create multiple originals.
@@ -367,18 +566,32 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       pdfLeaseExpiresAt: leaseExpiresAt,
       lastError: null,
     })
-    .where(and(
-      eq(eventReportArchives.id, archive.id),
-      or(
-        sql`${eventReportArchives.pdfStatus} in ('pending', 'failed')`,
-        and(
-          eq(eventReportArchives.pdfStatus, "uploading"),
-          or(isNull(eventReportArchives.pdfLeaseExpiresAt), lte(eventReportArchives.pdfLeaseExpiresAt, now))
+    .where(
+      and(
+        eq(eventReportArchives.id, archive.id),
+        or(
+          sql`${eventReportArchives.pdfStatus} in ('pending', 'failed')`,
+          and(
+            eq(eventReportArchives.pdfStatus, "uploading"),
+            or(
+              isNull(eventReportArchives.pdfLeaseExpiresAt),
+              lte(eventReportArchives.pdfLeaseExpiresAt, now)
+            )
+          )
         )
       )
-    ));
-  const [claimed] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, archive.id)).limit(1);
-  if (!claimed || claimed.pdfClaimToken !== claimToken || claimed.pdfKey !== key || claimed.pdfStatus !== "uploading")
+    );
+  const [claimed] = await db
+    .select()
+    .from(eventReportArchives)
+    .where(eq(eventReportArchives.id, archive.id))
+    .limit(1);
+  if (
+    !claimed ||
+    claimed.pdfClaimToken !== claimToken ||
+    claimed.pdfKey !== key ||
+    claimed.pdfStatus !== "uploading"
+  )
     return { ...(claimed ?? archive), pdfArchivedNow: false };
   try {
     await storagePut(
@@ -392,9 +605,25 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       "application/octet-stream"
     );
   } catch {
-    await db.update(eventReportArchives).set({ pdfStatus: "failed", pdfClaimToken: null, pdfLeaseExpiresAt: null, lastError: "pdf-storage-failed" })
-      .where(and(eq(eventReportArchives.id, archive.id), eq(eventReportArchives.pdfKey, key), eq(eventReportArchives.pdfClaimToken, claimToken), eq(eventReportArchives.pdfStatus, "uploading")));
-    throw new Error("The original PDF could not be stored. Retry the same prepared file.");
+    await db
+      .update(eventReportArchives)
+      .set({
+        pdfStatus: "failed",
+        pdfClaimToken: null,
+        pdfLeaseExpiresAt: null,
+        lastError: "pdf-storage-failed",
+      })
+      .where(
+        and(
+          eq(eventReportArchives.id, archive.id),
+          eq(eventReportArchives.pdfKey, key),
+          eq(eventReportArchives.pdfClaimToken, claimToken),
+          eq(eventReportArchives.pdfStatus, "uploading")
+        )
+      );
+    throw new Error(
+      "The original PDF could not be stored. Retry the same prepared file."
+    );
   }
   const finalization = await db
     .update(eventReportArchives)
@@ -405,30 +634,49 @@ export async function storeParticipantReportPdf(sessionId: number, pdf: Uint8Arr
       pdfLeaseExpiresAt: null,
       lastError: null,
     })
-    .where(and(
-      eq(eventReportArchives.id, archive.id),
-      eq(eventReportArchives.pdfKey, key),
-      eq(eventReportArchives.pdfClaimToken, claimToken),
-      eq(eventReportArchives.pdfStatus, "uploading"),
-      gte(eventReportArchives.pdfLeaseExpiresAt, new Date())
-    ));
-  const [saved] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.id, archive.id)).limit(1);
+    .where(
+      and(
+        eq(eventReportArchives.id, archive.id),
+        eq(eventReportArchives.pdfKey, key),
+        eq(eventReportArchives.pdfClaimToken, claimToken),
+        eq(eventReportArchives.pdfStatus, "uploading"),
+        gte(eventReportArchives.pdfLeaseExpiresAt, new Date())
+      )
+    );
+  const [saved] = await db
+    .select()
+    .from(eventReportArchives)
+    .where(eq(eventReportArchives.id, archive.id))
+    .limit(1);
   const rowsFinalized = affectedRows(finalization);
   return {
     ...saved!,
     // In production the update result proves this claim completed the state
     // transition. Minimal test doubles may omit an affected-row header.
-    pdfArchivedNow: saved?.pdfStatus === "archived" && (rowsFinalized === undefined || rowsFinalized > 0),
+    pdfArchivedNow:
+      saved?.pdfStatus === "archived" &&
+      (rowsFinalized === undefined || rowsFinalized > 0),
   };
 }
 
 export async function readArchivedReportPdf(archiveId: string) {
   const db = await database();
-  const [archive] = await db.select().from(eventReportArchives).where(eq(eventReportArchives.archiveId, archiveId)).limit(1);
-  if (!archive || archive.pdfStatus !== "archived" || !archive.pdfKey || !archive.pdfSha256) return undefined;
+  const [archive] = await db
+    .select()
+    .from(eventReportArchives)
+    .where(eq(eventReportArchives.archiveId, archiveId))
+    .limit(1);
+  if (
+    !archive ||
+    archive.pdfStatus !== "archived" ||
+    !archive.pdfKey ||
+    !archive.pdfSha256
+  )
+    return undefined;
   const { url } = await storageGet(archive.pdfKey);
   const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) throw new Error("Archived report PDF could not be fetched.");
+  if (!response.ok)
+    throw new Error("Archived report PDF could not be fetched.");
   const bytes = Buffer.from(await response.arrayBuffer());
   const plain = decryptArchiveBytes(bytes, {
     archiveId: archive.archiveId,
@@ -441,11 +689,24 @@ export async function readArchivedReportPdf(archiveId: string) {
   return { archive, pdf: plain };
 }
 
-export async function eventReportArchiveForSession(sessionId: number, reportRevision?: number) {
+export async function eventReportArchiveForSession(
+  sessionId: number,
+  reportRevision?: number
+) {
   const db = await database();
-  const [archive] = await db.select().from(eventReportArchives)
-    .where(and(eq(eventReportArchives.sessionId, sessionId), reportRevision === undefined ? undefined : eq(eventReportArchives.reportRevision, reportRevision)))
-    .orderBy(sql`${eventReportArchives.reportRevision} desc`).limit(1);
+  const [archive] = await db
+    .select()
+    .from(eventReportArchives)
+    .where(
+      and(
+        eq(eventReportArchives.sessionId, sessionId),
+        reportRevision === undefined
+          ? undefined
+          : eq(eventReportArchives.reportRevision, reportRevision)
+      )
+    )
+    .orderBy(sql`${eventReportArchives.reportRevision} desc`)
+    .limit(1);
   return archive;
 }
 
@@ -456,10 +717,15 @@ export async function eventReportArchiveForSession(sessionId: number, reportRevi
  * No delivery status is persisted here: that would require an explicitly approved
  * outbox outside the operational LIM schema.
  */
-export async function archivedReportPdfReconciliationPage(eventCode: string, afterId = 0, limit = 25) {
+export async function archivedReportPdfReconciliationPage(
+  eventCode: string,
+  afterId = 0,
+  limit = 25
+) {
   const db = await database();
   const scopedEventCode = eventCode.trim();
-  if (!scopedEventCode) throw new Error("A reconciliation event code is required.");
+  if (!scopedEventCode)
+    throw new Error("A reconciliation event code is required.");
   const boundedAfter = Math.max(0, Math.trunc(afterId) || 0);
   const boundedLimit = Math.max(1, Math.min(100, Math.trunc(limit) || 25));
   const rows = await db
@@ -473,11 +739,13 @@ export async function archivedReportPdfReconciliationPage(eventCode: string, aft
       pdfArchivedAt: eventReportArchives.pdfArchivedAt,
     })
     .from(eventReportArchives)
-    .where(and(
-      eq(eventReportArchives.eventCode, scopedEventCode),
-      eq(eventReportArchives.pdfStatus, "archived"),
-      gt(eventReportArchives.id, boundedAfter),
-    ))
+    .where(
+      and(
+        eq(eventReportArchives.eventCode, scopedEventCode),
+        eq(eventReportArchives.pdfStatus, "archived"),
+        gt(eventReportArchives.id, boundedAfter)
+      )
+    )
     .orderBy(eventReportArchives.id)
     .limit(boundedLimit + 1);
   const archives = rows.slice(0, boundedLimit);
@@ -490,7 +758,10 @@ export async function archivedReportPdfReconciliationPage(eventCode: string, aft
 export async function archiveSummary() {
   const db = await database();
   const rows = await db
-    .select({ pdfStatus: eventReportArchives.pdfStatus, count: sql<number>`count(*)` })
+    .select({
+      pdfStatus: eventReportArchives.pdfStatus,
+      count: sql<number>`count(*)`,
+    })
     .from(eventReportArchives)
     .groupBy(eventReportArchives.pdfStatus);
   return rows.reduce<Record<string, number>>((summary, row) => {

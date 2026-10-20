@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  buildAssessmentCompanion,
+  deliverAssessmentCompanion,
+} from "./assessmentCompanion";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -143,7 +147,19 @@ export async function sendPreparedResearchReport(
   const pdf = decodeResearchPdf(base64),
     meta = preparedResearchMetadata(context, pdf, reissued);
   try {
-    return await deliverResearchPdfBytes(meta, pdf);
+    const receipt = await deliverResearchPdfBytes(meta, pdf);
+    if (receipt.delivered) {
+      await deliverAssessmentCompanion(
+        buildAssessmentCompanion(context.snapshot, {
+          archiveId: meta.archiveId,
+          revision: meta.revision,
+          reportPdfSha256: meta.pdfSha256,
+          snapshotSha256: context.archive.snapshotSha256,
+        }),
+        context.snapshot.eventCode
+      );
+    }
+    return receipt;
   } catch {
     throw new TRPCError({
       code: "SERVICE_UNAVAILABLE",

@@ -1,6 +1,9 @@
 import * as otp from "./eventOtp";
 import { readFileSync } from "node:fs";
-vi.mock("./eventOtp", async importOriginal => ({ ...await importOriginal<typeof import("./eventOtp")>(), consumeEventOtp: vi.fn() }));
+vi.mock("./eventOtp", async importOriginal => ({
+  ...(await importOriginal<typeof import("./eventOtp")>()),
+  consumeEventOtp: vi.fn(),
+}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
@@ -8,18 +11,27 @@ import * as db from "./db";
 import { requireOpenEvent } from "./eventAdminDb";
 vi.mock("./eventAdminDb", () => ({ requireOpenEvent: vi.fn() }));
 import * as tracks from "./eventTracksDb";
-vi.mock("./eventTracksDb", () => ({ selectRegistrationTrack: vi.fn(), requireTrack: vi.fn(), listTracks: vi.fn() }));
+vi.mock("./eventTracksDb", () => ({
+  selectRegistrationTrack: vi.fn(),
+  requireTrack: vi.fn(),
+  listTracks: vi.fn(),
+}));
 import { createCareSnapshot, readCare } from "./eventCareDb";
-vi.mock("./eventCareDb", () => ({ readCare: vi.fn(), createCareSnapshot: vi.fn() }));
+vi.mock("./eventCareDb", () => ({
+  readCare: vi.fn(),
+  createCareSnapshot: vi.fn(),
+}));
 import { storeParticipantReportPdf } from "./eventReportArchive";
 vi.mock("./eventReportArchive", async importOriginal => ({
-  ...await importOriginal<typeof import("./eventReportArchive")>(),
+  ...(await importOriginal<typeof import("./eventReportArchive")>()),
   storeParticipantReportPdf: vi.fn(),
 }));
 import { scheduleArchivedResearchPdfDelivery } from "./researchPdfDelivery";
-vi.mock("./researchPdfDelivery", () => ({ scheduleArchivedResearchPdfDelivery: vi.fn() }));
+vi.mock("./researchPdfDelivery", () => ({
+  scheduleArchivedResearchPdfDelivery: vi.fn(),
+}));
 
-vi.mock("./db", async (importOriginal) => {
+vi.mock("./db", async importOriginal => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
@@ -66,19 +78,63 @@ const eventSession = {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(otp.consumeEventOtp).mockResolvedValue(undefined);
-  vi.mocked(requireOpenEvent).mockResolvedValue({questionnaireIds:["lifestyle"],closed:0} as never);
-  vi.mocked(tracks.selectRegistrationTrack).mockResolvedValue({ id: 1, name: "المسار 1", eventCode: "lim-events", active: 1 });
-  vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: null } as never);
-  vi.mocked(createCareSnapshot).mockResolvedValue({ nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: null } as never);
+  vi.mocked(requireOpenEvent).mockResolvedValue({
+    questionnaireIds: ["lifestyle"],
+    closed: 0,
+  } as never);
+  vi.mocked(tracks.selectRegistrationTrack).mockResolvedValue({
+    id: 1,
+    name: "المسار 1",
+    eventCode: "lim-events",
+    active: 1,
+  });
+  vi.mocked(readCare).mockResolvedValue({
+    nursingEnabled: 0,
+    measurements: {},
+    consultationMode: "physician",
+    approvedAt: null,
+  } as never);
+  vi.mocked(createCareSnapshot).mockResolvedValue({
+    nursingEnabled: 0,
+    measurements: {},
+    consultationMode: "physician",
+    approvedAt: null,
+  } as never);
   mockedDb.getUserByPhone.mockResolvedValue({
-    id: 42, openId: "phone:+966501234567", name: "Event Participant", phone: "+966501234567", email: null,
-    loginMethod: "machine_phone_pending", passwordHash: null, role: "user", adminType: null, specialty: null, bio: null,
-    gender: null, birthDate: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
+    id: 42,
+    openId: "phone:+966501234567",
+    name: "Event Participant",
+    phone: "+966501234567",
+    email: null,
+    loginMethod: "machine_phone_pending",
+    passwordHash: null,
+    role: "user",
+    adminType: null,
+    specialty: null,
+    bio: null,
+    gender: null,
+    birthDate: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
   });
   mockedDb.getUserById.mockResolvedValue({
-    id: 42, openId: "phone:+966501234567", name: "Event Participant", phone: "+966501234567", email: null,
-    loginMethod: "machine_phone_pending", passwordHash: null, role: "user", adminType: null, specialty: null, bio: null,
-    gender: null, birthDate: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(),
+    id: 42,
+    openId: "phone:+966501234567",
+    name: "Event Participant",
+    phone: "+966501234567",
+    email: null,
+    loginMethod: "machine_phone_pending",
+    passwordHash: null,
+    role: "user",
+    adminType: null,
+    specialty: null,
+    bio: null,
+    gender: null,
+    birthDate: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
   });
 });
 
@@ -89,86 +145,157 @@ describe("standalone events.createSession", () => {
     vi.stubEnv("OURSMS_SENDER_ID", "LIM");
     vi.stubEnv("EVENTS_OTP_SECRET", "test-only-secret-at-least-32-characters");
     try {
-      const actual = await vi.importActual<typeof import("./eventOtp")>("./eventOtp");
+      const actual =
+        await vi.importActual<typeof import("./eventOtp")>("./eventOtp");
       vi.mocked(otp.consumeEventOtp).mockImplementation(actual.consumeEventOtp);
-      await expect(appRouter.createCaller(anonymousContext).events.createSession({ age: 40, sex: "male", phone: "0501234567", consent: true, consentVersion: "events-service-2026-10-05" })).rejects.toThrow("رمز التحقق");
+      await expect(
+        appRouter
+          .createCaller(anonymousContext)
+          .events.createSession({
+            age: 40,
+            sex: "male",
+            phone: "0501234567",
+            consent: true,
+            consentVersion: "events-service-2026-10-05",
+          })
+      ).rejects.toThrow("رمز التحقق");
       expect(mockedDb.getUserByPhone).not.toHaveBeenCalled();
       expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
-    } finally { vi.unstubAllEnvs(); }
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("creates a browser-owned event session and returns the Saudi mobile QR value without main-app authentication", async () => {
     mockedDb.createEventParticipantSession.mockResolvedValue(eventSession);
     const caller = appRouter.createCaller(anonymousContext);
     const result = await caller.events.createSession({
-      firstName: "Event Participant", age: 30, sex: "male", phone: "0501234567", city: "Jeddah", consent: true, consentVersion: "events-service-2026-10-05",
+      firstName: "Event Participant",
+      age: 30,
+      sex: "male",
+      phone: "0501234567",
+      city: "Jeddah",
+      consent: true,
+      consentVersion: "events-service-2026-10-05",
     });
 
     expect(result.accessToken.length).toBeGreaterThanOrEqual(32);
     expect(result.deviceUserId).toBe("0501234567");
-    expect(mockedDb.createEventParticipantSession).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 42,
-      accessTokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-      consent: "true",
-      consentVersion: "events-service-2026-10-05",
-      consentedAt: expect.any(Date),
-    }));
+    expect(mockedDb.createEventParticipantSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 42,
+        accessTokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        consent: "true",
+        consentVersion: "events-service-2026-10-05",
+        consentedAt: expect.any(Date),
+      })
+    );
     expect(createCareSnapshot).toHaveBeenCalledWith(eventSession.id);
   });
 
   it("rejects a stale consent text version instead of recording ambiguous consent", async () => {
     const caller = appRouter.createCaller(anonymousContext);
-    await expect(caller.events.createSession({
-      age: 30,
-      sex: "male",
-      phone: "0501234567",
-      consent: true,
-      consentVersion: "old-version" as "events-service-2026-10-05",
-    })).rejects.toThrow();
+    await expect(
+      caller.events.createSession({
+        age: 30,
+        sex: "male",
+        phone: "0501234567",
+        consent: true,
+        consentVersion: "old-version" as "events-service-2026-10-05",
+      })
+    ).rejects.toThrow();
     expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
   });
 
   it("does not create a participant or visit after the event is closed", async () => {
     vi.mocked(requireOpenEvent).mockRejectedValue(new Error("انتهى التسجيل"));
-    const caller=appRouter.createCaller(anonymousContext);
-    await expect(caller.events.createSession({age:30,sex:"male",phone:"0501234567",consent:true,consentVersion:"events-service-2026-10-05"})).rejects.toThrow("انتهى التسجيل");
+    const caller = appRouter.createCaller(anonymousContext);
+    await expect(
+      caller.events.createSession({
+        age: 30,
+        sex: "male",
+        phone: "0501234567",
+        consent: true,
+        consentVersion: "events-service-2026-10-05",
+      })
+    ).rejects.toThrow("انتهى التسجيل");
     expect(mockedDb.createMachinePhoneUser).not.toHaveBeenCalled();
     expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
   });
   it("snapshots an empty questionnaire selection for a new visit", async () => {
-    vi.mocked(requireOpenEvent).mockResolvedValue({questionnaireIds:[],closed:0} as never);
-    mockedDb.createEventParticipantSession.mockResolvedValue({...eventSession,questionnaireIds:[]});
-    await appRouter.createCaller(anonymousContext).events.createSession({age:30,sex:"male",phone:"0501234567",consent:true,consentVersion:"events-service-2026-10-05"});
-    expect(mockedDb.createEventParticipantSession).toHaveBeenCalledWith(expect.objectContaining({questionnaireIds:[]}));
+    vi.mocked(requireOpenEvent).mockResolvedValue({
+      questionnaireIds: [],
+      closed: 0,
+    } as never);
+    mockedDb.createEventParticipantSession.mockResolvedValue({
+      ...eventSession,
+      questionnaireIds: [],
+    });
+    await appRouter
+      .createCaller(anonymousContext)
+      .events.createSession({
+        age: 30,
+        sex: "male",
+        phone: "0501234567",
+        consent: true,
+        consentVersion: "events-service-2026-10-05",
+      });
+    expect(mockedDb.createEventParticipantSession).toHaveBeenCalledWith(
+      expect.objectContaining({ questionnaireIds: [] })
+    );
   });
   it("rejects invalid event phone numbers", async () => {
     const caller = appRouter.createCaller(anonymousContext);
-    await expect(caller.events.createSession({
-      age: 30, sex: "male", phone: "0123456789", consent: true, consentVersion: "events-service-2026-10-05",
-    })).rejects.toThrow("valid Saudi mobile");
+    await expect(
+      caller.events.createSession({
+        age: 30,
+        sex: "male",
+        phone: "0123456789",
+        consent: true,
+        consentVersion: "events-service-2026-10-05",
+      })
+    ).rejects.toThrow("valid Saudi mobile");
   });
 });
 
 describe("standalone Events questionnaire safeguards", () => {
   it("rejects answers for a visit snapshot configured without a questionnaire", async () => {
-    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({ ...eventSession, questionnaireIds: [] });
-    await expect(appRouter.createCaller(anonymousContext).events.saveLifestyle({ accessToken: "z".repeat(43), answers: {} }))
-      .rejects.toThrow("الاستبيان غير مفعّل");
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
+      ...eventSession,
+      questionnaireIds: [],
+    });
+    await expect(
+      appRouter
+        .createCaller(anonymousContext)
+        .events.saveLifestyle({ accessToken: "z".repeat(43), answers: {} })
+    ).rejects.toThrow("الاستبيان غير مفعّل");
     expect(mockedDb.saveEventLifestyleAnswers).not.toHaveBeenCalled();
   });
 
   it("freezes questionnaire changes after a completed report", async () => {
-    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
-    vi.mocked(readCare).mockResolvedValue({ nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: new Date() } as never);
-    await expect(appRouter.createCaller(anonymousContext).events.saveLifestyle({ accessToken: "z".repeat(43), answers: {} }))
-      .rejects.toThrow("لا يمكن تعديل الاستبيان");
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(
+      eventSession
+    );
+    vi.mocked(readCare).mockResolvedValue({
+      nursingEnabled: 0,
+      measurements: {},
+      consultationMode: "physician",
+      approvedAt: new Date(),
+    } as never);
+    await expect(
+      appRouter
+        .createCaller(anonymousContext)
+        .events.saveLifestyle({ accessToken: "z".repeat(43), answers: {} })
+    ).rejects.toThrow("لا يمكن تعديل الاستبيان");
     expect(mockedDb.saveEventLifestyleAnswers).not.toHaveBeenCalled();
   });
 });
 
 describe("standalone events results", () => {
   it("does not expose prior LIM measurements to a fresh event journey", async () => {
-    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(eventSession);
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(
+      eventSession
+    );
     const caller = appRouter.createCaller(anonymousContext);
     const result = await caller.events.results({ accessToken: "z".repeat(43) });
     expect(result.readings).toEqual([]);
@@ -182,7 +309,13 @@ describe("standalone events results", () => {
       latestRecordNo: "EVENT-RECORD-1",
     });
     mockedDb.getEventReadingByRecordNo.mockResolvedValue([
-      { id: 1, userId: 42, source: "x18", recordNo: "EVENT-RECORD-1", machineMetrics: { fatRate: "22.1" } },
+      {
+        id: 1,
+        userId: 42,
+        source: "x18",
+        recordNo: "EVENT-RECORD-1",
+        machineMetrics: { fatRate: "22.1" },
+      },
     ] as never);
 
     const caller = appRouter.createCaller(anonymousContext);
@@ -190,23 +323,42 @@ describe("standalone events results", () => {
 
     expect(result.readings).toHaveLength(1);
     expect(result.readings[0].id).toBe(1);
-    expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(42, "EVENT-RECORD-1");
+    expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(
+      42,
+      "EVENT-RECORD-1"
+    );
   });
 
   it("uses the exact approved reading rather than a newer session record", async () => {
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
-      ...eventSession, status: "measured", latestRecordNo: "NEWER-X18-2",
+      ...eventSession,
+      status: "measured",
+      latestRecordNo: "NEWER-X18-2",
     });
     vi.mocked(readCare).mockResolvedValue({
-      nursingEnabled: 0, measurements: {}, consultationMode: "physician", approvedAt: new Date(), approvedRecordNo: "REVIEWED-X18-1",
+      nursingEnabled: 0,
+      measurements: {},
+      consultationMode: "physician",
+      approvedAt: new Date(),
+      approvedRecordNo: "REVIEWED-X18-1",
     } as never);
-    mockedDb.getEventReadingByRecordNo.mockResolvedValue([{ id: 1, userId: 42, recordNo: "REVIEWED-X18-1" }] as never);
-    await appRouter.createCaller(anonymousContext).events.results({ accessToken: "z".repeat(43) });
-    expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(42, "REVIEWED-X18-1");
+    mockedDb.getEventReadingByRecordNo.mockResolvedValue([
+      { id: 1, userId: 42, recordNo: "REVIEWED-X18-1" },
+    ] as never);
+    await appRouter
+      .createCaller(anonymousContext)
+      .events.results({ accessToken: "z".repeat(43) });
+    expect(mockedDb.getEventReadingByRecordNo).toHaveBeenCalledWith(
+      42,
+      "REVIEWED-X18-1"
+    );
   });
 
   it("does not expose a synthetic Events measurement generation procedure", () => {
-    const source = readFileSync(new URL("./routers/events.ts", import.meta.url), "utf8");
+    const source = readFileSync(
+      new URL("./routers/events.ts", import.meta.url),
+      "utf8"
+    );
     expect(source).not.toContain("generateTestMeasurement");
     expect(source).not.toContain("EVENTS_TEST");
   });
@@ -214,24 +366,36 @@ describe("standalone events results", () => {
   it("rejects a missing or unknown event token", async () => {
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(undefined);
     const caller = appRouter.createCaller(anonymousContext);
-    await expect(caller.events.results({ accessToken: "x".repeat(43) })).rejects.toThrow("event session");
+    await expect(
+      caller.events.results({ accessToken: "x".repeat(43) })
+    ).rejects.toThrow("event session");
   });
 });
 
 describe("standalone Events completion milestones", () => {
   it("moves from an associated measurement through consultation then final report", async () => {
-    const measuredSession = { ...eventSession, status: "measured" as const, latestRecordNo: "EVENT-RECORD-1" };
+    const measuredSession = {
+      ...eventSession,
+      status: "measured" as const,
+      latestRecordNo: "EVENT-RECORD-1",
+    };
     const consultationAt = new Date("2026-09-25T15:00:00Z");
-    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(measuredSession);
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(
+      measuredSession
+    );
     mockedDb.updateEventParticipantSession.mockResolvedValue({
       ...measuredSession,
       consultationCompletedAt: consultationAt,
     });
 
     const caller = appRouter.createCaller(anonymousContext);
-    await expect(caller.events.completeConsultation({ accessToken: "z".repeat(43) })).rejects.toThrow("يعتمد الطبيب");
+    await expect(
+      caller.events.completeConsultation({ accessToken: "z".repeat(43) })
+    ).rejects.toThrow("يعتمد الطبيب");
     expect(mockedDb.updateEventParticipantSession).not.toHaveBeenCalled();
-    vi.mocked(readCare).mockResolvedValue({ approvedAt: consultationAt } as never);
+    vi.mocked(readCare).mockResolvedValue({
+      approvedAt: consultationAt,
+    } as never);
 
     mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue({
       ...measuredSession,
@@ -243,11 +407,13 @@ describe("standalone Events completion milestones", () => {
       consultationCompletedAt: consultationAt,
       reportCompletedAt: reportAt,
     });
-    const report = await caller.events.completeReport({ accessToken: "z".repeat(43) });
+    const report = await caller.events.completeReport({
+      accessToken: "z".repeat(43),
+    });
     expect(report.success).toBe(true);
     expect(mockedDb.updateEventParticipantSession).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ reportCompletedAt: expect.any(Date) }),
+      expect.objectContaining({ reportCompletedAt: expect.any(Date) })
     );
   });
 
@@ -258,15 +424,18 @@ describe("standalone Events completion milestones", () => {
       latestRecordNo: "EVENT-RECORD-1",
     });
     const caller = appRouter.createCaller(anonymousContext);
-    await expect(caller.events.completeReport({ accessToken: "z".repeat(43) }))
-      .rejects.toThrow("Complete the consultation");
+    await expect(
+      caller.events.completeReport({ accessToken: "z".repeat(43) })
+    ).rejects.toThrow("Complete the consultation");
   });
 });
 
 describe("independent Research PDF handoff boundary", () => {
   const archiveId = "d3f3f6a0-70fe-49c1-8691-0fc7202c86fe";
   const snapshotSha256 = "a".repeat(64);
-  const encodedPdf = Buffer.from("%PDF-1.4\nsynthetic delivery fixture\n%%EOF").toString("base64");
+  const encodedPdf = Buffer.from(
+    "%PDF-1.4\nsynthetic delivery fixture\n%%EOF"
+  ).toString("base64");
   // In-memory only: never inserted into an operational database or exposed to a
   // researcher. This is the bounded QA event/participant used to exercise the
   // actual Events archivePdf router path.
@@ -280,11 +449,16 @@ describe("independent Research PDF handoff boundary", () => {
   };
 
   beforeEach(() => {
-    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(syntheticQaSession);
-    vi.mocked(readCare).mockResolvedValue({ approvedAt: new Date(), revision: 4 } as never);
+    mockedDb.getEventParticipantSessionByTokenHash.mockResolvedValue(
+      syntheticQaSession
+    );
+    vi.mocked(readCare).mockResolvedValue({
+      approvedAt: new Date(),
+      revision: 4,
+    } as never);
   });
 
-  it("keeps the archived participant response and exact PDF bytes when Research scheduling fails", async () => {
+  it("keeps exact archived PDF bytes and leaves Research to the separate prepared-byte handoff", async () => {
     vi.mocked(storeParticipantReportPdf).mockResolvedValue({
       archiveId,
       pdfStatus: "archived",
@@ -294,21 +468,23 @@ describe("independent Research PDF handoff boundary", () => {
       throw new Error("synthetic Research endpoint outage");
     });
 
-    const result = await appRouter.createCaller(anonymousContext).events.archivePdf({
-      accessToken: "z".repeat(43),
-      archiveId,
-      reportRevision: 4,
-      snapshotSha256,
-      pdfBase64: encodedPdf,
-    });
+    const result = await appRouter
+      .createCaller(anonymousContext)
+      .events.archivePdf({
+        accessToken: "z".repeat(43),
+        archiveId,
+        reportRevision: 4,
+        snapshotSha256,
+        pdfBase64: encodedPdf,
+      });
 
     expect(result).toEqual({ status: "archived" });
     expect(storeParticipantReportPdf).toHaveBeenCalledWith(
       syntheticQaSession.id,
       Buffer.from(encodedPdf, "base64"),
-      { archiveId, reportRevision: 4, snapshotSha256 },
+      { archiveId, reportRevision: 4, snapshotSha256 }
     );
-    expect(scheduleArchivedResearchPdfDelivery).toHaveBeenCalledWith(archiveId);
+    expect(scheduleArchivedResearchPdfDelivery).not.toHaveBeenCalled();
   });
 
   it("does not schedule Research before the original PDF is durably archived", async () => {
@@ -318,9 +494,15 @@ describe("independent Research PDF handoff boundary", () => {
       pdfArchivedNow: false,
     } as never);
 
-    await expect(appRouter.createCaller(anonymousContext).events.archivePdf({
-      accessToken: "z".repeat(43), archiveId, reportRevision: 4, snapshotSha256, pdfBase64: encodedPdf,
-    })).resolves.toEqual({ status: "uploading" });
+    await expect(
+      appRouter.createCaller(anonymousContext).events.archivePdf({
+        accessToken: "z".repeat(43),
+        archiveId,
+        reportRevision: 4,
+        snapshotSha256,
+        pdfBase64: encodedPdf,
+      })
+    ).resolves.toEqual({ status: "uploading" });
     expect(scheduleArchivedResearchPdfDelivery).not.toHaveBeenCalled();
   });
 
@@ -331,9 +513,15 @@ describe("independent Research PDF handoff boundary", () => {
       pdfArchivedNow: false,
     } as never);
 
-    await expect(appRouter.createCaller(anonymousContext).events.archivePdf({
-      accessToken: "z".repeat(43), archiveId, reportRevision: 4, snapshotSha256, pdfBase64: encodedPdf,
-    })).resolves.toEqual({ status: "archived" });
+    await expect(
+      appRouter.createCaller(anonymousContext).events.archivePdf({
+        accessToken: "z".repeat(43),
+        archiveId,
+        reportRevision: 4,
+        snapshotSha256,
+        pdfBase64: encodedPdf,
+      })
+    ).resolves.toEqual({ status: "archived" });
     expect(scheduleArchivedResearchPdfDelivery).not.toHaveBeenCalled();
   });
 });

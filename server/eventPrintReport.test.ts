@@ -30,11 +30,36 @@ it("prints the exact same eight measurements and both distributions, preserving 
       readings,
       participant,
       answers: {
-        importance: 5, confidence: 5, priority1: "nutrition", priority2: "activity", priority3: "sleep",
-        fruit: "5", vegetables: "5", wholeGrains: "5", refinedGrains: "2", preparedFood: "2", sugary: "2", salty: "2", fried: "2", proteins: ["legumes"],
-        sleepHours: "3", dayTired: "0", activeDays: 3, activeMinutes: 30, strengthDays: 2,
-        lowInterest: "0", lowMood: "0", notOnTop: "0", overwhelmed: "0", purpose: "3", support: "3",
-        tobacco: "3", alcohol: "3", medMisuse: "3", cannabis: "3", otherDrugs: "3",
+        importance: 5,
+        confidence: 5,
+        priority1: "nutrition",
+        priority2: "activity",
+        priority3: "sleep",
+        fruit: "5",
+        vegetables: "5",
+        wholeGrains: "5",
+        refinedGrains: "2",
+        preparedFood: "2",
+        sugary: "2",
+        salty: "2",
+        fried: "2",
+        proteins: ["legumes"],
+        sleepHours: "3",
+        dayTired: "0",
+        activeDays: 3,
+        activeMinutes: 30,
+        strengthDays: 2,
+        lowInterest: "0",
+        lowMood: "0",
+        notOnTop: "0",
+        overwhelmed: "0",
+        purpose: "3",
+        support: "3",
+        tobacco: "3",
+        alcohol: "3",
+        medMisuse: "3",
+        cannabis: "3",
+        otherDrugs: "3",
       },
       lifestyleEnabled: true,
       care: { advice, doctorName: "الطبيب", measurements: {} },
@@ -54,11 +79,15 @@ it("prints the exact same eight measurements and both distributions, preserving 
   expect(enabledPrint).toContain("SAME-RECORD");
   expect(enabledPrint).toContain('data-pdf-logical-page="questionnaire"');
   expect(enabledPrint).toContain('data-pdf-logical-page="body"');
-  expect(enabledPrint.indexOf("توصيات الطبيب")).toBeLessThan(enabledPrint.indexOf("نتائج استبيان نمط الحياة"));
-  expect(enabledPrint.indexOf("نتائج استبيان نمط الحياة")).toBeLessThan(enabledPrint.indexOf("نتائج تحليل الجسم"));
+  expect(enabledPrint.indexOf("توصيات الطبيب")).toBeLessThan(
+    enabledPrint.indexOf("نتائج استبيان نمط الحياة")
+  );
+  expect(enabledPrint.indexOf("نتائج استبيان نمط الحياة")).toBeLessThan(
+    enabledPrint.indexOf("نتائج تحليل الجسم")
+  );
   expect(enabledPrint).toContain("جوانب التحسين بناء على إجاباتك");
   expect(enabledPrint).toContain("نقاط القوة في نمط حياتك");
-  expect(enabledPrint).toContain("خطواتك الصحية القادمة");
+  expect(enabledPrint).not.toContain("خطواتك الصحية القادمة");
   expect(enabledPrint).toContain("data-lifestyle-improvement");
 
   const disabledPrint = renderToStaticMarkup(
@@ -67,10 +96,16 @@ it("prints the exact same eight measurements and both distributions, preserving 
       participant,
       answers: { fruit: "0" },
       lifestyleEnabled: false,
-      care: { advice: "توصية في أعلى صفحة تحليل الجسم", doctorName: "الطبيب", measurements: {} },
+      care: {
+        advice: "توصية في أعلى صفحة تحليل الجسم",
+        doctorName: "الطبيب",
+        measurements: {},
+      },
     })
   );
   expect(disabledPrint.match(/data-pdf-logical-page/g)).toHaveLength(1);
   expect(disabledPrint).not.toContain("نتائج استبيان نمط الحياة");
-  expect(disabledPrint.indexOf("توصية في أعلى صفحة تحليل الجسم")).toBeLessThan(disabledPrint.indexOf("نتائج تحليل الجسم"));
+  expect(disabledPrint.indexOf("توصية في أعلى صفحة تحليل الجسم")).toBeLessThan(
+    disabledPrint.indexOf("نتائج تحليل الجسم")
+  );
 });
