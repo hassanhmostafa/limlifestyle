@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { createEventPdf } from "@/lib/eventPdf";
 
 function reportRoot(button: HTMLElement) {
-  return button.closest<HTMLElement>("[data-final-report]") ?? button.closest<HTMLElement>("[data-pdf-report]");
+  return (
+    button.closest<HTMLElement>("[data-final-report]") ??
+    button.closest<HTMLElement>("[data-pdf-report]")
+  );
 }
 function reportSignature(root: HTMLElement) {
   const printable = root.querySelector<HTMLElement>("[data-print-report]");
@@ -21,11 +24,24 @@ function saveFile(file: File) {
 }
 
 export default function EventPdfButton({
-  filename = "lim-report.pdf", shareable = false,
+  filename = "lim-report.pdf",
+  shareable = false,
   label = "تحميل التقرير للطباعة (PDF)",
   className = "rounded-xl bg-[#197f6f] px-5 py-3 font-bold text-white",
   onPreparedPdf,
-}: { filename?: string; shareable?: boolean; label?: string; className?: string; onPreparedPdf?: (file: File) => void | Promise<void> }) {
+  additionalFiles = [],
+  attachmentsPending = false,
+  onRetryAttachments,
+}: {
+  additionalFiles?: File[];
+  attachmentsPending?: boolean;
+  onRetryAttachments?: () => void;
+  filename?: string;
+  shareable?: boolean;
+  label?: string;
+  className?: string;
+  onPreparedPdf?: (file: File) => void | Promise<void>;
+}) {
   const wrapper = useRef<HTMLDivElement>(null);
   const preparedCallback = useRef(onPreparedPdf);
   preparedCallback.current = onPreparedPdf;
@@ -56,40 +72,69 @@ export default function EventPdfButton({
       timer = setTimeout(async () => {
         try {
           const pdf = await createEventPdf(root);
-          if (disposed || current !== revision || next !== reportSignature(root)) return;
-          const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
+          if (
+            disposed ||
+            current !== revision ||
+            next !== reportSignature(root)
+          )
+            return;
+          const file = new File([pdf.output("blob")], filename, {
+            type: "application/pdf",
+          });
           cached.current = { file, signature: next };
           // Non-blocking: sharing/downloading remains usable if archival storage
           // is temporarily unavailable. The next rendered report retries it.
-          void Promise.resolve(preparedCallback.current?.(file)).catch(() => {});
+          void Promise.resolve(preparedCallback.current?.(file)).catch(
+            () => {}
+          );
           setReady(true);
           setError("");
         } catch {
-          if (!disposed && current === revision) setError("تعذر تجهيز التقرير. أعد المحاولة.");
+          if (!disposed && current === revision)
+            setError("تعذر تجهيز التقرير. أعد المحاولة.");
         } finally {
           if (!disposed && current === revision) setPreparing(false);
         }
       }, 250);
     };
     const observer = new MutationObserver(schedule);
-    observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
     schedule();
-    return () => { disposed = true; revision++; clearTimeout(timer); observer.disconnect(); };
+    return () => {
+      disposed = true;
+      revision++;
+      clearTimeout(timer);
+      observer.disconnect();
+    };
   }, [filename, shareable, refresh]);
 
   const download = async () => {
     const root = wrapper.current && reportRoot(wrapper.current);
-    if (!root) { setError("تعذر العثور على التقرير"); return; }
+    if (!root) {
+      setError("تعذر العثور على التقرير");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      if (cached.current?.signature === reportSignature(root)) saveFile(cached.current.file);
+      if (cached.current?.signature === reportSignature(root))
+        saveFile(cached.current.file);
       else {
         const pdf = await createEventPdf(root);
-        saveFile(new File([pdf.output("blob")], filename, { type: "application/pdf" }));
+        saveFile(
+          new File([pdf.output("blob")], filename, { type: "application/pdf" })
+        );
       }
-    } catch { setError("تعذر تجهيز PDF. حاول مرة أخرى من Safari أو Chrome."); }
-    finally { setBusy(false); }
+    } catch {
+      setError("تعذر تجهيز PDF. حاول مرة أخرى من Safari أو Chrome.");
+    } finally {
+      setBusy(false);
+    }
   };
   const share = () => {
     const root = wrapper.current && reportRoot(wrapper.current);
@@ -99,40 +144,105 @@ export default function EventPdfButton({
       return;
     }
     setError("");
+    const files = [report.file, ...additionalFiles];
     let canShareFiles = false;
     try {
-      canShareFiles = Boolean(navigator.canShare?.({ files: [report.file] }));
+      canShareFiles = Boolean(navigator.canShare?.({ files }));
     } catch {
       canShareFiles = false;
     }
     if (!canShareFiles) {
       saveFile(report.file);
-      setError("تم تنزيل التقرير. أرفقه في محادثة واتساب التي تختارها.");
+      additionalFiles.forEach(saveFile);
+      setError(
+        files.length > 1
+          ? "تم تنزيل الملفين. أرفقهما في محادثة واتساب التي تختارها."
+          : "تم تنزيل التقرير. أرفقه في محادثة واتساب التي تختارها."
+      );
       return;
     }
     try {
       // Invoke directly during the click: iOS requires transient user activation.
-      const sharing = navigator.share({ files: [report.file], title: "تقرير ليم الصحي" });
+      const sharing = navigator.share({ files, title: "تقرير ليم الصحي" });
       setBusy(true);
-      Promise.resolve(sharing).catch(reason => {
-        if (!(reason instanceof Error && reason.name === "AbortError"))
-          setError("تعذرت المشاركة. حمّل التقرير وأرسله كمرفق في واتساب.");
-      }).finally(() => setBusy(false));
+      Promise.resolve(sharing)
+        .catch(reason => {
+          if (!(reason instanceof Error && reason.name === "AbortError"))
+            setError("تعذرت المشاركة. حمّل التقرير وأرسله كمرفق في واتساب.");
+        })
+        .finally(() => setBusy(false));
     } catch {
       saveFile(report.file);
       setError("تعذرت المشاركة. تم تنزيل التقرير لإرساله كمرفق في واتساب.");
     }
   };
-  return <div ref={wrapper} data-pdf-hide className="print:hidden">
-    <button type="button" className={className} disabled={busy || preparing} onClick={download}>
-      {busy ? "جارٍ فتح التقرير…" : label}
-    </button>
-    {shareable && <button type="button" className={`${className} mt-3`} disabled={busy || preparing}
-      onClick={ready ? share : () => setRefresh(value => value + 1)}>
-      {preparing ? "جارٍ تجهيز التقرير…" : ready ? "مشاركة التقرير عبر واتساب" : "إعادة تجهيز التقرير"}
-    </button>}
-    {shareable && preparing && <p role="status" className="mt-2 text-xs text-slate-500">يُجهّز الملف تلقائيًا؛ بعد ذلك اضغط المشاركة واختر واتساب.</p>}
-    <p className="mt-2 text-xs text-slate-500">للطباعة: افتح ملف PDF، ثم اختر طباعة.</p>
-    {error && <p role="status" className="mt-2 text-sm text-red-700">{error}</p>}
-  </div>;
+  return (
+    <div ref={wrapper} data-pdf-hide className="print:hidden">
+      <button
+        type="button"
+        className={className}
+        disabled={busy || preparing}
+        onClick={download}
+      >
+        {busy ? "جارٍ فتح التقرير…" : label}
+      </button>
+      {shareable &&
+        additionalFiles.map(file => (
+          <button
+            key={file.name}
+            type="button"
+            className={`${className} mt-3`}
+            onClick={() => saveFile(file)}
+          >
+            تحميل إجابات الاستبيانات (PDF)
+          </button>
+        ))}
+      {shareable && onRetryAttachments && additionalFiles.length === 0 && (
+        <button
+          type="button"
+          className={`${className} mt-3`}
+          disabled={attachmentsPending}
+          onClick={onRetryAttachments}
+        >
+          {attachmentsPending
+            ? "جارٍ تجهيز ملف الإجابات…"
+            : "إعادة تجهيز ملف الإجابات"}
+        </button>
+      )}
+      {shareable && additionalFiles.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500">
+          التقرير وملف الإجابات يحملان معرّف الفحص نفسه، وتتم مشاركتهما معًا.
+        </p>
+      )}
+      {shareable && (
+        <button
+          type="button"
+          className={`${className} mt-3`}
+          disabled={busy || preparing}
+          onClick={ready ? share : () => setRefresh(value => value + 1)}
+        >
+          {preparing
+            ? "جارٍ تجهيز التقرير…"
+            : ready
+              ? additionalFiles.length > 0
+                ? "مشاركة الملفين عبر واتساب"
+                : "مشاركة التقرير عبر واتساب"
+              : "إعادة تجهيز التقرير"}
+        </button>
+      )}
+      {shareable && preparing && (
+        <p role="status" className="mt-2 text-xs text-slate-500">
+          يُجهّز الملف تلقائيًا؛ بعد ذلك اضغط المشاركة واختر واتساب.
+        </p>
+      )}
+      <p className="mt-2 text-xs text-slate-500">
+        للطباعة: افتح ملف PDF، ثم اختر طباعة.
+      </p>
+      {error && (
+        <p role="status" className="mt-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }

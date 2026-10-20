@@ -289,6 +289,33 @@ export default function Events() {
       refetchOnWindowFocus: false,
     }
   );
+  const answersPdf = trpc.events.questionnairePdf.useQuery(
+    {
+      accessToken: accessToken ?? "",
+      archiveId:
+        archiveView.data?.binding.archiveId ??
+        "00000000-0000-0000-0000-000000000000",
+      reportRevision: archiveView.data?.binding.reportRevision ?? 1,
+      snapshotSha256:
+        archiveView.data?.binding.snapshotSha256 ?? "0".repeat(64),
+    },
+    {
+      enabled: Boolean(
+        accessToken && screen === "report" && archiveView.data?.binding
+      ),
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const answerFiles = useMemo(() => {
+    if (!answersPdf.data) return [];
+    const bytes = Uint8Array.from(atob(answersPdf.data.pdfBase64), c =>
+      c.charCodeAt(0)
+    );
+    return [
+      new File([bytes], answersPdf.data.filename, { type: "application/pdf" }),
+    ];
+  }, [answersPdf.data]);
   const retryArchive = trpc.events.retryReportArchive.useMutation();
   const [archiveFile, setArchiveFile] = useState<File | null>(null);
   const [archiveMessage, setArchiveMessage] = useState("");
@@ -964,6 +991,9 @@ export default function Events() {
                 onFinish={() =>
                   completeReport.mutate({ accessToken: session.token })
                 }
+                answerFiles={answerFiles}
+                answersPending={answersPdf.isLoading}
+                onRetryAnswers={() => void answersPdf.refetch()}
                 onPreparedPdf={savePreparedArchive}
                 frozenLifestyleReport={frozen?.lifestyleReport ?? undefined}
                 filename={finalFilename}
@@ -1601,6 +1631,9 @@ function DeviceView({
 }
 
 function ReportView({
+  answerFiles,
+  answersPending,
+  onRetryAnswers,
   lifestyleEnabled,
   session,
   readings,
@@ -1616,6 +1649,9 @@ function ReportView({
   archiveRetryDisabled,
   pdfEnabled,
 }: {
+  answerFiles: File[];
+  answersPending: boolean;
+  onRetryAnswers: () => void;
   lifestyleEnabled: boolean;
   session: StoredSession;
   readings: DashboardReading[];
@@ -1684,6 +1720,9 @@ function ReportView({
           <EventPdfButton
             filename={filename ?? `LIM-Plegacy-V${session.code}-undated-r1.pdf`}
             shareable
+            additionalFiles={answerFiles}
+            attachmentsPending={answersPending}
+            onRetryAttachments={onRetryAnswers}
             onPreparedPdf={onPreparedPdf}
             className="min-h-14 w-full rounded-2xl bg-[#197f6f] p-4 font-bold text-white"
           />

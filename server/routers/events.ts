@@ -1,3 +1,7 @@
+import {
+  assessmentAnswersPdf,
+  buildAssessmentCompanion,
+} from "../assessmentCompanion";
 import { generateAutomaticRecommendationsForSession } from "../eventRecommendationEngine";
 import {
   EVENT_LIFESTYLE_VERSION,
@@ -46,6 +50,7 @@ import { researchPdfDeliveryConfig } from "../researchPdfDelivery";
 import {
   approvedResearchContext,
   researchPdfInput,
+  researchReportBinding,
   sendPreparedResearchReport,
 } from "../participantResearchDelivery";
 
@@ -463,6 +468,26 @@ export const eventsRouter = router({
           message: "تعذر حفظ نسخة التقرير المؤرشفة",
         });
       }
+    }),
+
+  questionnairePdf: publicProcedure
+    .input(eventTokenInput.merge(researchReportBinding))
+    .query(async ({ input }) => {
+      const session = await requireEventSession(input.accessToken);
+      const context = await approvedResearchContext(session.id, input);
+      const data = buildAssessmentCompanion(context.snapshot, {
+        archiveId: context.archive.archiveId,
+        revision: context.archive.reportRevision,
+        reportPdfSha256:
+          context.archive.pdfSha256 ?? context.archive.snapshotSha256,
+        snapshotSha256: context.archive.snapshotSha256,
+      });
+      const pdf = await assessmentAnswersPdf(data);
+      const filename = eventReportFilename(context.snapshot.metadata!).replace(
+        /\.pdf$/i,
+        "-answers.pdf"
+      );
+      return { filename, pdfBase64: pdf.toString("base64") };
     }),
 
   researchPdf: publicProcedure
