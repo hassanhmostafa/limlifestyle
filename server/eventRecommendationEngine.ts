@@ -45,6 +45,7 @@ export type MinimizedRecommendationInput = {
   answers: Record<string, string | number | string[]>;
   body: Record<string, number>;
   nursing: Record<string, Record<string, string | number>>;
+  age?: number;
 };
 
 function numeric(value: unknown) {
@@ -237,8 +238,17 @@ function stableFingerprint(value: unknown) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+export function bodySuggestionIds(input: MinimizedRecommendationInput) {
+  const age = input.age;
+  if (age !== undefined && age >= 65) return ["older-nutrition-review", "body-composition-context"];
+  if (age !== undefined && age >= 18 && input.body.bmi >= 25)
+    return ["body-aerobic", "body-resistance", "body-weight-plan", "body-composition-context"];
+  return ["body-composition-context"];
+}
+
 async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
-  const candidateIds = candidateSuggestionIds(input.answers);
+  const bodyIds = bodySuggestionIds(input);
+  const candidateIds = [...candidateSuggestionIds(input.answers), ...bodyIds];
   const catalog = candidateIds.map(id => {
     const entry = eventRecommendationById.get(id)!;
     return {
@@ -301,7 +311,10 @@ async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
     parsed.suggestionIds.some(id => typeof id !== "string" || !candidateIds.includes(id))
   )
     throw new Error("Recommendation selection did not satisfy the allowlist.");
-  return { model, ids: parsed.suggestionIds as string[] };
+  // Always retain applicable body advice, then fill remaining slots with the
+  // model's priorities; age-specific cards cannot be selected out of scope.
+  const bodyRequired = bodyIds.slice(0, 2);
+  return { model, ids: Array.from(new Set([...bodyRequired, ...parsed.suggestionIds as string[]])).slice(0, 4) };
 }
 
 async function readRecommendationSession(sessionId: number) {
@@ -336,6 +349,7 @@ async function buildMinimizedInput(sessionId: number) {
     answers: minimizeQuestionnaire(session.answers),
     body: minimizeBodyReading(latest),
     nursing: minimizeNursingMeasurements(care.measurements),
+    age: integerInRange(session.age, 18, 120),
   };
   if (!hasSubstantiveBodyCompositionResult(input.body))
     throw new Error("A completed body-composition result is required.");
@@ -367,6 +381,10 @@ function recommendationMeta(ids: string[], fingerprint: string, mode: EventConsu
     inputFingerprint: fingerprint,
     suggestionIds: chosen.map(item => item.id),
     sourceIds: Array.from(new Set(chosen.map(item => item.sourceId))),
+    sourceDetails: chosen.map(item => ({ suggestionId: item.id, sourceId: item.sourceId,
+      location: item.sourceLocation ?? "Foundations of Lifestyle Medicine Board Review, 4th ed.; relevant pillar chapter",
+      rationale: item.sourceSummary })),
+    smartSchedules: "Applied examples, not verbatim guideline doses",
   };
 }
 

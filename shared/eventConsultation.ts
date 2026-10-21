@@ -7,4 +7,4 @@ export function isEventConsultationMode(value: unknown): value is EventConsultat
 }
 
 export const EVENT_AUTOMATIC_RECOMMENDATION_MAX_ATTEMPTS = 2;
-export const EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION = "events-lifestyle-v1";
+export const EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION = "events-lifestyle-smart-bia-v2";

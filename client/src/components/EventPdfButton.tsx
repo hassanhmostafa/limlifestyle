@@ -31,10 +31,12 @@ export default function EventPdfButton({
   onPreparedPdf,
   additionalFiles = [],
   attachmentsPending = false,
+  attachmentsExpected = false,
   onRetryAttachments,
 }: {
   additionalFiles?: File[];
   attachmentsPending?: boolean;
+  attachmentsExpected?: boolean;
   onRetryAttachments?: () => void;
   filename?: string;
   shareable?: boolean;
@@ -137,6 +139,10 @@ export default function EventPdfButton({
     }
   };
   const share = () => {
+    if (attachmentsExpected && (attachmentsPending || additionalFiles.length === 0)) {
+      onRetryAttachments?.();
+      return;
+    }
     const root = wrapper.current && reportRoot(wrapper.current);
     const report = cached.current;
     if (!root || !report || report.signature !== reportSignature(root)) {
@@ -167,46 +173,26 @@ export default function EventPdfButton({
       setBusy(true);
       Promise.resolve(sharing)
         .catch(reason => {
-          if (!(reason instanceof Error && reason.name === "AbortError"))
-            setError("تعذرت المشاركة. حمّل التقرير وأرسله كمرفق في واتساب.");
+          if (!(reason instanceof Error && reason.name === "AbortError")) {
+            files.forEach(saveFile);
+            setError(files.length > 1
+              ? "تعذرت المشاركة المباشرة؛ تم تنزيل الملفين لإرفاقهما في واتساب."
+              : "تعذرت المشاركة المباشرة؛ تم تنزيل التقرير لإرفاقه في واتساب.");
+          }
         })
         .finally(() => setBusy(false));
     } catch {
-      saveFile(report.file);
-      setError("تعذرت المشاركة. تم تنزيل التقرير لإرساله كمرفق في واتساب.");
+      files.forEach(saveFile);
+      setError(files.length > 1
+        ? "تم تنزيل الملفين. أرفقهما في محادثة واتساب التي تختارها."
+        : "تم تنزيل التقرير. أرفقه في محادثة واتساب التي تختارها.");
     }
   };
   return (
     <div ref={wrapper} data-pdf-hide className="print:hidden">
-      <button
-        type="button"
-        className={className}
-        disabled={busy || preparing}
-        onClick={download}
-      >
-        {busy ? "جارٍ فتح التقرير…" : label}
-      </button>
-      {shareable &&
-        additionalFiles.map(file => (
-          <button
-            key={file.name}
-            type="button"
-            className={`${className} mt-3`}
-            onClick={() => saveFile(file)}
-          >
-            تحميل إجابات الاستبيانات (PDF)
-          </button>
-        ))}
-      {shareable && onRetryAttachments && additionalFiles.length === 0 && (
-        <button
-          type="button"
-          className={`${className} mt-3`}
-          disabled={attachmentsPending}
-          onClick={onRetryAttachments}
-        >
-          {attachmentsPending
-            ? "جارٍ تجهيز ملف الإجابات…"
-            : "إعادة تجهيز ملف الإجابات"}
+      {!shareable && (
+        <button type="button" className={className} disabled={busy || preparing} onClick={download}>
+          {busy ? "جارٍ فتح التقرير…" : label}
         </button>
       )}
       {shareable && additionalFiles.length > 0 && (
@@ -218,16 +204,18 @@ export default function EventPdfButton({
         <button
           type="button"
           className={`${className} mt-3`}
-          disabled={busy || preparing}
+          disabled={busy || preparing || (attachmentsExpected && attachmentsPending)}
           onClick={ready ? share : () => setRefresh(value => value + 1)}
         >
           {preparing
             ? "جارٍ تجهيز التقرير…"
-            : ready
-              ? additionalFiles.length > 0
-                ? "مشاركة الملفين عبر واتساب"
-                : "مشاركة التقرير عبر واتساب"
-              : "إعادة تجهيز التقرير"}
+            : attachmentsExpected && attachmentsPending
+              ? "جارٍ تجهيز الاستبيان…"
+              : attachmentsExpected && additionalFiles.length === 0
+                ? "إعادة تجهيز التقرير + الاستبيان للمشاركة"
+                : ready
+                  ? "مشاركة التقرير + الاستبيان عبر الواتساب"
+                  : "إعادة تجهيز التقرير"}
         </button>
       )}
       {shareable && preparing && (
@@ -235,9 +223,7 @@ export default function EventPdfButton({
           يُجهّز الملف تلقائيًا؛ بعد ذلك اضغط المشاركة واختر واتساب.
         </p>
       )}
-      <p className="mt-2 text-xs text-slate-500">
-        للطباعة: افتح ملف PDF، ثم اختر طباعة.
-      </p>
+
       {error && (
         <p role="status" className="mt-2 text-sm text-red-700">
           {error}

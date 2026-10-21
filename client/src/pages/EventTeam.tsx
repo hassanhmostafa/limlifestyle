@@ -1,3 +1,4 @@
+import { recommendationReviewSources } from "../../../shared/eventRecommendationCatalog";
 import EventLifestyleCharts from "@/components/EventLifestyleCharts";
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -545,6 +546,20 @@ export default function EventTeam() {
                         onChange={e => { setAdvice(e.target.value); setAdviceDirty(true); }}
                       />
                     </label>
+                    {recommendationReviewSources(care.recommendationMeta?.suggestionIds).length > 0 && (
+                      <details className="rounded-xl border border-slate-200 bg-white p-3 text-sm" dir="rtl">
+                        <summary className="cursor-pointer font-bold">مراجع المسودة وأسباب الاختيار</summary>
+                        <p className="mt-2">مواعيد البداية والتدرج صياغة SMART تطبيقية قابلة للتعديل، وليست جرعات منقولة حرفيًا. راجع الملاءمة السريرية قبل الاعتماد.</p>
+                        {recommendationReviewSources(care.recommendationMeta?.suggestionIds).map(source => (
+                          <div key={source.id} className="mt-3 border-t pt-2">
+                            <p className="font-bold">{source.label}</p>
+                            <p>{source.title}</p>
+                            {source.location && <p>{source.location}</p>}
+                            <p>{source.rationale}</p>
+                          </div>
+                        ))}
+                      </details>
+                    )}
                     {!care.approvedAt && (
                       <div className="flex gap-3">
                         <button

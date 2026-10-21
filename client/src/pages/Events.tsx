@@ -1722,7 +1722,8 @@ function ReportView({
           <EventPdfButton
             filename={filename ?? `LIM-Plegacy-V${session.code}-undated-r1.pdf`}
             shareable
-            additionalFiles={answerFiles}
+            additionalFiles={lifestyleEnabled ? answerFiles : []}
+            attachmentsExpected={lifestyleEnabled}
             attachmentsPending={answersPending}
             onRetryAttachments={onRetryAnswers}
             onPreparedPdf={onPreparedPdf}
