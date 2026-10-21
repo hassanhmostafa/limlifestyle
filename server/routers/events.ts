@@ -232,6 +232,7 @@ export const eventsRouter = router({
         latestRecordNo: session.latestRecordNo,
         consultationCompletedAt: session.consultationCompletedAt,
         reportCompletedAt: session.reportCompletedAt,
+        phone: user?.phone ?? null,
         deviceUserId: user?.phone ? toMachineUserId(user.phone) : null,
       };
     }),

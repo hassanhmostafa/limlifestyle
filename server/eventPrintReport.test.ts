@@ -20,7 +20,7 @@ it("prints the exact same eight measurements and both distributions, preserving 
       },
     },
   ];
-  const participant = { firstName: "اختبار", code: "TEST" };
+  const participant = { firstName: "اختبار", code: "TEST", phone: "+966501234567" };
   const advice = "نص عربي مع English 123.\n".repeat(80) + "نهاية التوصيات";
   const screen = renderToStaticMarkup(
     createElement(EventBodyResults, { readings, participant })
@@ -67,6 +67,8 @@ it("prints the exact same eight measurements and both distributions, preserving 
   );
   const cards = (html: string) =>
     html.match(/<article data-body-metric=.*?<\/article>/g);
+  expect(screen).toContain("+966501234567");
+  expect(enabledPrint).toContain("+966501234567");
   expect(cards(enabledPrint)).toEqual(cards(screen));
   expect(cards(enabledPrint)).toHaveLength(8);
   expect(enabledPrint).toContain("/api/events/anatomy/fat");
@@ -103,6 +105,7 @@ it("prints the exact same eight measurements and both distributions, preserving 
       },
     })
   );
+  expect(disabledPrint).toContain("+966501234567");
   expect(disabledPrint.match(/data-pdf-logical-page/g)).toHaveLength(1);
   expect(disabledPrint).not.toContain("نتائج استبيان نمط الحياة");
   expect(disabledPrint.indexOf("توصية في أعلى صفحة تحليل الجسم")).toBeLessThan(

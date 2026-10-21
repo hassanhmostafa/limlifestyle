@@ -523,7 +523,7 @@ export default function Events() {
           firstName: apiSession.firstName,
           age: apiSession.age,
           sex: apiSession.sex,
-          phone: "",
+          phone: apiSession.phone ?? "",
           city: apiSession.city,
           status: apiSession.status,
           answers: apiSession.answers as EventAnswers,
@@ -539,6 +539,7 @@ export default function Events() {
       ? {
           ...session,
           ...frozen.participant,
+          phone: frozen.participant.mobile ?? "",
           answers: frozen.answers as EventAnswers,
         }
       : session;
@@ -1680,6 +1681,7 @@ function ReportView({
         <p dir="ltr" className="mt-1 text-xs text-[#708a84]">
           {session.code}
         </p>
+        {session.phone && <p className="mt-2 text-sm" data-participant-phone>الجوال: <bdi dir="ltr">{session.phone}</bdi></p>}
       </div>
       {lifestyleEnabled && (
         <div className="mt-6">

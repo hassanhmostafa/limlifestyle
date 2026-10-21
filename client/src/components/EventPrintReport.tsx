@@ -28,6 +28,7 @@ function PrintHeading({ participant, provenance }: { participant: EventParticipa
       <div>
         <h1>تقرير رحلتك الصحية</h1>
         <p>{participant.firstName || "المشارك"} · <bdi>{participant.code}</bdi></p>
+        {(participant.mobile || participant.phone) && <p data-participant-phone>الجوال: <bdi dir="ltr">{participant.mobile || participant.phone}</bdi></p>}
       </div>
       <span>{provenance ? <><b>أُعيد توليده · {eventReportDate(provenance.generatedAt)}</b><br /><small dir="ltr">{provenance.templateVersion} · r{provenance.reportRevision}</small></> : "فعاليات LIM"}</span>
     </header>

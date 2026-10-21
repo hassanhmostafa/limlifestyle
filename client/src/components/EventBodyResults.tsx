@@ -16,6 +16,8 @@ import "@/styles/event-results.css";
 
 export type EventParticipantIdentity = {
   firstName?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
   age?: number | null;
   sex?: string | null;
 };
@@ -136,6 +138,7 @@ export function EventBodyResults({
           </p>
           <p className="lim-results-participant">
             {name && <b>{name}</b>}
+            {(participant?.mobile || participant?.phone) && <span data-participant-phone>الجوال: <bdi dir="ltr">{participant.mobile || participant.phone}</bdi></span>}
             {age != null && <span>{age} سنة</span>}
             {sexLabel && <span>{sexLabel}</span>}
           </p>

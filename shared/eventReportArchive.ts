@@ -1,5 +1,5 @@
 /** Version identifiers describe the logic used at issuance, not today's date. */
-export const EVENT_REPORT_TEMPLATE_VERSION = "lim-a4-2026-10-20-smart";
+export const EVENT_REPORT_TEMPLATE_VERSION = "lim-a4-2026-10-21-phone";
 export const EVENT_REPORT_SCORING_VERSION = "lifestyle-score-2026-10-09";
 
 export type EventReportMetadata = {

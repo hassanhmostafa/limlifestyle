@@ -489,6 +489,7 @@ export default function EventTeam() {
                         readings={record.data!.readings}
                         participant={{
                           firstName: participant.name,
+                          phone: participant.phone,
                           age: participant.age,
                           sex: participant.sex,
                         }}
