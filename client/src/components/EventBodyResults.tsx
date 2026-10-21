@@ -1,3 +1,4 @@
+import { useEventLocale } from "@/contexts/EventLocale";
 import React from "react";
 import { CalendarDays } from "lucide-react";
 import type { DashboardReading } from "@/components/BodyCompositionReport";
@@ -21,11 +22,14 @@ export type EventParticipantIdentity = {
   age?: number | null;
   sex?: string | null;
 };
-export function eventReadingDate(value: Date | string) {
+export function eventReadingDate(
+  value: Date | string,
+  language: "ar" | "en" = "ar"
+) {
   const date = new Date(value);
   return Number.isNaN(date.valueOf())
     ? "وقت القياس غير متوفر"
-    : date.toLocaleString("ar-SA", {
+    : date.toLocaleString(language === "ar" ? "ar-SA" : "en-GB", {
         dateStyle: "medium",
         timeStyle: "short",
         timeZone: "Asia/Riyadh",
@@ -50,6 +54,7 @@ function MetricCard({
   field: EventResultField;
   values: Record<string, string>;
 }) {
+  const { t } = useEventLocale();
   const [key, label, unit] = field;
   const value = eventNumeric(values[key]);
   const status = eventMetricStatus(values, key);
@@ -61,36 +66,45 @@ function MetricCard({
       style={{ background: eventMetricBackground(values, key) }}
       className={`lim-result-metric${status ? ` lim-result-metric-status-${status.code}` : ""}`}
     >
-      <img className="lim-metric-icon" src={iconSource} alt="" aria-hidden="true" />
-      <p>{label}</p>
+      <img
+        className="lim-metric-icon"
+        src={iconSource}
+        alt=""
+        aria-hidden="true"
+      />
+      <p>{t(label)}</p>
       <div className="lim-result-value">
         <strong dir="ltr">
-          {value?.toLocaleString("en-US", { maximumFractionDigits: 2 }) ?? "—"}
+          {t(
+            value?.toLocaleString("en-US", { maximumFractionDigits: 2 }) ?? "—"
+          )}
         </strong>
-        {value !== null && unit && <small>{unit}</small>}
+        {value !== null && unit && <small>{t(unit)}</small>}
       </div>
       {value === null ? (
-        <span className="lim-result-unavailable">غير متوفر</span>
+        <span className="lim-result-unavailable">{t("غير متوفر")}</span>
       ) : status ? (
         <span className={`lim-result-status lim-result-status-${status.code}`}>
-          {status.label}
+          {t(status.label)}
         </span>
       ) : key === "bodyAge" ? (
         <span className="lim-result-status lim-result-status-neutral">
-          تقدير الجهاز
+          {t("تقدير الجهاز")}
         </span>
       ) : null}
       {value !== null && reference && (
         <span className="lim-result-reference">
-          {reference.label}: <bdi dir="ltr">{reference.value}</bdi>
-          {unit ? ` ${unit}` : ""}
+          {t(reference.label)}: <bdi dir="ltr">{t(reference.value)}</bdi>
+          {t(unit ? ` ${unit}` : "")}
         </span>
       )}
       {value !== null &&
         !reference &&
         key !== "height" &&
         key !== "bodyAge" && (
-          <span className="lim-result-reference">المدى الطبيعي غير متوفر</span>
+          <span className="lim-result-reference">
+            {t("المدى الطبيعي غير متوفر")}
+          </span>
         )}
     </article>
   );
@@ -104,6 +118,7 @@ export function EventBodyResults({
   readings: DashboardReading[];
   participant?: EventParticipantIdentity;
 }) {
+  const { t, language, direction } = useEventLocale();
   const reading = readings[0];
   if (!reading) return null;
   const values = eventReadingValues(reading);
@@ -121,26 +136,39 @@ export function EventBodyResults({
       data-pdf-report
       data-body-record={reading.recordNo ?? reading.id}
       className="lim-results-page lim-body-unified"
-      dir="rtl"
+      dir={direction}
     >
       <header className="lim-results-header">
         <LimLogo />
         <div className="lim-results-title">
           <span>
-            {reading.source === "x18_test"
-              ? "بيانات اختبار"
-              : "نتائج جهاز القياس"}
+            {t(
+              reading.source === "x18_test"
+                ? t("بيانات اختبار")
+                : t("نتائج جهاز القياس")
+            )}
           </span>
-          <h2>نتائج تحليل الجسم</h2>
+          <h2>{t("نتائج تحليل الجسم")}</h2>
           <p>
             <CalendarDays size={14} />
-            {eventReadingDate(reading.recordedAt)}
+            {t(eventReadingDate(reading.recordedAt, language))}
           </p>
           <p className="lim-results-participant">
             {name && <b>{name}</b>}
-            {(participant?.mobile || participant?.phone) && <span data-participant-phone>الجوال: <bdi dir="ltr">{participant.mobile || participant.phone}</bdi></span>}
-            {age != null && <span>{age} سنة</span>}
-            {sexLabel && <span>{sexLabel}</span>}
+            {(participant?.mobile || participant?.phone) && (
+              <span data-participant-phone>
+                {t("الجوال: ")}
+                <bdi dir="ltr">
+                  {t(participant.mobile || participant.phone)}
+                </bdi>
+              </span>
+            )}
+            {age != null && (
+              <span>
+                {t(age)}{t(" سنة")}
+              </span>
+            )}
+            {sexLabel && <span>{t(sexLabel)}</span>}
           </p>
         </div>
       </header>
@@ -149,7 +177,10 @@ export function EventBodyResults({
           <MetricCard key={field[0]} field={field} values={values} />
         ))}
       </div>
-      <section className="lim-distributions" aria-label="توزيع الدهون والعضلات">
+      <section
+        className="lim-distributions"
+        aria-label={t("توزيع الدهون والعضلات")}
+      >
         {(["muscle", "fat"] as const).map(mode => (
           <section
             key={mode}
@@ -157,25 +188,41 @@ export function EventBodyResults({
             className={`lim-results-card lim-distribution-${mode}`}
           >
             <h3>
-              {mode === "muscle"
-                ? "توزيع العضلات بالجسم"
-                : "توزيع الدهون بالجسم"}
+              {t(
+                mode === "muscle"
+                  ? t("توزيع العضلات بالجسم")
+                  : t("توزيع الدهون بالجسم")
+              )}
             </h3>
-            <LIMAnatomyDistribution mode={mode} values={values} language="ar" />
+            <LIMAnatomyDistribution
+              mode={mode}
+              values={values}
+              language={language}
+            />
           </section>
         ))}
       </section>
       <footer className="lim-results-footer">
         <p>
-          {reading.source === "x18_test"
-            ? "قيم اختبار مولّدة عشوائيًا ومرفوعة عبر رابط بيانات X18، وليست نتيجة من جهاز فعلي."
-            : "القياسات تقديرية. التصنيف حسب المدى الموضح أو تقييم الجهاز عند غيابه. اليمين واليسار من منظور صاحب القياس."}
+          {t(
+            reading.source === "x18_test"
+              ? t(
+                  "قيم اختبار مولّدة عشوائيًا ومرفوعة عبر رابط بيانات X18، وليست نتيجة من جهاز فعلي."
+                )
+              : t(
+                  "القياسات تقديرية. التصنيف حسب المدى الموضح أو تقييم الجهاز عند غيابه. اليمين واليسار من منظور صاحب القياس."
+                )
+          )}
           <span className="lim-footer-legend">
-            {" "}الأخضر: طبيعي؛ البرتقالي إلى الأحمر: ابتعاد عن المدى فقط، وليس شدة حالة.
+           {t(" ")}
+            {t(
+              "الأخضر: طبيعي؛ البرتقالي إلى الأحمر: ابتعاد عن المدى فقط، وليس شدة حالة."
+            )}
           </span>
         </p>
         <span>
-          رقم التحليل: <bdi>{reading.recordNo ?? "—"}</bdi>
+          {t("رقم التحليل:")}
+          <bdi>{t(reading.recordNo ?? "—")}</bdi>
         </span>
       </footer>
     </section>

@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
 export type Language = "en" | "ar";
 
@@ -126,16 +132,19 @@ const en: Translations = {
   home_whySubtitle:
     "Experience modern healthcare accessibility with our comprehensive health screening platform",
   home_servicesTitle: "Health Screening Services",
-  home_servicesSubtitle: "Our kiosks provide comprehensive health measurements and assessments",
+  home_servicesSubtitle:
+    "Our kiosks provide comprehensive health measurements and assessments",
   home_ctaTitle: "Ready to Start Your Wellness Journey?",
-  home_ctaSubtitle: "Find your nearest LIM station today and take control of your health",
+  home_ctaSubtitle:
+    "Find your nearest LIM station today and take control of your health",
   home_ctaBtn: "Find a Station Near You",
 
   feat_locations: "Convenient Locations",
   feat_locationsDesc:
     "Find health stations in shopping malls, pharmacies, and community centers across Jeddah",
   feat_hours: "Extended Hours",
-  feat_hoursDesc: "Access health screenings during extended hours, from early morning to late evening",
+  feat_hoursDesc:
+    "Access health screenings during extended hours, from early morning to late evening",
   feat_screening: "Comprehensive Screening",
   feat_screeningDesc:
     "Measure blood pressure, weight, BMI, heart rate, and receive personalized health assessments",
@@ -146,7 +155,8 @@ const en: Translations = {
   feat_privacyDesc:
     "Your health data is encrypted and protected with industry-leading security standards",
   feat_instant: "Instant Results",
-  feat_instantDesc: "Get immediate health screening results and recommendations at the kiosk",
+  feat_instantDesc:
+    "Get immediate health screening results and recommendations at the kiosk",
 
   svc_bp: "Blood Pressure",
   svc_bpDesc: "Monitor your cardiovascular health",
@@ -186,10 +196,12 @@ const en: Translations = {
   health_bmiComparison: "BMI Comparison",
   health_history: "Reading History",
   health_noReadings: "No readings yet. Log your first health measurement!",
-  health_signInPrompt: "Sign in to view your health history and track your wellness trends over time.",
+  health_signInPrompt:
+    "Sign in to view your health history and track your wellness trends over time.",
   health_signInBtn: "Sign In to Continue",
 
-  footer_tagline: "Empowering health through accessible technology across Saudi Arabia.",
+  footer_tagline:
+    "Empowering health through accessible technology across Saudi Arabia.",
   footer_quickLinks: "Quick Links",
   footer_services: "Services",
   footer_contact: "Contact",
@@ -219,7 +231,8 @@ const ar: Translations = {
   home_searchPlaceholder: "أدخل موقعك أو اسم المحطة...",
   home_searchBtn: "بحث",
   home_whyTitle: "لماذا تختار تك كير؟",
-  home_whySubtitle: "اختبر إمكانية الوصول إلى الرعاية الصحية الحديثة مع منصة الفحص الصحي الشاملة",
+  home_whySubtitle:
+    "اختبر إمكانية الوصول إلى الرعاية الصحية الحديثة مع منصة الفحص الصحي الشاملة",
   home_servicesTitle: "خدمات الفحص الصحي",
   home_servicesSubtitle: "توفر أكشاكنا قياسات وتقييمات صحية شاملة",
   home_ctaTitle: "هل أنت مستعد لبدء رحلتك الصحية؟",
@@ -227,15 +240,20 @@ const ar: Translations = {
   home_ctaBtn: "ابحث عن محطة قريبة منك",
 
   feat_locations: "مواقع مريحة",
-  feat_locationsDesc: "ابحث عن محطات صحية في المراكز التجارية والصيدليات ومراكز المجتمع عبر جدة",
+  feat_locationsDesc:
+    "ابحث عن محطات صحية في المراكز التجارية والصيدليات ومراكز المجتمع عبر جدة",
   feat_hours: "ساعات ممتدة",
-  feat_hoursDesc: "الوصول إلى الفحوصات الصحية خلال ساعات ممتدة، من الصباح الباكر حتى وقت متأخر من الليل",
+  feat_hoursDesc:
+    "الوصول إلى الفحوصات الصحية خلال ساعات ممتدة، من الصباح الباكر حتى وقت متأخر من الليل",
   feat_screening: "فحص شامل",
-  feat_screeningDesc: "قِس ضغط الدم والوزن ومؤشر كتلة الجسم ومعدل ضربات القلب واحصل على تقييمات صحية شخصية",
+  feat_screeningDesc:
+    "قِس ضغط الدم والوزن ومؤشر كتلة الجسم ومعدل ضربات القلب واحصل على تقييمات صحية شخصية",
   feat_tracking: "تتبع التقدم",
-  feat_trackingDesc: "راقب مقاييسك الصحية بمرور الوقت واحصل على رؤى لتحسين صحتك",
+  feat_trackingDesc:
+    "راقب مقاييسك الصحية بمرور الوقت واحصل على رؤى لتحسين صحتك",
   feat_privacy: "خصوصية محمية",
-  feat_privacyDesc: "بياناتك الصحية مشفرة ومحمية بأعلى معايير الأمان في الصناعة",
+  feat_privacyDesc:
+    "بياناتك الصحية مشفرة ومحمية بأعلى معايير الأمان في الصناعة",
   feat_instant: "نتائج فورية",
   feat_instantDesc: "احصل على نتائج الفحص الصحي والتوصيات فوراً عند الكشك",
 
@@ -277,10 +295,12 @@ const ar: Translations = {
   health_bmiComparison: "مقارنة مؤشر كتلة الجسم",
   health_history: "سجل القراءات",
   health_noReadings: "لا توجد قراءات بعد. سجّل أول قياس صحي!",
-  health_signInPrompt: "سجّل الدخول لعرض سجلك الصحي وتتبع اتجاهات صحتك بمرور الوقت.",
+  health_signInPrompt:
+    "سجّل الدخول لعرض سجلك الصحي وتتبع اتجاهات صحتك بمرور الوقت.",
   health_signInBtn: "سجّل الدخول للمتابعة",
 
-  footer_tagline: "تمكين الصحة من خلال التكنولوجيا المتاحة في جميع أنحاء المملكة العربية السعودية.",
+  footer_tagline:
+    "تمكين الصحة من خلال التكنولوجيا المتاحة في جميع أنحاء المملكة العربية السعودية.",
   footer_quickLinks: "روابط سريعة",
   footer_services: "الخدمات",
   footer_contact: "تواصل معنا",
@@ -297,20 +317,33 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType>({
-  language: "en",
+  language: "ar",
   setLanguage: () => {},
-  t: en,
-  isRTL: false,
+  t: ar,
+  isRTL: true,
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    return (localStorage.getItem("tc_lang") as Language) ?? "en";
+    try {
+      const saved = localStorage.getItem("tc_lang");
+      if (saved === "ar" || saved === "en") return saved;
+    } catch {
+      /* Storage may be disabled in private browsing. */
+    }
+    return typeof navigator !== "undefined" &&
+      navigator.language.toLowerCase().startsWith("ar")
+      ? "ar"
+      : "en";
   });
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem("tc_lang", lang);
+    try {
+      localStorage.setItem("tc_lang", lang);
+    } catch {
+      /* Keep this session usable. */
+    }
   };
 
   const isRTL = language === "ar";
@@ -321,7 +354,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t: translations[language], isRTL }}>
+    <LanguageContext.Provider
+      value={{ language, setLanguage, t: translations[language], isRTL }}
+    >
       {children}
     </LanguageContext.Provider>
   );

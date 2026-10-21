@@ -348,3 +348,11 @@
   [data-lifestyle-score-overview] [data-lifestyle-score-card] { width: 100%; }
   [data-lifestyle-score-overview] [data-lifestyle-reference] { width: 100%; }
 }
+
+/* English display preserves chart scales and anatomy coordinates. */
+[lang="en"] .lim-print-lifestyle-score,
+[lang="en"] .lim-print-lifestyle [data-lifestyle-bullet],
+[lang="en"] .lim-print-next-steps [data-lifestyle-next-step],
+[lang="en"] .lim-segment-card { direction: ltr; }
+[lang="en"] .lim-print-report { text-align: left; }
+[lang="en"] .lim-print-advice { text-align: start; }

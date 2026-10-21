@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
+import React, { Component, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -21,10 +21,27 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  isArabic() {
+    try {
+      const saved = localStorage.getItem("tc_lang");
+      if (saved === "ar" || saved === "en") return saved === "ar";
+    } catch {
+      /* Browser storage is optional. */
+    }
+    return (
+      typeof navigator !== "undefined" && navigator.language.startsWith("ar")
+    );
+  }
+
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
+        <div
+          translate="no"
+          lang={this.isArabic() ? "ar" : "en"}
+          dir={this.isArabic() ? "rtl" : "ltr"}
+          className="flex items-center justify-center min-h-screen p-8 bg-background"
+        >
           <div className="flex flex-col items-center w-full max-w-2xl p-8">
             <AlertTriangle
               size={48}
@@ -32,16 +49,18 @@ class ErrorBoundary extends Component<Props, State> {
             />
 
             <h2 className="text-xl mb-4">
-              {typeof window !== "undefined" && localStorage.getItem("tc_lang") === "ar"
+              {typeof window !== "undefined" && this.isArabic()
                 ? "حدث خطأ غير متوقع."
                 : "An unexpected error occurred."}
             </h2>
 
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
-              </pre>
-            </div>
+            {import.meta.env.DEV && (
+              <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
+                <pre className="text-sm text-muted-foreground whitespace-break-spaces">
+                  {this.state.error?.stack}
+                </pre>
+              </div>
+            )}
 
             <button
               onClick={() => window.location.reload()}
@@ -52,7 +71,7 @@ class ErrorBoundary extends Component<Props, State> {
               )}
             >
               <RotateCcw size={16} />
-              {typeof window !== "undefined" && localStorage.getItem("tc_lang") === "ar"
+              {typeof window !== "undefined" && this.isArabic()
                 ? "إعادة تحميل الصفحة"
                 : "Reload Page"}
             </button>

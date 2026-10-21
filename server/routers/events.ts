@@ -472,7 +472,11 @@ export const eventsRouter = router({
     }),
 
   questionnairePdf: publicProcedure
-    .input(eventTokenInput.merge(researchReportBinding))
+    .input(
+      eventTokenInput
+        .merge(researchReportBinding)
+        .extend({ language: z.enum(["ar", "en"]).optional() })
+    )
     .query(async ({ input }) => {
       const session = await requireEventSession(input.accessToken);
       const context = await approvedResearchContext(session.id, input);
@@ -483,7 +487,9 @@ export const eventsRouter = router({
           context.archive.pdfSha256 ?? context.archive.snapshotSha256,
         snapshotSha256: context.archive.snapshotSha256,
       });
-      const pdf = await assessmentAnswersPdf(data);
+      const pdf = await (input.language
+        ? assessmentAnswersPdf(data, input.language)
+        : assessmentAnswersPdf(data));
       const filename = eventReportFilename(context.snapshot.metadata!).replace(
         /\.pdf$/i,
         "-answers.pdf"

@@ -81,9 +81,7 @@ export function appendTextLineRectangles(
   if (!nodeFilter) return;
   const renderedLines = new Map<string, PdfKeepTogether>();
   for (const container of Array.from(
-    root.querySelectorAll<HTMLElement>(
-      "[data-doctor-advice], .lim-print-notes"
-    )
+    root.querySelectorAll<HTMLElement>("[data-doctor-advice], .lim-print-notes")
   )) {
     const walker = doc.createTreeWalker(container, nodeFilter.SHOW_TEXT);
     let textNode: Node | null;
@@ -110,7 +108,11 @@ export function appendTextLineRectangles(
 }
 
 /** Wrap by words while retaining Arabic shaping and explicit paragraph breaks. */
-export function wrapPdfText(text: string, width: number, measure: (text: string) => number) {
+export function wrapPdfText(
+  text: string,
+  width: number,
+  measure: (text: string) => number
+) {
   const lines: string[] = [];
   for (const paragraph of text.split("\n")) {
     let line = "";
@@ -122,9 +124,15 @@ export function wrapPdfText(text: string, width: number, measure: (text: string)
       } else line = candidate;
       if (measure(line) > width) {
         let fragment = "";
-        const segments = typeof Intl.Segmenter === "function"
-          ? Array.from(new Intl.Segmenter("ar", { granularity: "grapheme" }).segment(line), item => item.segment)
-          : Array.from(line);
+        const segments =
+          typeof Intl.Segmenter === "function"
+            ? Array.from(
+                new Intl.Segmenter("ar", { granularity: "grapheme" }).segment(
+                  line
+                ),
+                item => item.segment
+              )
+            : Array.from(line);
         for (const segment of segments) {
           if (fragment && measure(fragment + segment) > width) {
             lines.push(fragment);
@@ -141,12 +149,21 @@ export function wrapPdfText(text: string, width: number, measure: (text: string)
 
 /** Draw whole visual lines so browser shaping keeps Arabic letters joined. */
 function rasterizeAdvice(doc: Document, root: HTMLElement) {
-  const rendered: Array<{ image: HTMLImageElement; lineHeight: number; count: number }> = [];
-  for (const node of Array.from(root.querySelectorAll<HTMLElement>("[data-doctor-advice], .lim-print-notes"))) {
+  const rendered: Array<{
+    image: HTMLImageElement;
+    lineHeight: number;
+    count: number;
+  }> = [];
+  for (const node of Array.from(
+    root.querySelectorAll<HTMLElement>("[data-doctor-advice], .lim-print-notes")
+  )) {
     const css = doc.defaultView!.getComputedStyle(node);
     const width = Math.max(1, node.getBoundingClientRect().width);
     const size = parseFloat(css.fontSize) || 12;
-    const lineHeight = Math.max(parseFloat(css.lineHeight) || size * 1.6, size * 1.6);
+    const lineHeight = Math.max(
+      parseFloat(css.lineHeight) || size * 1.6,
+      size * 1.6
+    );
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
     const font = `${css.fontWeight} ${size}px ${css.fontFamily}`;
@@ -155,16 +172,23 @@ function rasterizeAdvice(doc: Document, root: HTMLElement) {
     const text = paragraphs.length
       ? Array.from(paragraphs, line => line.textContent || " ").join("\n")
       : node.textContent || "";
-    const lines = wrapPdfText(text, width - 4, value => ctx.measureText(value).width);
+    const lines = wrapPdfText(
+      text,
+      width - 4,
+      value => ctx.measureText(value).width
+    );
     canvas.width = Math.ceil(width * 2);
     canvas.height = Math.ceil(lines.length * lineHeight * 2 + 8);
     ctx.scale(2, 2);
     ctx.font = font;
     ctx.fillStyle = css.color;
-    ctx.direction = "rtl";
-    ctx.textAlign = "right";
+    const rtl = /[\u0600-\u06ff]/.test(text);
+    ctx.direction = rtl ? "rtl" : "ltr";
+    ctx.textAlign = rtl ? "right" : "left";
     ctx.textBaseline = "top";
-    lines.forEach((line, index) => ctx.fillText(line, width - 2, index * lineHeight + 2));
+    lines.forEach((line, index) =>
+      ctx.fillText(line, rtl ? width - 2 : 2, index * lineHeight + 2)
+    );
     const image = doc.createElement("img");
     image.src = canvas.toDataURL("image/png");
     image.alt = text;
@@ -180,7 +204,8 @@ export async function createEventPdf(source: HTMLElement) {
   // Render an isolated copy. Never resize/hide the visible report: doing so
   // moves the share button and triggers mobile scroll anchoring.
   const host = document.createElement("div");
-  host.style.cssText = "position:fixed;left:-10000px;top:0;width:760px;pointer-events:none;";
+  host.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:760px;pointer-events:none;";
   host.setAttribute("aria-hidden", "true");
   const element = source.cloneNode(true) as HTMLElement;
   element.style.fontFamily = getComputedStyle(source).fontFamily;
@@ -304,10 +329,19 @@ async function captureEventPdf(element: HTMLElement) {
         root
           .querySelectorAll<HTMLElement>("[data-doctor-advice]")
           .forEach(node => {
-            node.setAttribute("dir", "rtl");
-            node.setAttribute("lang", "ar");
-            node.style.setProperty("direction", "rtl", "important");
-            node.style.setProperty("text-align", "right", "important");
+            const rtl = /[\u0600-\u06ff]/.test(node.textContent || "");
+            node.setAttribute("dir", rtl ? "rtl" : "ltr");
+            node.setAttribute("lang", rtl ? "ar" : "en");
+            node.style.setProperty(
+              "direction",
+              rtl ? "rtl" : "ltr",
+              "important"
+            );
+            node.style.setProperty(
+              "text-align",
+              rtl ? "right" : "left",
+              "important"
+            );
             node.style.setProperty("unicode-bidi", "plaintext", "important");
             node.style.setProperty("white-space", "pre-wrap", "important");
             node.style.setProperty("overflow-wrap", "anywhere", "important");
@@ -388,7 +422,10 @@ async function captureEventPdf(element: HTMLElement) {
         for (const { image, lineHeight, count } of adviceImages) {
           const top = image.getBoundingClientRect().top - bounds.top;
           for (let index = 0; index < count; index++)
-            keepTogether.push({ top: top + index * lineHeight, bottom: top + (index + 1) * lineHeight });
+            keepTogether.push({
+              top: top + index * lineHeight,
+              bottom: top + (index + 1) * lineHeight,
+            });
         }
       },
     });
@@ -419,10 +456,14 @@ async function captureEventPdf(element: HTMLElement) {
     height = 291;
   const sliceHeight = Math.floor((canvas.width * height) / width);
   const pixelScale = canvas.width / captureWidth;
-  const pageRanges = logicalPdfPageRanges(logicalPages, pixelScale, canvas.height);
+  const pageRanges = logicalPdfPageRanges(
+    logicalPages,
+    pixelScale,
+    canvas.height
+  );
   let addedPages = 0;
   for (const range of pageRanges) {
-    for (let top = range.top; top < range.bottom;) {
+    for (let top = range.top; top < range.bottom; ) {
       let bottom = Math.min(top + sliceHeight, range.bottom);
       if (bottom < range.bottom)
         bottom = adjustPdfSliceBottom(top, bottom, pixelScale, keepTogether);
@@ -443,7 +484,11 @@ async function captureEventPdf(element: HTMLElement) {
           slice.height
         );
       const context = slice.getContext("2d")!;
-      if (hasPdfSliceInk(context.getImageData(0, 0, slice.width, slice.height).data)) {
+      if (
+        hasPdfSliceInk(
+          context.getImageData(0, 0, slice.width, slice.height).data
+        )
+      ) {
         if (addedPages) pdf.addPage();
         pdf.addImage(
           slice.toDataURL("image/png"),

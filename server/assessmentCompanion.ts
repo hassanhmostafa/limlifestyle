@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { eventText, type EventLanguage } from "../shared/eventTranslations";
 import { readFile } from "node:fs/promises";
 import { jsPDF } from "jspdf";
 import type { AssessmentCompanion } from "../shared/assessmentCompanion";
@@ -42,7 +43,11 @@ export function buildAssessmentCompanion(
 }
 
 /** Text PDF, generated from the same immutable data that crosses the bridge. */
-export async function assessmentAnswersPdf(data: AssessmentCompanion) {
+export async function assessmentAnswersPdf(
+  data: AssessmentCompanion,
+  language: EventLanguage = "ar"
+) {
+  const t = (text: string) => eventText(text, language);
   const font = await readFile(
     new URL("./assets/DejaVuSans.ttf", import.meta.url)
   ).catch(() =>
@@ -52,7 +57,7 @@ export async function assessmentAnswersPdf(data: AssessmentCompanion) {
   pdf.setFileId(
     crypto
       .createHash("sha256")
-      .update(JSON.stringify(data))
+      .update(JSON.stringify(data) + (language === "en" ? ":en" : ""))
       .digest("hex")
       .slice(0, 32)
   );
@@ -68,21 +73,23 @@ export async function assessmentAnswersPdf(data: AssessmentCompanion) {
   let y = 18;
   const line = (text: string, size = 11) => {
     pdf.setFontSize(size);
-    for (const l of pdf.splitTextToSize(text, 174)) {
+    for (const l of pdf.splitTextToSize(t(text), 174)) {
       if (y > 276) {
         pdf.addPage();
         y = 18;
       }
-      pdf.text(l, 194, y, { align: "right" });
+      pdf.text(l, language === "ar" ? 194 : 18, y, {
+        align: language === "ar" ? "right" : "left",
+      });
       y += size === 15 ? 9 : 7;
     }
   };
   line("LIM — إجابات الاستبيانات", 15);
   line(
-    `معرّف الفحص: ${data.participant.code} | المراجعة: ${data.binding.revision}`
+    `${t("معرّف الفحص:")} ${data.participant.code} | ${t("المراجعة:")} ${data.binding.revision}`
   );
-  if (data.participant.name) line(`الاسم: ${data.participant.name}`);
-  line(`مرجع الأرشيف: ${data.binding.archiveId}`, 9);
+  if (data.participant.name) line(`${t("الاسم:")} ${data.participant.name}`);
+  line(`${t("مرجع الأرشيف:")} ${data.binding.archiveId}`, 9);
   y += 4;
   if (!data.questionnaires.length)
     line("لم يكن هناك استبيان مفعّل لهذا الفحص.");
@@ -112,16 +119,17 @@ export async function assessmentAnswersPdf(data: AssessmentCompanion) {
             : values.length === 0
               ? "لم يُختر أي خيار"
               : values
-                  .map(
-                    v =>
+                  .map(v =>
+                    t(
                       question.options?.find(o => o.value === String(v))
                         ?.label ?? String(v)
+                    )
                   )
-                  .join("، ");
+                  .join(language === "ar" ? "، " : ", ");
         pdf.setFontSize(11);
         const required =
-          (pdf.splitTextToSize(question.text, 174).length +
-            pdf.splitTextToSize("الإجابة: " + display, 174).length) *
+          (pdf.splitTextToSize(t(question.text), 174).length +
+            pdf.splitTextToSize(t("الإجابة:") + " " + t(display), 174).length) *
             7 +
           (values?.length ? 9 : 0) +
           2;
@@ -130,7 +138,7 @@ export async function assessmentAnswersPdf(data: AssessmentCompanion) {
           y = 18;
         }
         line(question.text);
-        line("الإجابة: " + display);
+        line(t("الإجابة:") + " " + t(display));
         y += 2;
         if (values?.length) {
           pdf.setFontSize(9);

@@ -1,3 +1,4 @@
+import { useEventLocale } from "@/contexts/EventLocale";
 import React, { useEffect, useRef, useState } from "react";
 import { createEventPdf } from "@/lib/eventPdf";
 
@@ -44,6 +45,7 @@ export default function EventPdfButton({
   className?: string;
   onPreparedPdf?: (file: File) => void | Promise<void>;
 }) {
+  const { t } = useEventLocale();
   const wrapper = useRef<HTMLDivElement>(null);
   const preparedCallback = useRef(onPreparedPdf);
   preparedCallback.current = onPreparedPdf;
@@ -139,7 +141,10 @@ export default function EventPdfButton({
     }
   };
   const share = () => {
-    if (attachmentsExpected && (attachmentsPending || additionalFiles.length === 0)) {
+    if (
+      attachmentsExpected &&
+      (attachmentsPending || additionalFiles.length === 0)
+    ) {
       onRetryAttachments?.();
       return;
     }
@@ -169,64 +174,79 @@ export default function EventPdfButton({
     }
     try {
       // Invoke directly during the click: iOS requires transient user activation.
-      const sharing = navigator.share({ files, title: "تقرير ليم الصحي" });
+      const sharing = navigator.share({ files, title: t("تقرير ليم الصحي") });
       setBusy(true);
       Promise.resolve(sharing)
         .catch(reason => {
           if (!(reason instanceof Error && reason.name === "AbortError")) {
             files.forEach(saveFile);
-            setError(files.length > 1
-              ? "تعذرت المشاركة المباشرة؛ تم تنزيل الملفين لإرفاقهما في واتساب."
-              : "تعذرت المشاركة المباشرة؛ تم تنزيل التقرير لإرفاقه في واتساب.");
+            setError(
+              files.length > 1
+                ? "تعذرت المشاركة المباشرة؛ تم تنزيل الملفين لإرفاقهما في واتساب."
+                : "تعذرت المشاركة المباشرة؛ تم تنزيل التقرير لإرفاقه في واتساب."
+            );
           }
         })
         .finally(() => setBusy(false));
     } catch {
       files.forEach(saveFile);
-      setError(files.length > 1
-        ? "تم تنزيل الملفين. أرفقهما في محادثة واتساب التي تختارها."
-        : "تم تنزيل التقرير. أرفقه في محادثة واتساب التي تختارها.");
+      setError(
+        files.length > 1
+          ? "تم تنزيل الملفين. أرفقهما في محادثة واتساب التي تختارها."
+          : "تم تنزيل التقرير. أرفقه في محادثة واتساب التي تختارها."
+      );
     }
   };
   return (
     <div ref={wrapper} data-pdf-hide className="print:hidden">
       {!shareable && (
-        <button type="button" className={className} disabled={busy || preparing} onClick={download}>
-          {busy ? "جارٍ فتح التقرير…" : label}
+        <button
+          type="button"
+          className={className}
+          disabled={busy || preparing}
+          onClick={download}
+        >
+          {t(busy ? t("جارٍ فتح التقرير…") : label)}
         </button>
       )}
       {shareable && additionalFiles.length > 0 && (
         <p className="mt-2 text-xs text-slate-500">
-          التقرير وملف الإجابات يحملان معرّف الفحص نفسه، وتتم مشاركتهما معًا.
+          {t(
+            "التقرير وملف الإجابات يحملان معرّف الفحص نفسه، وتتم مشاركتهما معًا."
+          )}
         </p>
       )}
       {shareable && (
         <button
           type="button"
           className={`${className} mt-3`}
-          disabled={busy || preparing || (attachmentsExpected && attachmentsPending)}
+          disabled={
+            busy || preparing || (attachmentsExpected && attachmentsPending)
+          }
           onClick={ready ? share : () => setRefresh(value => value + 1)}
         >
-          {preparing
-            ? "جارٍ تجهيز التقرير…"
-            : attachmentsExpected && attachmentsPending
-              ? "جارٍ تجهيز الاستبيان…"
-              : attachmentsExpected && additionalFiles.length === 0
-                ? "إعادة تجهيز التقرير + الاستبيان للمشاركة"
-                : ready
-                  ? "مشاركة التقرير + الاستبيان عبر الواتساب"
-                  : "إعادة تجهيز التقرير"}
+          {t(
+            preparing
+              ? t("جارٍ تجهيز التقرير…")
+              : attachmentsExpected && attachmentsPending
+                ? t("جارٍ تجهيز الاستبيان…")
+                : attachmentsExpected && additionalFiles.length === 0
+                  ? t("إعادة تجهيز التقرير + الاستبيان للمشاركة")
+                  : ready
+                    ? t("مشاركة التقرير + الاستبيان عبر الواتساب")
+                    : t("إعادة تجهيز التقرير")
+          )}
         </button>
       )}
       {shareable && preparing && (
         <p role="status" className="mt-2 text-xs text-slate-500">
-          يُجهّز الملف تلقائيًا؛ بعد ذلك اضغط المشاركة واختر واتساب.
+          {t("يُجهّز الملف تلقائيًا؛ بعد ذلك اضغط المشاركة واختر واتساب.")}
         </p>
       )}
 
       {error && (
         <p role="status" className="mt-2 text-sm text-red-700">
-          {error}
+          {t(error)}
         </p>
       )}
     </div>

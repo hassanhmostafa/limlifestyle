@@ -1,3 +1,4 @@
+import { useEventLocale } from "@/contexts/EventLocale";
 import { nursingCatalog } from "@shared/eventNursing";
 import type { Measurements } from "@shared/eventCare";
 export default function EventCareSummary({
@@ -7,6 +8,7 @@ export default function EventCareSummary({
   measurements: Measurements;
   notes?: string | null;
 }) {
+  const { t } = useEventLocale();
   return (
     <div className="space-y-3">
       {Object.entries(measurements).map(([id, values]) => {
@@ -16,7 +18,7 @@ export default function EventCareSummary({
             key={id}
             className="rounded-2xl border border-emerald-100 bg-white p-4"
           >
-            <h3 className="font-bold">{test?.name ?? id}</h3>
+            <h3 className="font-bold">{t(test?.name ?? id)}</h3>
             <dl className="mt-2 flex flex-wrap gap-4">
               {Object.entries(values)
                 .filter(([, v]) => v !== "")
@@ -25,10 +27,10 @@ export default function EventCareSummary({
                   return (
                     <div key={key}>
                       <dt className="text-xs text-slate-500">
-                        {field?.label ?? key}
+                        {t(field?.label ?? key)}
                       </dt>
                       <dd className="font-bold">
-                        {value} <small>{field?.unit}</small>
+                        {t(value)} <small>{t(field?.unit)}</small>
                       </dd>
                     </div>
                   );
