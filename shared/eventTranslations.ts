@@ -1,6 +1,11 @@
 /** Reviewed display translations. Answer codes, stored snapshots and clinical values are never rewritten. */
 export type EventLanguage = "ar" | "en";
 export const eventEnglish: Readonly<Record<string, string>> = {
+  "يُجهّز الملف تلقائيًا؛ يمكنك حفظه عند اكتمال التجهيز أو استخدام نافذة الطباعة.":
+    "The file is prepared automatically. Save it when ready, or use the browser print dialog.",
+  "حفظ التقرير والاستبيان (PDF)": "Save report + questionnaire (PDF)",
+  "حفظ التقرير (PDF)": "Save report (PDF)",
+  "طباعة / حفظ PDF من المتصفح": "Print / Save PDF in browser",
   جدة: "Jeddah",
   "تم إنشاء جلستك الصحية": "Your health session has been created",
   "تعذر حفظ الجلسة بعد التحقق. بياناتك محفوظة؛ اطلب رمزًا جديدًا وأعد المحاولة.":

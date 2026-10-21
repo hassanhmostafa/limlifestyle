@@ -15,6 +15,22 @@ function reportSignature(root: HTMLElement) {
   copy.querySelectorAll("[data-pdf-hide]").forEach(node => node.remove());
   return copy.innerHTML;
 }
+export function supportsEventFileShare() {
+  if (
+    typeof navigator === "undefined" ||
+    typeof navigator.share !== "function" ||
+    typeof navigator.canShare !== "function"
+  )
+    return false;
+  try {
+    return navigator.canShare({
+      files: [new File(["%PDF"], "report.pdf", { type: "application/pdf" })],
+    });
+  } catch {
+    return false;
+  }
+}
+
 function saveFile(file: File) {
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");
@@ -46,6 +62,13 @@ export default function EventPdfButton({
   onPreparedPdf?: (file: File) => void | Promise<void>;
 }) {
   const { t } = useEventLocale();
+  const [nativeShare, setNativeShare] = useState(false);
+  useEffect(() => {
+    setNativeShare(
+      supportsEventFileShare() &&
+        !window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    );
+  }, []);
   const wrapper = useRef<HTMLDivElement>(null);
   const preparedCallback = useRef(onPreparedPdf);
   preparedCallback.current = onPreparedPdf;
@@ -140,6 +163,47 @@ export default function EventPdfButton({
       setBusy(false);
     }
   };
+  const saveReportFiles = async () => {
+    if (
+      attachmentsExpected &&
+      (attachmentsPending || additionalFiles.length === 0)
+    ) {
+      onRetryAttachments?.();
+      return;
+    }
+    const root = wrapper.current && reportRoot(wrapper.current);
+    if (!root) {
+      setError("تعذر العثور على التقرير");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const signature = reportSignature(root);
+      let file =
+        cached.current?.signature === signature ? cached.current.file : null;
+      if (!file) {
+        const pdf = await createEventPdf(root);
+        // Locale or approval may have changed during capture. Never export stale bytes.
+        if (signature !== reportSignature(root)) {
+          setRefresh(value => value + 1);
+          return;
+        }
+        file = new File([pdf.output("blob")], filename, {
+          type: "application/pdf",
+        });
+        cached.current = { file, signature };
+        setReady(true);
+        void Promise.resolve(preparedCallback.current?.(file)).catch(() => {});
+      }
+      saveFile(file);
+      additionalFiles.forEach(saveFile);
+    } catch {
+      setError("تعذر تجهيز التقرير. أعد المحاولة.");
+    } finally {
+      setBusy(false);
+    }
+  };
   const share = () => {
     if (
       attachmentsExpected &&
@@ -223,24 +287,48 @@ export default function EventPdfButton({
           disabled={
             busy || preparing || (attachmentsExpected && attachmentsPending)
           }
-          onClick={ready ? share : () => setRefresh(value => value + 1)}
+          onClick={
+            !nativeShare
+              ? saveReportFiles
+              : ready
+                ? share
+                : () => setRefresh(value => value + 1)
+          }
         >
           {t(
-            preparing
-              ? t("جارٍ تجهيز التقرير…")
-              : attachmentsExpected && attachmentsPending
-                ? t("جارٍ تجهيز الاستبيان…")
-                : attachmentsExpected && additionalFiles.length === 0
-                  ? t("إعادة تجهيز التقرير + الاستبيان للمشاركة")
-                  : ready
-                    ? t("مشاركة التقرير + الاستبيان عبر الواتساب")
-                    : t("إعادة تجهيز التقرير")
+            !nativeShare
+              ? attachmentsExpected
+                ? "حفظ التقرير والاستبيان (PDF)"
+                : "حفظ التقرير (PDF)"
+              : preparing
+                ? t("جارٍ تجهيز التقرير…")
+                : attachmentsExpected && attachmentsPending
+                  ? t("جارٍ تجهيز الاستبيان…")
+                  : attachmentsExpected && additionalFiles.length === 0
+                    ? t("إعادة تجهيز التقرير + الاستبيان للمشاركة")
+                    : ready
+                      ? t("مشاركة التقرير + الاستبيان عبر الواتساب")
+                      : t("إعادة تجهيز التقرير")
           )}
+        </button>
+      )}
+      {shareable && !nativeShare && (
+        <button
+          type="button"
+          className="mt-3 w-full rounded-xl border border-[#197f6f] px-4 py-3 font-bold text-[#197f6f]"
+          disabled={busy}
+          onClick={() => window.print()}
+        >
+          {t("طباعة / حفظ PDF من المتصفح")}
         </button>
       )}
       {shareable && preparing && (
         <p role="status" className="mt-2 text-xs text-slate-500">
-          {t("يُجهّز الملف تلقائيًا؛ بعد ذلك اضغط المشاركة واختر واتساب.")}
+          {t(
+            nativeShare
+              ? "يُجهّز الملف تلقائيًا؛ بعد ذلك اضغط المشاركة واختر واتساب."
+              : "يُجهّز الملف تلقائيًا؛ يمكنك حفظه عند اكتمال التجهيز أو استخدام نافذة الطباعة."
+          )}
         </p>
       )}
 

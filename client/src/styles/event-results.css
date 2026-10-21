@@ -356,3 +356,11 @@
 [lang="en"] .lim-segment-card { direction: ltr; }
 [lang="en"] .lim-print-report { text-align: left; }
 [lang="en"] .lim-print-advice { text-align: start; }
+
+@media print {
+  main:has([data-final-report]) > div > header, main:has([data-final-report]) > div > :not([data-final-report]) { display: none !important; }
+  main:has([data-final-report]), main:has([data-final-report]) > div { max-width: none !important; min-height: 0 !important; box-shadow: none !important; }
+  [data-final-report] > [data-print-report] { width: 100%; }
+  [data-print-report] .lim-print-logical-page { width: 100%; }
+  [data-print-report] .lim-print-logical-page + .lim-print-logical-page { break-before: page; }
+}

@@ -1,3 +1,6 @@
+import html2canvas from "html2canvas";
+import JsPDF from "jspdf";
+import { eventPdfFailureCode } from "./eventPdfFailure";
 /** Export the visible report as paginated A4 PDF; does not depend on window.print. */
 type PdfKeepTogether = { top: number; bottom: number };
 type PdfLogicalPage = { top: number; bottom: number };
@@ -207,22 +210,25 @@ export async function createEventPdf(source: HTMLElement) {
   host.style.cssText =
     "position:fixed;left:-10000px;top:0;width:760px;pointer-events:none;";
   host.setAttribute("aria-hidden", "true");
-  const element = source.cloneNode(true) as HTMLElement;
+  const printable = source.querySelector<HTMLElement>("[data-print-report]");
+  // Capture only the printable subtree, avoiding interactive images/controls
+  // whose asynchronous state is unrelated to the exported report.
+  const element = source.cloneNode(!printable) as HTMLElement;
+  if (printable) element.appendChild(printable.cloneNode(true));
   element.style.fontFamily = getComputedStyle(source).fontFamily;
   host.appendChild(element);
   document.body.appendChild(host);
   try {
     return await captureEventPdf(element);
+  } catch (error) {
+    console.warn("[LIM PDF]", eventPdfFailureCode(error));
+    throw error;
   } finally {
     host.remove();
   }
 }
 
 async function captureEventPdf(element: HTMLElement) {
-  const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
-    import("html2canvas"),
-    import("jspdf"),
-  ]);
   await document.fonts.ready;
   const marker = "pdf-" + crypto.randomUUID();
   element.dataset.pdfCapture = marker;

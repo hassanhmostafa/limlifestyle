@@ -1,3 +1,4 @@
+import { presentEventAdvice } from "@shared/eventAdvicePresentation";
 import { useEventLocale } from "@/contexts/EventLocale";
 import React from "react";
 import type { DashboardReading } from "@/components/BodyCompositionReport";
@@ -84,11 +85,13 @@ function AdvicePanel({ care }: { care: Care }) {
         )}
       </h2>
       <div data-doctor-advice>
-        {(care.advice || "لم تُضف توصيات.").split("\n").map((line, index) => (
-          <span className="lim-print-advice-line" data-pdf-keep key={index}>
-            {t(line || " ")}
-          </span>
-        ))}
+        {(presentEventAdvice(care.advice) || "لم تُضف توصيات.")
+          .split("\n")
+          .map((line, index) => (
+            <span className="lim-print-advice-line" data-pdf-keep key={index}>
+              {t(line || " ")}
+            </span>
+          ))}
       </div>
     </section>
   );

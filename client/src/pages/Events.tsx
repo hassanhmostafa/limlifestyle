@@ -1,3 +1,4 @@
+import { presentEventAdvice } from "@shared/eventAdvicePresentation";
 import { useEventLocale } from "@/contexts/EventLocale";
 import { EventOtpVerification } from "@/components/EventOtpVerification";
 import EventPdfButton from "@/components/EventPdfButton";
@@ -992,10 +993,10 @@ export default function Events() {
                 <div
                   data-doctor-advice
                   dir={direction}
-                  lang="ar"
+                  lang={language}
                   className="whitespace-pre-wrap break-words rounded-2xl bg-white p-5 text-start leading-8 [overflow-wrap:anywhere] [unicode-bidi:plaintext]"
                 >
-                  {t(care.advice)}
+                  {t(presentEventAdvice(care.advice))}
                 </div>
                 {care.consultationMode !== "automatic" && (
                   <p className="text-sm">
