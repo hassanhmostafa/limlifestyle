@@ -138,10 +138,8 @@ export function composeEventLifestyleDraft(ids: readonly string[]) {
     .map(id => eventRecommendationById.get(id))
     .filter((item): item is EventRecommendationCatalogEntry => Boolean(item));
   return [
-    "نتائج BIA تقديرات وليست تشخيصًا؛ لا يُستنتج ضعف العضلات من كتلتها وحدها، ولا يُعد العمر الجسدي أو مؤشر الدهون الحشوية هدفًا علاجيًا.",
-    "توصيات تثقيفية مبنية على بيانات هذه الزيارة؛ اختر منها ما يلائمك وناقش أي قلق صحي مع مختص.",
+    "توصيات تثقيفية مبنية على بيانات هذه الزيارة.",
     ...selected.map((item, index) => `${index + 1}. ${item.text}`),
-    "مواعيد البداية والتدرج أمثلة تطبيقية لأهداف SMART تُعدَّل حسب القدرة وتفضيلات الشخص؛ ليست جرعات منقولة حرفيًا من المراجع.",
   ].join("\n");
 }
 
