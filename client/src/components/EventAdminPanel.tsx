@@ -477,6 +477,7 @@ export default function EventAdminPanel() {
             <p>
               تفعيل OTP: {otpDiagnostics.data.enabled ? "نعم" : "لا"} · اسم
               المرسل: {otpDiagnostics.data.senderConfigured ? "مضبوط" : "ناقص"}{" "}
+              · الاسم الفعلي: {otpDiagnostics.data.senderName ?? "غير صالح أو غير مضبوط"}{" "}
               · صيغة الإرسال: {otpDiagnostics.data.messageFormat} · سر التحقق:{" "}
               {otpDiagnostics.data.secretConfigured ? "مضبوط" : "ناقص"}
             </p>
