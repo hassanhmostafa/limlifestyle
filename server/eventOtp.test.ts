@@ -33,20 +33,22 @@ describe("OurSMS boundary", () => {
   expect(body).toEqual({src:'Authora',dests:['966501234567'],body:'رمز التحقق في ليم: 0123. صالح لمدة 10 دقائق. لا تشارك الرمز مع أحد.'});
  });
 
- it("decodes percent-encoded spaces in a sender ID only for the provider request",async()=>{
+ it("ignores the obsolete env sender and uses the versioned Authora sender",async()=>{
   vi.stubEnv('OURSMS_SENDER_ID','RAWZ%20OTP');
   vi.mocked(fetch).mockResolvedValue(new Response('{}'));
   await sendOurSms('+966501234567','0123');
   const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
-  expect(body.src).toBe('RAWZ OTP');
+  expect(body.src).toBe('Authora');
   expect(JSON.stringify(vi.mocked(fetch).mock.calls)).not.toContain('RAWZ%20OTP');
  });
- it("fails closed for an invalid percent-encoded sender ID",async()=>{
+ it("ignores a malformed obsolete env sender",async()=>{
   vi.stubEnv('OURSMS_SENDER_ID','LIM%bad');
-  await expect(sendOurSms('+966501234567','0123')).rejects.toThrow('OTP-SENDER');
-  expect(fetch).not.toHaveBeenCalled();
- });
- it.each(['OURSMS_API_KEY','OURSMS_SENDER_ID','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
+  vi.mocked(fetch).mockResolvedValue(new Response('{}'));
+  await sendOurSms('+966501234567','0123');
+  const body=JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+  expect(body.src).toBe('Authora');
+});
+ it.each(['OURSMS_API_KEY','EVENTS_OTP_SECRET'])('fails closed with missing %s',async key=>{
 
   vi.stubEnv(key,'');await expect(sendEventOtp('0501234567','ip')).rejects.toThrow('OTP-CONFIG');expect(fetch).not.toHaveBeenCalled();
  });

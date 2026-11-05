@@ -11,7 +11,7 @@ describe("OurSMS runtime diagnostics", () => {
   });
   it("uses a read-only authenticated endpoint and never reads the body", async () => {
     vi.stubEnv("OURSMS_API_KEY", "secret-key");
-    vi.stubEnv("OURSMS_SENDER_ID", "LIM%20Lifestyle");
+    vi.stubEnv("OURSMS_SENDER_ID", "RAWZ%20OTP");
     vi.stubEnv("EVENTS_OTP_SECRET", "s".repeat(32));
     const json = vi.fn(),
       text = vi.fn();
@@ -28,7 +28,7 @@ describe("OurSMS runtime diagnostics", () => {
     );
     expect(d.balanceReachable).toBe(true);
     expect(d.senderConfigured).toBe(true);
-    expect(d.senderName).toBe("LIM Lifestyle");
+    expect(d.senderName).toBe("Authora");
     expect(JSON.stringify(d)).not.toContain("secret-key");
     expect(json).not.toHaveBeenCalled();
     expect(text).not.toHaveBeenCalled();

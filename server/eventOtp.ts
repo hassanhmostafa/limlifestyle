@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { eventOtpChallenges, eventOtpLimits } from "../drizzle/schema";
 import { getDb } from "./db";
 import { normalizeSaudiMobilePhone } from "./lib/phone";
+import { OURSMS_SENDER_ID } from "./lib/oursmsConfig";
 
 const TTL = 10 * 60_000;
 export const otpEnabled = () => process.env.EVENTS_OTP_ENABLED === "true";
@@ -35,11 +36,10 @@ function otpSender(value: string) {
 
 export function otpConfiguration() {
   const key = process.env.OURSMS_API_KEY?.trim();
-  const configuredSender = process.env.OURSMS_SENDER_ID?.trim();
   const secret = process.env.EVENTS_OTP_SECRET;
-  if (!otpEnabled() || !key || !configuredSender || !secret || secret.length < 32)
+  if (!otpEnabled() || !key || !secret || secret.length < 32)
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "التحقق بالجوال غير متاح حاليًا. تواصل مع منظم الفعالية. (OTP-CONFIG)" });
-  const sender = otpSender(configuredSender);
+  const sender = otpSender(OURSMS_SENDER_ID);
   return { key, sender, secret };
 }
 export function otpDigest(phoneHash: string, tokenHash: string, code: string) {

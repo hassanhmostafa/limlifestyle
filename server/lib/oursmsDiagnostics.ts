@@ -1,17 +1,9 @@
 import crypto from "node:crypto";
+import { OURSMS_SENDER_ID } from "./oursmsConfig";
 /** Read-only diagnostics from the actual server runtime. Never return credentials. */
 export async function getOurSmsDiagnostics(fetcher: typeof fetch = fetch) {
   const key = process.env.OURSMS_API_KEY?.trim();
-  const configuredSender = process.env.OURSMS_SENDER_ID?.trim();
-  let senderName: string | null = null;
-  if (configuredSender) {
-    try {
-      const decoded = decodeURIComponent(configuredSender).trim();
-      if (decoded) senderName = decoded;
-    } catch {
-      senderName = null;
-    }
-  }
+  const senderName = decodeURIComponent(OURSMS_SENDER_ID).trim();
   const base = {
     provider: "OurSMS",
     enabled: process.env.EVENTS_OTP_ENABLED === "true",
@@ -22,7 +14,7 @@ export async function getOurSmsDiagnostics(fetcher: typeof fetch = fetch) {
         crypto.createHash("sha256").update(key).digest("hex").slice(0, 12)
       : null,
     messageFormat: "original-lim-text-v1" as const,
-    senderConfigured: Boolean(configuredSender),
+    senderConfigured: Boolean(senderName),
     senderName,
     secretConfigured: (process.env.EVENTS_OTP_SECRET?.length ?? 0) >= 32,
   };
