@@ -4,8 +4,6 @@ import { eventLifestyleSections } from "../shared/eventLifestyle";
 export const PHYSICIAN_PLAN_VERSION = "physician-fitt-smart-2026-11-12";
 export const PHYSICIAN_PLAN_SOURCES = [
   "UPLOADED_FITT_SMART_EXAMPLES",
-  "UPLOADED_CHI_PHM_GUIDEBOOK",
-  "UPLOADED_PHM_CLINICAL_SUMMARY",
 ];
 const labels: Record<string, string> = {
   nutrition: "التغذية",

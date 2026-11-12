@@ -29,6 +29,7 @@ import {
   minimizeNursingMeasurements,
   minimizeQuestionnaire,
   candidateSuggestionIds,
+  bodySuggestionIds,
 } from "./eventRecommendationEngine";
 import { eventRecommendationById } from "../shared/eventRecommendationCatalog";
 
@@ -37,7 +38,7 @@ const session = {
   userId: 7,
   eventCode: "lim-events",
   latestRecordNo: "X18-1",
-  answers: { priority1: "activity", priority2: "sleep", priority3: "nutrition", activeDays: "1", activeMinutes: "20", sleepHours: "6", tobacco: "3" },
+  answers: { activeDays: "1", activeMinutes: "20", sleepHours: "6", tobacco: "3" },
 };
 const care = {
   sessionId: 1,
@@ -47,9 +48,9 @@ const care = {
   revision: 4,
   measurements: { blood_pressure: { systolic: "130", diastolic: "80" } },
 };
-function dbForSession() {
+function dbForSession(row = session) {
   return {
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => [session] }) }) }),
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => [row] }) }) }),
   };
 }
 
@@ -99,8 +100,11 @@ describe("automatic Events recommendations", () => {
     }), expect.objectContaining({
       model: "gpt-5-mini",
       recommendationMeta: expect.objectContaining({
-        suggestionIds: ["measurement-followup", "small-goal"],
-        sourceIds: [eventRecommendationById.get("measurement-followup")!.sourceId],
+        suggestionIds: ["body-composition-context", "measurement-followup", "small-goal"],
+        sourceIds: [
+          eventRecommendationById.get("body-composition-context")!.sourceId,
+          eventRecommendationById.get("measurement-followup")!.sourceId,
+        ],
       }),
     }));
   });
@@ -166,6 +170,15 @@ describe("automatic Events recommendations", () => {
   });
 
   it("persists an editable physician-only allowlisted draft without approval", async () => {
+    getDb.mockResolvedValue(dbForSession({
+      ...session,
+      answers: {
+        ...session.answers,
+        priority1: "activity",
+        priority2: "sleep",
+        priority3: "nutrition",
+      },
+    }));
     readCare.mockReset();
     readCare.mockResolvedValue({ ...care, consultationMode: "physician", nursingEnabled: 0, nursingCompletedAt: null });
     const result = await generatePhysicianRecommendationDraftForSession({
@@ -174,6 +187,32 @@ describe("automatic Events recommendations", () => {
     expect(result.advice).toContain("الوصفة FITT");
     expect(result.advice).toContain("اقتراحات أهداف SMART");
     expect(invoke).not.toHaveBeenCalled();
-    expect(updateCare).toHaveBeenCalledWith(1, expect.objectContaining({ approvedAt: null, recommendationMeta: expect.objectContaining({ reviewRequired: true }) }), false, 1, 4);
+    expect(updateCare).toHaveBeenCalledWith(1, expect.objectContaining({ approvedAt: null, recommendationMeta: expect.objectContaining({
+      reviewRequired: true,
+      sourceIds: expect.arrayContaining([
+        "UPLOADED_FITT_SMART_EXAMPLES",
+        "ACLM_BOARD4_ACTIVITY",
+        "ACLM_BOARD4_SLEEP",
+        "ACLM_BOARD4_NUTRITION",
+      ]),
+    }) }), false, 1, 4);
+    const metadata = vi.mocked(updateCare).mock.calls[0][1].recommendationMeta as { sourceIds: string[] };
+    expect(metadata.sourceIds).not.toContain("UPLOADED_CHI_PHM_GUIDEBOOK");
+    expect(metadata.sourceIds).not.toContain("UPLOADED_PHM_CLINICAL_SUMMARY");
+  });
+});
+
+describe("age-specific BIA guidance", () => {
+  const input = { answers: {}, body: { bmi: 29.4 }, nursing: {} };
+  it("offers weight and muscle guidance for an adult with elevated BMI", () => {
+    expect(bodySuggestionIds({ ...input, age: 42 })).toContain("body-resistance");
+    expect(bodySuggestionIds({ ...input, age: 42 })).toContain("body-weight-plan");
+  });
+  it("uses geriatric assessment instead of routine weight loss at 65", () => {
+    expect(bodySuggestionIds({ ...input, age: 65 })).toEqual(["older-nutrition-review", "body-composition-context"]);
+  });
+  it("does not infer weight-loss eligibility from fat, visceral index, or missing age", () => {
+    expect(bodySuggestionIds(input)).toEqual(["body-composition-context"]);
+    expect(bodySuggestionIds({ ...input, age: 42, body: { bmi: 24, fatRate: 40, vfal: 12 } })).toEqual(["body-composition-context"]);
   });
 });
