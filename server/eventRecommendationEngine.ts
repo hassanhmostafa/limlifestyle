@@ -24,6 +24,9 @@ import { getDb } from "./db";
 import { and, eq } from "drizzle-orm";
 import { archiveApprovedEventReportSnapshot } from "./eventReportArchive";
 
+import { composePhysicianPlan, PHYSICIAN_PLAN_VERSION, PHYSICIAN_PLAN_SOURCES } from "./eventPhysicianPlan";
+import { lifestyleSectionsForAnswers } from "../shared/eventLifestyle";
+
 const MAX_NUMERIC_NURSING_VALUE = 10_000;
 /** Keep all provider work below the 90-second automatic-generation lease. */
 const MODEL_CATALOG_DEADLINE_MS = 8_000;
@@ -45,7 +48,6 @@ export type MinimizedRecommendationInput = {
   answers: Record<string, string | number | string[]>;
   body: Record<string, number>;
   nursing: Record<string, Record<string, string | number>>;
-  age?: number;
 };
 
 function numeric(value: unknown) {
@@ -238,17 +240,8 @@ function stableFingerprint(value: unknown) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-export function bodySuggestionIds(input: MinimizedRecommendationInput) {
-  const age = input.age;
-  if (age !== undefined && age >= 65) return ["older-nutrition-review", "body-composition-context"];
-  if (age !== undefined && age >= 18 && input.body.bmi >= 25)
-    return ["body-aerobic", "body-resistance", "body-weight-plan", "body-composition-context"];
-  return ["body-composition-context"];
-}
-
 async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
-  const bodyIds = bodySuggestionIds(input);
-  const candidateIds = [...candidateSuggestionIds(input.answers), ...bodyIds];
+  const candidateIds = candidateSuggestionIds(input.answers);
   const catalog = candidateIds.map(id => {
     const entry = eventRecommendationById.get(id)!;
     return {
@@ -311,10 +304,7 @@ async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
     parsed.suggestionIds.some(id => typeof id !== "string" || !candidateIds.includes(id))
   )
     throw new Error("Recommendation selection did not satisfy the allowlist.");
-  // Always retain applicable body advice, then fill remaining slots with the
-  // model's priorities; age-specific cards cannot be selected out of scope.
-  const bodyRequired = bodyIds.slice(0, 2);
-  return { model, ids: Array.from(new Set([...bodyRequired, ...parsed.suggestionIds as string[]])).slice(0, 4) };
+  return { model, ids: parsed.suggestionIds as string[] };
 }
 
 async function readRecommendationSession(sessionId: number) {
@@ -349,11 +339,10 @@ async function buildMinimizedInput(sessionId: number) {
     answers: minimizeQuestionnaire(session.answers),
     body: minimizeBodyReading(latest),
     nursing: minimizeNursingMeasurements(care.measurements),
-    age: integerInRange(session.age, 18, 120),
   };
   if (!hasSubstantiveBodyCompositionResult(input.body))
     throw new Error("A completed body-composition result is required.");
-  return { session, care, input, fingerprint: stableFingerprint(input) };
+  return { session, care, input, fingerprint: stableFingerprint({ input, physicianAnswers: care.consultationMode === "physician" ? session.answers : undefined }) };
 }
 
 async function inputStillMatches(
@@ -381,10 +370,6 @@ function recommendationMeta(ids: string[], fingerprint: string, mode: EventConsu
     inputFingerprint: fingerprint,
     suggestionIds: chosen.map(item => item.id),
     sourceIds: Array.from(new Set(chosen.map(item => item.sourceId))),
-    sourceDetails: chosen.map(item => ({ suggestionId: item.id, sourceId: item.sourceId,
-      location: item.sourceLocation ?? "Foundations of Lifestyle Medicine Board Review, 4th ed.; relevant pillar chapter",
-      rationale: item.sourceSummary })),
-    smartSchedules: "Applied examples, not verbatim guideline doses",
   };
 }
 
@@ -498,10 +483,25 @@ export async function generatePhysicianRecommendationDraftForSession(input: {
       inputFingerprint: context.fingerprint,
     };
   } else {
-    const selected = await chooseSuggestionIds(context.input);
-    advice = composeEventLifestyleDraft(selected.ids);
-    metadata = recommendationMeta(selected.ids, context.fingerprint, "physician");
-    model = selected.model;
+    const answers: EventAnswers = { ...context.input.answers };
+    for (const question of lifestyleSectionsForAnswers(context.session.answers ?? {}).flatMap(section => section.questions)) {
+      const raw = context.session.answers?.[question.id];
+      if (question.options) {
+        const allowed = new Set(question.options.map(option => option.value));
+        if (typeof raw === "string" && allowed.has(raw)) answers[question.id] = raw;
+        if (Array.isArray(raw)) answers[question.id] = raw.filter(value => allowed.has(value));
+      }
+    }
+    const plan = composePhysicianPlan(answers);
+    advice = plan.advice;
+    metadata = {
+      promptVersion: PHYSICIAN_PLAN_VERSION,
+      mode: "physician", reviewRequired: true,
+      inputFingerprint: context.fingerprint,
+      priorities: plan.priorities,
+      sourceIds: PHYSICIAN_PLAN_SOURCES,
+      suggestionIds: plan.priorities.map(pillar => `fitt-smart-${pillar}`),
+    };
   }
   if (!(await inputStillMatches(input.sessionId, {
     recordNo: context.session.latestRecordNo!,

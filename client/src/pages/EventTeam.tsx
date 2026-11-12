@@ -1,4 +1,3 @@
-import { recommendationReviewSources } from "../../../shared/eventRecommendationCatalog";
 import EventLifestyleCharts from "@/components/EventLifestyleCharts";
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -490,7 +489,6 @@ export default function EventTeam() {
                         readings={record.data!.readings}
                         participant={{
                           firstName: participant.name,
-                          phone: participant.phone,
                           age: participant.age,
                           sex: participant.sex,
                         }}
@@ -530,11 +528,12 @@ export default function EventTeam() {
                     </section>
                     <label className="block rounded-2xl bg-white p-5">
                       <span className="mb-3 block font-bold">
-                        نصائح الطبيب التي تظهر للمستفيد
+                        وصفة الطبيب وأهدافه — تُعرض للمستفيد بعد الاعتماد
                       </span>
+                      <p className="mb-3 text-sm text-slate-600">تُبنى المسودة على الأولويات الثلاث المختارة وإجابات المشارك. اختر هدفًا أو هدفين للبدء من الخيارات، واحذف غير المختار وعدّل النص قبل الاعتماد.</p>
                       <textarea
                         className={multilineInputClass}
-                        rows={6}
+                        rows={18}
                         dir="rtl"
                         lang="ar"
                         wrap="soft"
@@ -546,20 +545,6 @@ export default function EventTeam() {
                         onChange={e => { setAdvice(e.target.value); setAdviceDirty(true); }}
                       />
                     </label>
-                    {recommendationReviewSources(care.recommendationMeta?.suggestionIds).length > 0 && (
-                      <details className="rounded-xl border border-slate-200 bg-white p-3 text-sm" dir="rtl">
-                        <summary className="cursor-pointer font-bold">مراجع المسودة وأسباب الاختيار</summary>
-                        <p className="mt-2">مواعيد البداية والتدرج صياغة SMART تطبيقية قابلة للتعديل، وليست جرعات منقولة حرفيًا. راجع الملاءمة السريرية قبل الاعتماد.</p>
-                        {recommendationReviewSources(care.recommendationMeta?.suggestionIds).map(source => (
-                          <div key={source.id} className="mt-3 border-t pt-2">
-                            <p className="font-bold">{source.label}</p>
-                            <p>{source.title}</p>
-                            {source.location && <p>{source.location}</p>}
-                            <p>{source.rationale}</p>
-                          </div>
-                        ))}
-                      </details>
-                    )}
                     {!care.approvedAt && (
                       <div className="flex gap-3">
                         <button
@@ -567,7 +552,7 @@ export default function EventTeam() {
                           disabled={pending || adviceDirty || !record.data?.readings.length || Boolean(care.nursingEnabled && !care.nursingCompletedAt)}
                           onClick={() => generateDraft.mutate({ sessionId: participant.id, confirmed: true, expectedRevision: activeRevision })}
                         >
-                          {generateDraft.isPending ? "جارٍ إعداد مسودة خاصة…" : "إنشاء مسودة مقيدة بالمصادر"}
+                          {generateDraft.isPending ? "جارٍ إعداد مسودة خاصة…" : "إنشاء وصفة FITT وأهداف SMART"}
                         </button>
                         {adviceDirty && <p className="self-center text-sm text-amber-800">احفظ تعديلاتك أو استخدم نسخة الخادم قبل إنشاء مسودة جديدة.</p>}
                         <button

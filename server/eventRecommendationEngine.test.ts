@@ -29,15 +29,15 @@ import {
   minimizeNursingMeasurements,
   minimizeQuestionnaire,
   candidateSuggestionIds,
-  bodySuggestionIds,
 } from "./eventRecommendationEngine";
+import { eventRecommendationById } from "../shared/eventRecommendationCatalog";
 
 const session = {
   id: 1,
   userId: 7,
   eventCode: "lim-events",
   latestRecordNo: "X18-1",
-  answers: { activeDays: "1", activeMinutes: "20", sleepHours: "6", tobacco: "3" },
+  answers: { priority1: "activity", priority2: "sleep", priority3: "nutrition", activeDays: "1", activeMinutes: "20", sleepHours: "6", tobacco: "3" },
 };
 const care = {
   sessionId: 1,
@@ -99,8 +99,8 @@ describe("automatic Events recommendations", () => {
     }), expect.objectContaining({
       model: "gpt-5-mini",
       recommendationMeta: expect.objectContaining({
-        suggestionIds: ["body-composition-context", "measurement-followup", "small-goal"],
-        sourceIds: ["NICE_NG246_ASSESSMENT", "ACLM_BOARD4_BEHAVIOR"],
+        suggestionIds: ["measurement-followup", "small-goal"],
+        sourceIds: [eventRecommendationById.get("measurement-followup")!.sourceId],
       }),
     }));
   });
@@ -171,22 +171,9 @@ describe("automatic Events recommendations", () => {
     const result = await generatePhysicianRecommendationDraftForSession({
       sessionId: 1, trackId: 1, expectedRevision: 4, doctor: { userId: 12, staffId: 8, name: "طبيب تجريبي" },
     });
-    expect(result.advice).toContain("توصيات تثقيفية");
+    expect(result.advice).toContain("الوصفة FITT");
+    expect(result.advice).toContain("اقتراحات أهداف SMART");
+    expect(invoke).not.toHaveBeenCalled();
     expect(updateCare).toHaveBeenCalledWith(1, expect.objectContaining({ approvedAt: null, recommendationMeta: expect.objectContaining({ reviewRequired: true }) }), false, 1, 4);
-  });
-});
-
-describe("age-specific BIA guidance", () => {
-  const input = { answers: {}, body: { bmi: 29.4 }, nursing: {} };
-  it("offers weight and muscle guidance for an adult with elevated BMI", () => {
-    expect(bodySuggestionIds({ ...input, age: 42 })).toContain("body-resistance");
-    expect(bodySuggestionIds({ ...input, age: 42 })).toContain("body-weight-plan");
-  });
-  it("uses geriatric assessment instead of routine weight loss at 65", () => {
-    expect(bodySuggestionIds({ ...input, age: 65 })).toEqual(["older-nutrition-review", "body-composition-context"]);
-  });
-  it("does not infer weight-loss eligibility from fat, visceral index, or missing age", () => {
-    expect(bodySuggestionIds(input)).toEqual(["body-composition-context"]);
-    expect(bodySuggestionIds({ ...input, age: 42, body: { bmi: 24, fatRate: 40, vfal: 12 } })).toEqual(["body-composition-context"]);
   });
 });
