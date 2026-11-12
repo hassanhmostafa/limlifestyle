@@ -1,4 +1,5 @@
 import html2canvas from "html2canvas";
+import { adviceLineKind } from "./eventAdviceLayout";
 import JsPDF from "jspdf";
 import { eventPdfFailureCode } from "./eventPdfFailure";
 /** Export the visible report as paginated A4 PDF; does not depend on window.print. */
@@ -152,52 +153,43 @@ export function wrapPdfText(
 
 /** Draw whole visual lines so browser shaping keeps Arabic letters joined. */
 function rasterizeAdvice(doc: Document, root: HTMLElement) {
-  const rendered: Array<{
-    image: HTMLImageElement;
-    lineHeight: number;
-    count: number;
-  }> = [];
-  for (const node of Array.from(
-    root.querySelectorAll<HTMLElement>("[data-doctor-advice], .lim-print-notes")
-  )) {
+  const rendered: Array<{ image: HTMLImageElement; lineHeight: number; count: number }> = [];
+  for (const node of Array.from(root.querySelectorAll<HTMLElement>("[data-doctor-advice], .lim-print-notes"))) {
     const css = doc.defaultView!.getComputedStyle(node);
     const width = Math.max(1, node.getBoundingClientRect().width);
     const size = parseFloat(css.fontSize) || 12;
-    const lineHeight = Math.max(
-      parseFloat(css.lineHeight) || size * 1.6,
-      size * 1.6
-    );
+    const lineHeight = Math.max(parseFloat(css.lineHeight) || size * 1.6, size * 1.6);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
-    const font = `${css.fontWeight} ${size}px ${css.fontFamily}`;
-    ctx.font = font;
     const paragraphs = node.querySelectorAll(".lim-print-advice-line");
-    const text = paragraphs.length
-      ? Array.from(paragraphs, line => line.textContent || " ").join("\n")
-      : node.textContent || "";
-    const lines = wrapPdfText(
-      text,
-      width - 4,
-      value => ctx.measureText(value).width
-    );
+    const text = paragraphs.length ? Array.from(paragraphs, line => line.textContent || " ").join("\n") : node.textContent || "";
+    const isAdvice = node.hasAttribute("data-doctor-advice");
+    const rows: Array<{ text: string; font: string; color: string; heading: boolean }> = [];
+    for (const paragraph of text.split("\n")) {
+      const kind = isAdvice ? adviceLineKind(paragraph) : 'text';
+      const heading = kind === 'heading';
+      const font = `${heading || kind === 'label' ? 700 : css.fontWeight} ${size}px ${css.fontFamily}`;
+      ctx.font = font;
+      const color = heading ? '#123f37' : css.color;
+      for (const line of wrapPdfText(paragraph, width - 12, value => ctx.measureText(value).width)) rows.push({ text: line, font, color, heading });
+    }
     canvas.width = Math.ceil(width * 2);
-    canvas.height = Math.ceil(lines.length * lineHeight * 2 + 8);
+    canvas.height = Math.ceil(rows.length * lineHeight * 2 + 8);
     ctx.scale(2, 2);
-    ctx.font = font;
-    ctx.fillStyle = css.color;
     const rtl = /[\u0600-\u06ff]/.test(text);
     ctx.direction = rtl ? "rtl" : "ltr";
     ctx.textAlign = rtl ? "right" : "left";
     ctx.textBaseline = "top";
-    lines.forEach((line, index) =>
-      ctx.fillText(line, rtl ? width - 2 : 2, index * lineHeight + 2)
-    );
+    rows.forEach((row, index) => {
+      if (row.heading) { ctx.fillStyle = '#edf6f1'; ctx.fillRect(0, index * lineHeight, width, lineHeight); }
+      ctx.font = row.font; ctx.fillStyle = row.color;
+      ctx.fillText(row.text, rtl ? width - 6 : 6, index * lineHeight + 2);
+    });
     const image = doc.createElement("img");
-    image.src = canvas.toDataURL("image/png");
-    image.alt = text;
+    image.src = canvas.toDataURL("image/png"); image.alt = text;
     image.style.cssText = `display:block;width:${width}px;height:${canvas.height / 2}px;max-width:none`;
     node.replaceChildren(image);
-    rendered.push({ image, lineHeight, count: lines.length });
+    rendered.push({ image, lineHeight, count: rows.length });
     canvas.width = canvas.height = 0;
   }
   return rendered;

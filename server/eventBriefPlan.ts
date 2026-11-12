@@ -1,5 +1,5 @@
 import type { EventAnswers } from '../shared/eventLifestyle';
-export const BRIEF_PLAN_VERSION='brief-single-source-2026-11-13';
+export const BRIEF_PLAN_VERSION='brief-single-source-2026-11-13-readable-v2';
 export const BRIEF_PLAN_SOURCE='PHA_LIFESTYLE_GUIDELINES_20260705';
 type Body=Record<string,number>;
 const labels:Record<string,string>={sleep:'النوم',activity:'النشاط البدني',nutrition:'التغذية',stress:'إدارة الضغوط',connection:'الترابط الاجتماعي',substances:'تجنب المواد الضارة'};
@@ -22,22 +22,23 @@ export function composeEventBriefPlan(input:{answers:EventAnswers;body?:Body;age
  const sections=(priorities as string[]).map((p,index)=>{
   const goals:string[]=[]; let rx='';
   if(p==='sleep'){
-   const short=['0','1','2'].includes(String(a.sleepHours));
-   const known=a.sleepHours!==undefined;
+   const code=String(a.sleepHours);
+   const short=['0','1','2'].includes(code);
+   const known=['0','1','2','3','3.1','2.1','0.1'].includes(code);
    rx=known?`نظّم النوم والاستيقاظ يوميًا، ${short?'وزِد مدة النوم تدريجيًا نحو':'وحافظ على'} ${age!==undefined&&age>=65?'٧–٨':'٧–٩'} ساعات، مع روتين هادئ قبل النوم.`:'استكمل تقييم مدة النوم وانتظامه قبل تحديد خطة شخصية.';
-   if(short)goals.push('قدّم موعد النوم ١٥ دقيقة في الأسبوع الأول، وراجع المدة أسبوعيًا لتقترب من ٧ ساعات على الأقل خلال ٤ أسابيع.');
+   if(short)goals.push('نم أبكر من موعدك المعتاد بـ١٥ دقيقة يوميًا لأسبوع، ثم راجع المدة أسبوعيًا لمدة ٤ أسابيع.');
    if(known)goals.push('سجّل وقت النوم والاستيقاظ كل صباح لمدة أسبوعين.');
   }else if(p==='activity'){
    const days=number(a,'activeDays'),mins=number(a,'activeMinutes'),strength=number(a,'strengthDays');
    const total=days!==undefined&&mins!==undefined?days*mins:undefined;
    rx=total===undefined?'استكمل تسجيل أيام النشاط ومدته قبل تحديد الجرعة المناسبة.':`${highWeight?'اجمع بين النشاط الهوائي والمقاومة لدعم خفض الدهون والحفاظ على العضلات':'مارس نشاطًا هوائيًا وتمارين للعضلات الرئيسية'} بشدة متوسطة؛ ${total>=150?'حافظ على مجموع نشاطك الحالي ووزّعه حسب قدرتك':'ابدأ بجلسات قصيرة وزِد المدة تدريجيًا حسب قدرتك'}.`;
-   if(total!==undefined&&total>=150)goals.push(`وزّع نشاطك الحالي (${total} دقيقة أسبوعيًا) على جلسات أقصر خلال ${Math.max(4,Math.min(5,days!))} أيام أسبوعيًا لمدة ٤ أسابيع، حسب التحمل.`);
+   if(total!==undefined&&total>=150)goals.push(`وزّع ${total} دقيقة نشاط على ${Math.max(4,Math.min(5,days!))} أيام أسبوعيًا لمدة ٤ أسابيع، بجلسات أقصر حسب التحمل.`);
    else if(total!==undefined){const start=total===0?10:Math.max(10,Math.min(20,mins!));goals.push(`امشِ ${start} دقائق في ${Math.max(3,Math.min(5,days??3))} أيام أسبوعيًا لمدة أسبوعين، ثم زد المدة تدريجيًا حسب التحمل.`);}
-   if(strength!==undefined)goals.push(strength>=2?'حافظ على جلستَي مقاومة للعضلات الرئيسية أسبوعيًا، مع راحة ٤٨ ساعة بينهما، لمدة ٤ أسابيع.':'ابدأ بجلسة مقاومة خفيفة أسبوعيًا لمدة أسبوعين، ثم جلستين غير متتاليتين للأسبوعين التاليين، حسب التحمل.');
+   if(strength!==undefined)goals.push(strength>=2?'حافظ على جلستَي مقاومة أسبوعيًا، بينهما ٤٨ ساعة راحة، لمدة ٤ أسابيع.':'ابدأ بجلسة مقاومة خفيفة أسبوعيًا لمدة أسبوعين، ثم جلستين غير متتاليتين للأسبوعين التاليين، حسب التحمل.');
   }else if(p==='nutrition'){
    rx=lowWeight?'تناول غذاءً متوازنًا يوميًا يتضمن البروتين والحبوب والخضروات، دون تقليل الكميات قبل تقييم احتياجك.':`${highWeight?'اضبط كميات وجباتك تدريجيًا لدعم خفض الدهون مع الحفاظ على مصادر البروتين':'حافظ على غذاء متوازن ومتنوع يوميًا'}، واستبدل الحبوب البيضاء بالكاملة ضمن الكمية المعتادة.`;
    const grain=number(a,'wholeGrains'),refined=number(a,'refinedGrains'),veg=number(a,'vegetables'),sugar=number(a,'sugary');
-   if(grain!==undefined&&grain<10.5&&refined!==undefined&&refined>0)goals.push('استبدل الحبوب البيضاء بكمية مماثلة من خيار كامل في وجبة واحدة، ٥ أيام أسبوعيًا لمدة ٤ أسابيع.');
+   if(grain!==undefined&&grain<10.5&&refined!==undefined&&refined>0)goals.push('استبدل الحبوب البيضاء بالكاملة بنفس الكمية في وجبة واحدة، ٥ أيام أسبوعيًا لمدة ٤ أسابيع.');
    if(veg!==undefined&&veg<10.5)goals.push('أضف الخضروات إلى وجبة واحدة في ٥ أيام أسبوعيًا لمدة ٤ أسابيع.');
    if(sugar!==undefined&&sugar>=2)goals.push('استبدل اختيارًا محلى معتادًا بفاكهة أو مشروب غير محلى في كل مرة تتناوله، لمدة ٤ أسابيع.');
    if(goals.length<2)goals.push('سجّل طعامك وشرابك وكمياتهما خلال ٣ أيام من الأسبوع الأول لتحديد تعديل مناسب.');
