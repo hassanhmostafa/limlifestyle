@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { invokeLLM, listLLMModels } from "./_core/llm";
 import { getEventReadingByRecordNo } from "./db";
 import {
   claimAutomaticRecommendationGeneration,
@@ -10,28 +9,17 @@ import {
 } from "./eventCareDb";
 import {
   EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION,
-  type EventConsultationMode,
 } from "../shared/eventConsultation";
 import type { EventAnswers } from "../shared/eventLifestyle";
 import type { Measurements } from "../shared/eventCare";
 import { nursingCatalog } from "../shared/eventNursing";
-import {
-  composeEventLifestyleDraft,
-  eventRecommendationById,
-} from "../shared/eventRecommendationCatalog";
 import { eventParticipantSessions } from "../drizzle/schema";
 import { getDb } from "./db";
 import { and, eq } from "drizzle-orm";
 import { archiveApprovedEventReportSnapshot } from "./eventReportArchive";
-
-import { composePhysicianPlan, PHYSICIAN_PLAN_VERSION } from "./eventPhysicianPlan";
-import { physicianEvidence } from "./eventPhysicianEvidence";
+import { composeEventBriefPlan } from "./eventBriefPlan";
 import { lifestyleSectionsForAnswers } from "../shared/eventLifestyle";
-
 const MAX_NUMERIC_NURSING_VALUE = 10_000;
-/** Keep all provider work below the 90-second automatic-generation lease. */
-const MODEL_CATALOG_DEADLINE_MS = 8_000;
-const MODEL_SELECTION_DEADLINE_MS = 58_000;
 const frequencyValues = new Set(["0", "0.5", "2", "5", "10.5", "21"]);
 const sleepValues = new Set(["0", "1", "2", "3", "3.1", "2.1", "0.1"]);
 const recentFrequencyValues = new Set(["0", "1", "2", "3"]);
@@ -76,14 +64,34 @@ function closedValue(value: unknown, allowed: Set<string>) {
 export function minimizeQuestionnaire(answers: EventAnswers | null | undefined) {
   const source = answers ?? {};
   const output: Record<string, string | number | string[]> = {};
-  for (const id of ["fruit", "vegetables", "wholeGrains", "sugary"] as const) {
-    const value = closedValue(source[id], frequencyValues);
+  const sections = lifestyleSectionsForAnswers(source);
+  const questions = new Map(
+    sections.flatMap(section => section.questions).map(question => [question.id, question])
+  );
+  const frequencyIds = [
+    "fruit", "vegetables", "wholeGrains", "refinedGrains", "preparedFood",
+    "sugary", "salty", "fried",
+  ] as const;
+  for (const id of frequencyIds) {
+    const question = questions.get(id);
+    const allowed = new Set((question?.options ?? []).map(option => option.value));
+    const value = closedValue(source[id], allowed.size ? allowed : frequencyValues);
     if (value !== undefined) output[id] = value;
   }
   const sleep = closedValue(source.sleepHours, sleepValues);
   if (sleep !== undefined) output.sleepHours = sleep;
-  const tobacco = closedValue(source.tobacco, substanceFrequencyValues);
-  if (tobacco !== undefined) output.tobacco = tobacco;
+  for (const id of ["tobacco", "alcoholUse", "medMisuse", "cannabis", "otherDrugs"] as const) {
+    const question = questions.get(id);
+    const allowed = new Set((question?.options ?? []).map(option => option.value));
+    const value = closedValue(source[id], allowed.size ? allowed : substanceFrequencyValues);
+    if (value !== undefined) output[id] = value;
+  }
+  const proteinQuestion = questions.get("proteins");
+  const proteinAllowed = new Set((proteinQuestion?.options ?? []).map(option => option.value));
+  if (Array.isArray(source.proteins) && proteinAllowed.size) {
+    const proteins = source.proteins.filter(value => proteinAllowed.has(value));
+    if (proteins.length) output.proteins = proteins;
+  }
   for (const id of ["priority1", "priority2", "priority3"] as const) {
     const value = closedValue(source[id], priorityValues);
     if (value !== undefined) output[id] = value;
@@ -250,77 +258,6 @@ export function bodySuggestionIds(input: MinimizedRecommendationInput) {
   return ["body-composition-context"];
 }
 
-async function chooseSuggestionIds(input: MinimizedRecommendationInput) {
-  const bodyIds = bodySuggestionIds(input);
-  const candidateIds = [...candidateSuggestionIds(input.answers), ...bodyIds];
-  const catalog = candidateIds.map(id => {
-    const entry = eventRecommendationById.get(id)!;
-    return {
-      id: entry.id,
-      label: entry.label,
-      sourceId: entry.sourceId,
-      sourceSummary: entry.sourceSummary,
-    };
-  });
-  const models = await listLLMModels({ timeoutMs: MODEL_CATALOG_DEADLINE_MS });
-  const model = models.data.find(item => item.id === "gpt-5-mini")?.id;
-  if (!model) throw new Error("Configured structured recommendation model is unavailable.");
-  const response = await invokeLLM({
-    model,
-    timeoutMs: MODEL_SELECTION_DEADLINE_MS,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a conservative Arabic lifestyle-recommendation prioritizer. Select only IDs from the supplied allowlist. Do not produce prose, diagnoses, treatment, medication, calorie targets, exercise clearance, or emergency advice. Never infer missing facts. Return two to four distinct IDs that best match the supplied non-identifying numeric/closed-choice data.",
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          promptVersion: EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION,
-          candidates: catalog,
-          minimizedInputs: input,
-        }),
-      },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "event_recommendation_selection",
-        strict: true,
-        schema: {
-          type: "object",
-          properties: {
-            suggestionIds: {
-              type: "array",
-              minItems: 2,
-              maxItems: 4,
-              items: { type: "string", enum: candidateIds },
-            },
-          },
-          required: ["suggestionIds"],
-          additionalProperties: false,
-        },
-      },
-    },
-  });
-  const text = response.choices[0]?.message.content;
-  if (typeof text !== "string") throw new Error("Recommendation selection was empty.");
-  const parsed = JSON.parse(text) as { suggestionIds?: unknown };
-  if (
-    !Array.isArray(parsed.suggestionIds) ||
-    parsed.suggestionIds.length < 2 ||
-    parsed.suggestionIds.length > 4 ||
-    new Set(parsed.suggestionIds).size !== parsed.suggestionIds.length ||
-    parsed.suggestionIds.some(id => typeof id !== "string" || !candidateIds.includes(id))
-  )
-    throw new Error("Recommendation selection did not satisfy the allowlist.");
-  // Always retain applicable body advice, then fill remaining slots with the
-  // model's priorities; age-specific cards cannot be selected out of scope.
-  const bodyRequired = bodyIds.slice(0, 2);
-  return { model, ids: Array.from(new Set([...bodyRequired, ...parsed.suggestionIds as string[]])).slice(0, 4) };
-}
-
 async function readRecommendationSession(sessionId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -379,22 +316,6 @@ async function inputStillMatches(
   }
 }
 
-function recommendationMeta(ids: string[], fingerprint: string, mode: EventConsultationMode) {
-  const chosen = ids.map(id => eventRecommendationById.get(id)!).filter(Boolean);
-  return {
-    promptVersion: EVENT_AUTOMATIC_RECOMMENDATION_PROMPT_VERSION,
-    mode,
-    reviewRequired: mode === "physician",
-    inputFingerprint: fingerprint,
-    suggestionIds: chosen.map(item => item.id),
-    sourceIds: Array.from(new Set(chosen.map(item => item.sourceId))),
-    sourceDetails: chosen.map(item => ({ suggestionId: item.id, sourceId: item.sourceId,
-      location: item.sourceLocation ?? "Foundations of Lifestyle Medicine Board Review, 4th ed.; relevant pillar chapter",
-      rationale: item.sourceSummary })),
-    smartSchedules: "Applied examples, not verbatim guideline doses",
-  };
-}
-
 export type AutomaticRecommendationResult =
   | { state: "not_applicable" | "already_generated" | "retry_limit" | "waiting_for_nursing" | "waiting_for_body" | "busy" | "input_changed" | "failed" }
   | { state: "generated"; mode: "automatic" };
@@ -446,16 +367,27 @@ export async function generateAutomaticRecommendationsForSession(sessionId: numb
       }
       return { state: "input_changed" };
     }
-    const selected = await chooseSuggestionIds(context.input);
+    const brief = composeEventBriefPlan({
+      answers: context.input.answers as EventAnswers,
+      body: context.input.body,
+      age: context.input.age,
+    });
     if (!(await inputStillMatches(sessionId, {
       recordNo: attempt.recordNo,
       careRevision: claimed.care.revision,
       fingerprint: attempt.fingerprint,
     }))) return { state: "input_changed" };
     const published = await completeAutomaticRecommendationGeneration(sessionId, attempt, {
-      advice: composeEventLifestyleDraft(selected.ids),
-      recommendationMeta: recommendationMeta(selected.ids, context.fingerprint, "automatic"),
-      model: selected.model,
+      advice: brief.advice,
+      recommendationMeta: {
+        promptVersion: brief.promptVersion,
+        mode: "automatic",
+        reviewRequired: false,
+        inputFingerprint: context.fingerprint,
+        priorities: brief.priorities,
+        sourceIds: brief.sourceIds,
+      },
+      model: null,
     });
     if (published) {
       try { await archiveApprovedEventReportSnapshot(sessionId, true); } catch { /* retried when the final report is read */ }
@@ -514,33 +446,19 @@ export async function generatePhysicianRecommendationDraftForSession(input: {
         if (Array.isArray(raw)) answers[question.id] = raw.filter(value => allowed.has(value));
       }
     }
-    const plan = composePhysicianPlan(answers);
-    const evidence = physicianEvidence(
-      plan.priorities,
-      integerInRange(context.session.age, 18, 120),
-      context.input.body.bmi,
-    );
-    const adviceParts = plan.advice.split("\n\n");
-    const sectionParts = adviceParts.slice(2).map((section, index) => {
-      const pillar = plan.priorities[index];
-      const references = evidence.sources
-        .filter(source => source.pillar === pillar)
-        .map(source => `${source.title} — ${source.location}`)
-        .filter((value, sourceIndex, values) => values.indexOf(value) === sourceIndex);
-      return references.length
-        ? `${section}\nالمراجع المناسبة للمراجعة: ${references.join("؛ ")}`
-        : section;
+    const brief = composeEventBriefPlan({
+      answers,
+      body: context.input.body,
+      age: integerInRange(context.session.age, 18, 120),
     });
-    advice = [...adviceParts.slice(0, 2), ...sectionParts].join("\n\n");
     metadata = {
-      promptVersion: PHYSICIAN_PLAN_VERSION,
+      promptVersion: brief.promptVersion,
       mode: "physician", reviewRequired: true,
       inputFingerprint: context.fingerprint,
-      priorities: plan.priorities,
-      sourceIds: evidence.sourceIds,
-      sourceDetails: evidence.sources,
-      suggestionIds: plan.priorities.map(pillar => `fitt-smart-${pillar}`),
+      priorities: brief.priorities,
+      sourceIds: brief.sourceIds,
     };
+    advice = brief.advice;
   }
   if (!(await inputStillMatches(input.sessionId, {
     recordNo: context.session.latestRecordNo!,

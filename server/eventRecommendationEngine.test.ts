@@ -31,14 +31,17 @@ import {
   candidateSuggestionIds,
   bodySuggestionIds,
 } from "./eventRecommendationEngine";
-import { eventRecommendationById } from "../shared/eventRecommendationCatalog";
-
 const session = {
   id: 1,
   userId: 7,
   eventCode: "lim-events",
   latestRecordNo: "X18-1",
-  answers: { activeDays: "1", activeMinutes: "20", sleepHours: "6", tobacco: "3" },
+  age: 42,
+  answers: {
+    priority1: "sleep", priority2: "activity", priority3: "nutrition",
+    activeDays: "1", activeMinutes: "20", strengthDays: "1", sleepHours: "6",
+    wholeGrains: "5", refinedGrains: "5", vegetables: "10.5", sugary: "0.5", tobacco: "3",
+  },
 };
 const care = {
   sessionId: 1,
@@ -82,31 +85,22 @@ describe("automatic Events recommendations", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("uses only the structured allowlist and never forwards free-text nursing notes", async () => {
+  it("uses only closed questionnaire values and produces the brief plan without free text", async () => {
     readCare.mockReset();
     readCare.mockResolvedValue({ ...care, revision: 5, autoGenerationState: "generating", measurements: { blood_pressure: { systolic: "130", diastolic: "80" }, notes: { notes: "DO NOT FORWARD" }, bone_screening: { device: "DO NOT FORWARD" } } });
     const result = await generateAutomaticRecommendationsForSession(1);
     expect(result).toEqual({ state: "generated", mode: "automatic" });
-    const request = invoke.mock.calls[0][0];
-    expect(request.response_format.json_schema.strict).toBe(true);
-    expect(request.response_format.json_schema.schema.properties.suggestionIds).not.toHaveProperty("uniqueItems");
-    expect(request.timeoutMs).toBeLessThan(90_000);
-    expect(models).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: expect.any(Number) }));
-    expect(JSON.stringify(request.messages)).not.toContain("DO NOT FORWARD");
-    expect(JSON.stringify(request.messages)).not.toContain("arbitrarySecret");
+    const payload = complete.mock.calls[0][2];
     expect(complete).toHaveBeenCalledWith(1, expect.objectContaining({
       token: "attempt-1",
       recordNo: "X18-1",
     }), expect.objectContaining({
-      model: "gpt-5-mini",
-      recommendationMeta: expect.objectContaining({
-        suggestionIds: ["body-composition-context", "measurement-followup", "small-goal"],
-        sourceIds: [
-          eventRecommendationById.get("body-composition-context")!.sourceId,
-          eventRecommendationById.get("measurement-followup")!.sourceId,
-        ],
-      }),
+      model: null,
+      advice: expect.stringContaining("استبدل الحبوب البيضاء"),
+      recommendationMeta: expect.objectContaining({ sourceIds: ["PHA_LIFESTYLE_GUIDELINES_20260705"] }),
     }));
+    expect(payload.advice).not.toContain("DO NOT FORWARD");
+    expect(payload.advice).not.toContain("محلى");
   });
 
   it("uses the deterministic urgent blood-pressure path without calling the model", async () => {
@@ -118,14 +112,6 @@ describe("automatic Events recommendations", () => {
       model: null,
       recommendationMeta: expect.objectContaining({ sourceIds: ["AHA_BP_180_120"] }),
     }));
-  });
-
-  it("fails closed when the model returns an ID outside the source-backed allowlist", async () => {
-    invoke.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ suggestionIds: ["unreviewed-diagnosis", "sleep-routine"] }) } }] });
-    const result = await generateAutomaticRecommendationsForSession(1);
-    expect(result).toEqual({ state: "failed" });
-    expect(complete).not.toHaveBeenCalled();
-    expect(fail).toHaveBeenCalledWith(1, "attempt-1", expect.any(String));
   });
 
   it("treats missing questionnaire responses as unknown and strips arbitrary values", () => {
@@ -148,16 +134,6 @@ describe("automatic Events recommendations", () => {
     const result = await generateAutomaticRecommendationsForSession(1);
     expect(result).toEqual({ state: "input_changed" });
     expect(invoke).not.toHaveBeenCalled();
-    expect(complete).not.toHaveBeenCalled();
-  });
-
-  it("does not publish a model result when the same record changes during generation", async () => {
-    invoke.mockImplementationOnce(async () => {
-      reading.mockResolvedValue([{ height: 170, weight: 70, bmi: 24, sbp: 120, dbp: 80, machineMetrics: { fatRate: "29", skeletalMuscle: "42" } }]);
-      return { choices: [{ message: { content: JSON.stringify({ suggestionIds: ["measurement-followup", "small-goal"] }) } }] };
-    });
-    const result = await generateAutomaticRecommendationsForSession(1);
-    expect(result).toEqual({ state: "input_changed" });
     expect(complete).not.toHaveBeenCalled();
   });
 
@@ -184,21 +160,43 @@ describe("automatic Events recommendations", () => {
     const result = await generatePhysicianRecommendationDraftForSession({
       sessionId: 1, trackId: 1, expectedRevision: 4, doctor: { userId: 12, staffId: 8, name: "طبيب تجريبي" },
     });
-    expect(result.advice).toContain("الوصفة FITT");
-    expect(result.advice).toContain("اقتراحات أهداف SMART");
+    expect(result.advice).toContain("استبدل الحبوب البيضاء");
+    expect(result.advice).not.toContain("الوصفة FITT");
+    expect(result.advice).not.toContain("المراجع المناسبة للمراجعة");
     expect(invoke).not.toHaveBeenCalled();
     expect(updateCare).toHaveBeenCalledWith(1, expect.objectContaining({ approvedAt: null, recommendationMeta: expect.objectContaining({
       reviewRequired: true,
-      sourceIds: expect.arrayContaining([
-        "UPLOADED_FITT_SMART_EXAMPLES",
-        "ACLM_BOARD4_ACTIVITY",
-        "ACLM_BOARD4_SLEEP",
-        "ACLM_BOARD4_NUTRITION",
-      ]),
+      sourceIds: ["PHA_LIFESTYLE_GUIDELINES_20260705"],
     }) }), false, 1, 4);
     const metadata = vi.mocked(updateCare).mock.calls[0][1].recommendationMeta as { sourceIds: string[] };
-    expect(metadata.sourceIds).not.toContain("UPLOADED_CHI_PHM_GUIDEBOOK");
-    expect(metadata.sourceIds).not.toContain("UPLOADED_PHM_CLINICAL_SUMMARY");
+    expect(metadata.sourceIds).toEqual(["PHA_LIFESTYLE_GUIDELINES_20260705"]);
+  });
+
+  it("carries the real user food answers into both modes without inventing a sugary goal", async () => {
+    const userAnswers = {
+      priority1: "sleep", priority2: "activity", priority3: "nutrition",
+      sleepHours: "2", activeDays: 2, activeMinutes: 120, strengthDays: 2,
+      wholeGrains: "5", refinedGrains: "5", vegetables: "10.5", sugary: "0.5",
+    };
+    getDb.mockResolvedValue(dbForSession({ ...session, age: 42, answers: userAnswers }));
+    reading.mockResolvedValue([{ height: 162.5, weight: 75.7, bmi: 28.7, sbp: 120, dbp: 80, machineMetrics: { fatRate: "37.6", skeletalMuscle: "26" } }]);
+
+    readCare.mockReset();
+    readCare.mockResolvedValueOnce({ ...care, consultationMode: "automatic", revision: 4 })
+      .mockResolvedValue({ ...care, consultationMode: "automatic", revision: 5 });
+    expect(await generateAutomaticRecommendationsForSession(1)).toEqual({ state: "generated", mode: "automatic" });
+    const automaticAdvice = complete.mock.calls.at(-1)?.[2].advice as string;
+    expect(automaticAdvice).toContain("استبدل الحبوب البيضاء");
+    expect(automaticAdvice).not.toContain("محلى");
+
+    readCare.mockReset();
+    readCare.mockResolvedValue({ ...care, consultationMode: "physician", revision: 4, nursingEnabled: 0, nursingCompletedAt: null });
+    const physician = await generatePhysicianRecommendationDraftForSession({
+      sessionId: 1, trackId: 1, expectedRevision: 4,
+      doctor: { userId: 12, staffId: 8, name: "طبيب تجريبي" },
+    });
+    expect(physician.advice).toContain("استبدل الحبوب البيضاء");
+    expect(physician.advice).not.toContain("محلى");
   });
 });
 
