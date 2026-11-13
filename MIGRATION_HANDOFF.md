@@ -73,25 +73,32 @@ Values are entered only through the new project's Settings → Secrets / Environ
 
 ## 5. Database
 
-- Engine: **MySQL** (Drizzle `dialect: "mysql"`, driver `mysql2`).
+- Engine: **TiDB** (MySQL-compatible; Drizzle `dialect: "mysql"`, driver `mysql2`). Confirmed at migration time: `SET SESSION TRANSACTION READ ONLY` returns error 1235 (`function READ ONLY has only noop implementation in tidb`), and `mysqldump` fails with error 1305 `SAVEPOINT sp does not exist`.
+- Consequences: **`mysqldump` does not work against this server** and `READ ONLY` transactions are not enforced. A logical export must be produced through `mysql2` in one `REPEATABLE READ` consistent-snapshot transaction, with safety enforced by the export script (statement allowlist) rather than by the server.
 - 27 tables, including: `users`, `kiosks`, `health_readings`, `kiosk_devices`, `kiosk_sessions`, `bookings`, `expert_requests`, `conversations`, `messages`, `ai_plans`, `clinician_participant_access`, `event_*` (profiles, settings, staff, staff sessions, tracks, participant sessions, otp challenges/limits, care, researchers, research grants/sessions/audit, report archives).
 - Migrations: `drizzle/0000_*.sql` … `0022_event_report_pdf_claim_lease.sql`, journal in `drizzle/meta/_journal.json` (idx 0–22). Apply with `pnpm db:push` on a fresh database; the production database must already be at idx 22.
 
-Export (run where `DATABASE_URL` is available):
+Export (run where `DATABASE_URL` is available; **not** `mysqldump**):
 
 ```bash
-mysqldump --single-transaction --quick --no-tablespaces --routines --triggers \
-  --hex-blob --default-character-set=utf8mb4 \
-  --set-gtid-purged=OFF "$DATABASE_URL" > lim_prod.sql
+# Single connection, TiDB:
+#   SET SESSION tidb_enable_noop_functions = 1;   -- session-only, to accept READ ONLY as a no-op
+#   SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+#   SET SESSION TRANSACTION READ ONLY;             -- no-op on TiDB; safety comes from the script guard
+#   SET time_zone = '+00:00'; SET NAMES utf8mb4;
+#   START TRANSACTION WITH CONSISTENT SNAPSHOT;
+#   SHOW CREATE TABLE for every table (FK order) + SELECT * for every table
+#   COMMIT;
+# Emit escaped INSERTs (hex for binary, full mediumtext/JSON, byte-exact decimal/date/timestamp).
 ```
 
 Restore into the new database:
 
 ```bash
-mysql --default-character-set=utf8mb4 "$NEW_DATABASE_URL" < lim_prod.sql
+mysql --default-character-set=utf8mb4 "$NEW_DATABASE_URL" < lim_prod.sql   # SET FOREIGN_KEY_CHECKS=0 around it
 ```
 
-Verify after restore: table count = 27, per-table row counts match the pre-export counts, `drizzle/meta/_journal.json` state consistent (`pnpm db:push` reports no pending changes), and `pnpm db:check-events` passes. Encrypt the dump (`age`/`gpg`/7z with passphrase) before it leaves the machine; it contains participant PII. Never commit it.
+Verify after restore: table count = 27, per-table row counts match the pre-export counts, per-table deterministic checksums match (do not use `CHECKSUM TABLE`), restored `SHOW CREATE TABLE` matches source apart from `AUTO_INCREMENT`, `drizzle/meta/_journal.json` state consistent (`pnpm db:push` reports no pending changes), and `pnpm db:check-events` passes. Encrypt the dump (`age`/`gpg`/7z with passphrase) before it leaves the machine; it contains participant PII. Never commit it.
 
 ## 6. Private file storage
 
