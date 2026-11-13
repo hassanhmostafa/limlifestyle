@@ -124,3 +124,13 @@ Verify after restore: table count = 27, per-table row counts match the pre-expor
 ## 9. Do not migrate
 
 `.env*`, `node_modules/`, `dist/`, database dumps with real data, decrypted archives, QA screenshots/logs, Manus checkpoints/metadata. Keep the repo private and free of data exports.
+
+## 10. Known issue at migration time (2026-11-13): storage downloads return 403
+
+Exporting storage objects from the old project failed: `v1/storage/presign/get` returns HTTP 200 with a URL on `d36hbw14aib5lz.cloudfront.net`, and every GET of that URL returns `403 AccessDenied` (both with a plain unauthenticated GET and through the app's `/manus-storage/*` proxy). All 29 keys behave identically, so this is a platform/CDN-side problem, not a credential or script problem.
+
+Consequences for the migration:
+
+- All 15 `snapshotKey` objects are redundant: every snapshot is already embedded in `event_report_archives.snapshotPayload` (encrypted, base64) and travels with the database dump.
+- The 14 `pdfKey` objects are derived artefacts (PDFs rendered from snapshots). After the database is restored and `EVENT_REPORT_ARCHIVE_KEY` is in place, they can be regenerated from the embedded snapshots; compare against `pdfSha256` and record any object that cannot be reproduced byte-for-byte.
+- If byte-exact originals are required, escalate to Manus support / the project backup portal while the old project is still live. Do not delete the old project until this is resolved or explicitly waived.
