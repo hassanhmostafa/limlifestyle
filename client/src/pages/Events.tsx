@@ -906,14 +906,17 @@ export default function Events() {
                 )}
               </p>
               <p dir="ltr">{session.code}</p>
-              {session.deviceUserId && (
-                <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3">
-                  <QRCodeSVG
-                    value={session.deviceUserId}
-                    size={180}
-                    includeMargin
-                  />
-                </div>
+              {session.code && (
+                <>
+                  <p className="mt-3 text-sm">{t("رمز الزيارة للتمريض والطبيب")}</p>
+                  <div className="mx-auto my-4 w-fit rounded-2xl bg-white p-3">
+                    <QRCodeSVG
+                      value={session.code}
+                      size={180}
+                      includeMargin
+                    />
+                  </div>
+                </>
               )}
             </div>
             <Button

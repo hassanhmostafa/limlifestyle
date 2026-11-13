@@ -1,3 +1,4 @@
+import EventCameraScanner from "@/components/EventCameraScanner";
 import { recommendationReviewSources } from "../../../shared/eventRecommendationCatalog";
 import EventLifestyleCharts from "@/components/EventLifestyleCharts";
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +29,7 @@ export default function EventTeam() {
     onSuccess: () => window.location.assign("/events/team"),
   });
   const [query, setQuery] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const lookup = trpc.eventTeam.lookup.useMutation();
   const participant = lookup.data;
@@ -241,10 +243,14 @@ export default function EventTeam() {
                 onChange={e => setQuery(e.target.value)}
                 placeholder="05XXXXXXXX / LIM-…"
               />
-              <p className="my-3 text-sm text-slate-500">
-                ضع المؤشر في الخانة ثم استخدم القارئ اللاسلكي. زر Enter ينفذ
-                البحث.
-              </p>
+              <p className="my-3 text-sm text-slate-500">امسح رمز الزيارة بالكاميرا، أو اكتب رقم الجوال أو رمز الزيارة للبحث.</p>
+              <button type="button" className={`${buttonClass} mb-3 w-full`} disabled={lookup.isPending || pending || adviceDirty || nursingDirty} onClick={() => setScannerOpen(true)}>مسح رمز المشارك بالكاميرا</button>
+              {(adviceDirty || nursingDirty) && <p className="mb-3 text-sm">احفظ تعديلات الزيارة الحالية قبل مسح مشارك آخر.</p>}
+              {scannerOpen && <EventCameraScanner onClose={() => setScannerOpen(false)} onScan={value => {
+                setScannerOpen(false);
+                if (pending || lookup.isPending) return;
+                setQuery(value); setConfirmed(false); setMessage(""); lookup.reset(); lookup.mutate({query:value});
+              }} />}
               <button
                 className={buttonClass}
                 disabled={lookup.isPending || pending || !query.trim()}

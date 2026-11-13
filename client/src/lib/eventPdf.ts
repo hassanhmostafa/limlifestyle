@@ -46,11 +46,20 @@ export function adjustPdfSliceBottom(
     );
   });
   if (!crossing.length) return bottom;
+  const nextBlockTop = Math.min(...crossing.map(block => block.top * pixelScale));
+  // The usual safety gap must not cut a completed panel just before the next
+  // large block (for example advice followed by the lifestyle summary).
+  const previousBlockBottom = Math.max(
+    top,
+    ...keepTogether
+      .map(block => block.bottom * pixelScale)
+      .filter(end => end > top && end <= nextBlockTop - tolerance)
+  );
   return Math.floor(
     Math.max(
       top + 1,
-      Math.min(...crossing.map(block => block.top * pixelScale)) -
-        pixelScale * 18
+      nextBlockTop - pixelScale * 18,
+      previousBlockBottom + tolerance
     )
   );
 }

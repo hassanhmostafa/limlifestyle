@@ -43,6 +43,6 @@ describe('answer-specific maintenance and sleep branches',()=>{
  const active=composeEventBriefPlan({answers:a,age:42}).advice;
  const starter=composeEventBriefPlan({answers:{...a,activeDays:1,activeMinutes:20,strengthDays:0},age:42}).advice;
  expect(active).toContain('240');expect(active).not.toContain('امشِ 20');expect(active).not.toContain('ابدأ بجلسة مقاومة');
- expect(starter).toContain('امشِ 20');expect(starter).not.toContain('240');
+ expect(starter).toContain('مارس نشاطك 7 دقيقة');expect(starter).not.toContain('240');
  });
 });

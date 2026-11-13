@@ -63,6 +63,17 @@ it("moves a page boundary clear of a line that starts at antialiasing distance",
   expect(bottom).toBe(63);
 });
 
+it("keeps the completed advice frame when moving the next large panel", () => {
+  const bottom = adjustPdfSliceBottom(0, 1164, 1, [
+    { top: 80, bottom: 610 },
+    { top: 614, bottom: 1300 },
+    { top: 590, bottom: 606 },
+  ]);
+  expect(bottom).toBe(612);
+  expect(bottom).toBeGreaterThan(610);
+  expect(bottom).toBeLessThan(614);
+});
+
 it("does not create a terminal PDF page for an all-white raster slice", () => {
   const white = new Uint8ClampedArray(4 * 20).fill(255);
   expect(hasPdfSliceInk(white)).toBe(false);
