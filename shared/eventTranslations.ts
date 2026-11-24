@@ -105,7 +105,10 @@ export const eventEnglish: Readonly<Record<string, string>> = {
   ذكر: "Male",
   أنثى: "Female",
   "رقم الجوال": "Mobile number",
-  "المدينة (اختياري)": "City (optional)",
+  "المدينة (مطلوب)": "City (required)",
+  "أدخل مدينتك": "Enter your city",
+  "راجع موظف التسجيل وأعطه رقم جوالك لتفعيل التسجيل.": "Give your mobile number to the registration desk to activate your registration.",
+  "لم يصلك الرمز؟ اطلب مساعدة موظف التسجيل": "Didn't get the code? Ask the registration desk for help",
   "أوافق على استخدام بياناتي لإتمام التقييم وربط نتائج الفحص بهذه الجلسة وإتاحتها لفريق التمريض والطبيب المصرح لهم في هذه الفعالية.":
     "I consent to the use of my data to complete the assessment, link screening results to this session, and make them available to authorized nursing staff and doctors at this event.",
   "قرأت وأوافق على": "I have read and agree to the",

@@ -14,7 +14,8 @@ import {
   verifyEventOtp,
   consumeEventOtp,
 } from "../eventOtp";
-import { requireOpenEvent } from "../eventAdminDb";
+import * as registration from "../eventRegistration";
+import { readEventProfile, requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
 import {
   listTracks,
@@ -95,11 +96,28 @@ async function requireEventSession(accessToken: string) {
  * reading in health_readings for both products to use.
  */
 export const eventsRouter = router({
-  otpStatus: publicProcedure.query(() => ({ enabled: otpEnabled() })),
+  otpStatus: publicProcedure.query(async () => ({
+    enabled: otpEnabled(),
+    required: (await readEventProfile()).otpRequired !== 0,
+  })),
+  requestManualRegistration: publicProcedure
+    .input(z.object({ phone: z.string().max(32), trackId: z.number().int().positive().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      await requireOpenEvent();
+      const track = await selectRegistrationTrack(input.trackId);
+      return registration.request(input.phone, track.id, ctx.req.ip || ctx.req.socket?.remoteAddress || "unknown");
+    }),
+  manualRegistrationStatus: publicProcedure
+    .input(z.object({ token: z.string().length(43) }))
+    .query(({ input }) => registration.status(input.token)),
   sendOtp: publicProcedure
     .input(z.object({ phone: z.string().min(8).max(32) }))
     .mutation(async ({ input, ctx }) => {
-      await requireOpenEvent();
+      const profile = await requireOpenEvent();
+      if (profile.otpRequired === 0) throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "رمز التحقق غير مطلوب لهذه الفعالية.",
+      });
       return sendEventOtp(
         input.phone,
         ctx.req.ip || ctx.req.socket?.remoteAddress || "unknown"
@@ -127,9 +145,10 @@ export const eventsRouter = router({
         age: z.number().int().min(18).max(120),
         sex: z.enum(["male", "female"]),
         phone: z.string().trim().min(8).max(32),
-        city: z.string().trim().max(128).optional(),
+        city: z.string().trim().min(1).max(128),
         consent: z.literal(true),
         consentVersion: z.literal(EVENT_CONSENT_VERSION),
+        manualToken: z.string().length(43).optional(),
         otpChallengeToken: z.string().min(32).max(128).optional(),
         trackId: z.number().int().positive().optional(),
       })
@@ -145,7 +164,13 @@ export const eventsRouter = router({
         });
       }
 
-      await consumeEventOtp(normalizedPhone.e164, input.otpChallengeToken);
+      if (profile.otpRequired !== 0) {
+        if (input.manualToken) {
+          await registration.consume(normalizedPhone.e164, track.id, input.manualToken);
+        } else {
+          await consumeEventOtp(normalizedPhone.e164, input.otpChallengeToken);
+        }
+      }
 
       // The event website is independent from main-app sign-in, but it still
       // allocates the same internal LIM participant record. A later main-app
@@ -174,7 +199,7 @@ export const eventsRouter = router({
         displayName: input.firstName || null,
         age: input.age,
         sex: input.sex,
-        city: input.city || null,
+        city: input.city,
         consent: "true",
         consentVersion: input.consentVersion,
         consentedAt: new Date(),

@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { eventProfiles, eventParticipantSessions as visits, eventCare, users } from '../drizzle/schema';
 import { getDb, getEventReadingByRecordNo } from './db';
 import { EVENT_CODE } from './eventCareDb';
-export const defaultEventProfile = { eventCode: EVENT_CODE, name: 'فعالية ليم', startsOn: null, endsOn: null, location: '', organizer: '', poster: null, questionnaireIds: ['lifestyle'], closed: 0 };
+export const defaultEventProfile = { eventCode: EVENT_CODE, name: 'فعالية ليم', startsOn: null, endsOn: null, location: '', organizer: '', poster: null, questionnaireIds: ['lifestyle'], closed: 0, otpRequired: 1 };
 async function database() {
   const db = await getDb();
   if (!db) throw new TRPCError({code:'INTERNAL_SERVER_ERROR', message:'قاعدة البيانات غير متاحة'});

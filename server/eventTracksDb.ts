@@ -120,7 +120,7 @@ export async function listTeam() {
 export async function createStaff(data: {
   trackId: number;
   name: string;
-  duty: "nurse" | "doctor";
+  duty: "nurse" | "doctor" | "registration";
   codeHash: string;
 }) {
   await requireTrack(data.trackId);

@@ -153,7 +153,7 @@ export default function EventTeam() {
               ? "دخول فريق الفعالية"
               : me.data.duty === "doctor"
                 ? "صفحة الطبيب"
-                : "محطة التمريض"}
+                : me.data.duty === "registration" ? "محطة التسجيل" : "محطة التمريض"}
           </h1>
           {me.data && !me.isError && (
             <>
@@ -215,6 +215,8 @@ export default function EventTeam() {
               </p>
             )}
           </form>
+        ) : me.data.duty === "registration" ? (
+          <RegistrationDesk />
         ) : (
           <>
             <form
@@ -670,5 +672,44 @@ function LifestyleAnswers({
           </div>
         ))}
     </dl>
+  );
+}
+
+
+function RegistrationDesk() {
+  const [phone, setPhone] = useState("");
+  const lookup = trpc.eventTeam.registrationLookup.useMutation();
+  const activate = trpc.eventTeam.activateRegistration.useMutation();
+  const busy = lookup.isPending || activate.isPending;
+  const request = lookup.data;
+
+  return (
+    <form className="space-y-4 rounded-3xl bg-white p-5" onSubmit={e => {
+      e.preventDefault();
+      if (!busy && phone.trim()) {
+        activate.reset();
+        lookup.mutate({ phone });
+      }
+    }}>
+      <label className="block font-bold" htmlFor="registration-phone">رقم جوال المشارك</label>
+      <input id="registration-phone" type="tel" dir="ltr" className={inputClass} maxLength={32}
+        value={phone} disabled={busy} onChange={e => {
+          setPhone(e.target.value);
+          lookup.reset();
+          activate.reset();
+        }} />
+      <button className={buttonClass} disabled={busy || !phone.trim()}>بحث</button>
+      {request && !activate.isSuccess && (
+        <div className="flex items-center justify-between gap-4">
+          <bdi>{request.phone}</bdi>
+          <button type="button" className={buttonClass} disabled={busy}
+            onClick={() => activate.mutate({ phone: request.phone, requestId: request.requestId })}>
+            تفعيل يدوي
+          </button>
+        </div>
+      )}
+      {activate.isSuccess && <p role="status">تم تفعيل التسجيل.</p>}
+      {(activate.error || lookup.error) && <p role="alert">{(activate.error || lookup.error)?.message}</p>}
+    </form>
   );
 }

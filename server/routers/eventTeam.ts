@@ -1,3 +1,5 @@
+import * as registration from "../eventRegistration";
+import { requireOpenEvent } from "../eventAdminDb";
 import crypto from "crypto";
 import * as tracks from "../eventTracksDb";
 import { hashApiKey } from "../lib/apiSecurity";
@@ -42,6 +44,14 @@ const staffProcedure = publicProcedure.use(async ({ ctx, next }) => {
       trackName: authenticated!.trackName,
     },
   });
+});
+const registrationProcedure = staffProcedure.use(({ ctx, next }) => {
+  if (ctx.assignment.duty !== "registration") throw new TRPCError({ code: "FORBIDDEN" });
+  return next();
+});
+const careStaffProcedure = staffProcedure.use(({ ctx, next }) => {
+  if (ctx.assignment.duty === "registration") throw new TRPCError({ code: "FORBIDDEN" });
+  return next();
 });
 async function sessionById(id: number, trackId: number) {
   const row = await store.findSession({ id }, trackId);
@@ -102,7 +112,7 @@ export const eventTeamRouter = router({
       z.object({
         trackId: z.number().int().positive(),
         name: z.string().trim().min(1).max(255),
-        duty: z.enum(["nurse", "doctor"]),
+        duty: z.enum(["nurse", "doctor", "registration"]),
       })
     )
     .mutation(async ({ input }) => {
@@ -164,7 +174,19 @@ export const eventTeamRouter = router({
     ctx.res.clearCookie(STAFF_COOKIE, staffCookieOptions(ctx.req));
     return { success: true };
   }),
-  lookup: staffProcedure
+  registrationLookup: registrationProcedure
+    .input(z.object({ phone: z.string().trim().min(1).max(32) }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOpenEvent();
+      return registration.find(input.phone, ctx.assignment.trackId);
+    }),
+  activateRegistration: registrationProcedure
+    .input(z.object({ phone: z.string().trim().min(1).max(32), requestId: z.string().length(64) }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOpenEvent();
+      return registration.approve(input.phone, ctx.assignment.trackId, input.requestId);
+    }),
+  lookup: careStaffProcedure
     .input(z.object({ query: z.string().trim().min(1).max(80) }))
     .mutation(async ({ ctx, input }) => {
       const normalized = input.query.replace(/[٠-٩]/g, d =>
@@ -194,7 +216,7 @@ export const eventTeamRouter = router({
         phone: row.phone,
       };
     }),
-  record: staffProcedure
+  record: careStaffProcedure
     .input(
       z.object({
         sessionId: z.number().int().positive(),
@@ -219,7 +241,7 @@ export const eventTeamRouter = router({
           : [],
       };
     }),
-  saveNursing: staffProcedure
+  saveNursing: careStaffProcedure
     .input(
       z.object({
         sessionId: z.number().int().positive(),
@@ -275,7 +297,7 @@ export const eventTeamRouter = router({
         : null;
       return { success: true, automatic };
     }),
-  saveAdvice: staffProcedure
+  saveAdvice: careStaffProcedure
     .input(
       z.object({
         sessionId: z.number().int().positive(),
@@ -332,7 +354,7 @@ export const eventTeamRouter = router({
       }
       return { success: true };
     }),
-  generateDraft: staffProcedure
+  generateDraft: careStaffProcedure
     .input(z.object({
       sessionId: z.number().int().positive(),
       confirmed: z.literal(true),
@@ -369,7 +391,7 @@ export const eventTeamRouter = router({
         });
       }
     }),
-  retryAutomaticRecommendations: staffProcedure
+  retryAutomaticRecommendations: careStaffProcedure
     .input(z.object({ sessionId: z.number().int().positive(), confirmed: z.literal(true) }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.assignment.duty !== "nurse")

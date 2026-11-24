@@ -75,6 +75,12 @@ export const eventAdminRouter = router({
       });
       return { success: true };
     }),
+  setOtpRequired: superAdminProcedure
+    .input(z.object({ required: z.boolean() }))
+    .mutation(async ({ input }) => {
+      await store.updateEventProfile({ otpRequired: Number(input.required) });
+      return { success: true };
+    }),
   setClosed: superAdminProcedure
     .input(z.object({ closed: z.boolean() }))
     .mutation(async ({ input }) => {

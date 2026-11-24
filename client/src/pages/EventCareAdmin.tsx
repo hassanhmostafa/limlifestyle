@@ -12,6 +12,11 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { nursingCatalog } from "@shared/eventNursing";
 export default function EventCareAdmin() {
+  const profile = trpc.eventAdmin.profile.useQuery();
+  const utils = trpc.useUtils();
+  const setOtp = trpc.eventAdmin.setOtpRequired.useMutation({
+    onSuccess: () => Promise.all([profile.refetch(), utils.eventAdmin.publicProfile.invalidate(), utils.events.otpStatus.invalidate()]),
+  });
   const settings = trpc.eventTeam.settings.useQuery(undefined, {
     retry: false,
   });
@@ -72,6 +77,16 @@ export default function EventCareAdmin() {
         ) : (
           <>
             <EventAdminPanel />
+            <section className="space-y-2 rounded-3xl bg-white p-6">
+              <label className="flex items-center gap-3 font-bold">
+                <input type="checkbox" checked={profile.data?.otpRequired !== 0}
+                  disabled={!profile.data || setOtp.isPending}
+                  onChange={e => setOtp.mutate({ required: e.target.checked })} />
+                طلب رمز التحقق (OTP) عند التسجيل
+              </label>
+              <p>يسري هذا الإعداد على جميع مسارات الفعالية.</p>
+              {(setOtp.error || profile.error) && <p role="alert">{(setOtp.error || profile.error)?.message}</p>}
+            </section>
             <EventResearchAdmin />
             <section className="space-y-4 rounded-3xl bg-white p-6">
               <fieldset className="space-y-3 rounded-2xl bg-[#f3f8f6] p-4">
@@ -236,7 +251,7 @@ type Staff = {
   id: number;
   trackId: number | null;
   name: string | null;
-  duty: "doctor" | "nurse";
+  duty: "doctor" | "nurse" | "registration";
   active: number;
   hasCode: number;
 };
@@ -253,7 +268,7 @@ function TrackCard({
 }) {
   const [trackName, setTrackName] = useState(track.name);
   const [name, setName] = useState("");
-  const [duty, setDuty] = useState<"doctor" | "nurse">("doctor");
+  const [duty, setDuty] = useState<"doctor" | "nurse" | "registration">("doctor");
   const [message, setMessage] = useState("");
   const url = `${window.location.origin}/events?track=${track.id}`;
   const button =
@@ -371,7 +386,7 @@ function TrackCard({
             <div>
               <strong>{person.name || "الموظف"}</strong>
               <p className="text-sm">
-                {person.duty === "doctor" ? "طبيب" : "تمريض"} ·{" "}
+                {person.duty === "doctor" ? "طبيب" : person.duty === "nurse" ? "تمريض" : "موظف تسجيل"} ·{" "}
                 {person.active ? "مفعّل" : "متوقف"}
               </p>
             </div>
@@ -431,6 +446,7 @@ function TrackCard({
           >
             <option value="doctor">طبيب</option>
             <option value="nurse">تمريض</option>
+            <option value="registration">موظف تسجيل</option>
           </select>
         </label>
         <button

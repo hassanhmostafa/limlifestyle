@@ -1,4 +1,6 @@
 import * as otp from "./eventOtp";
+import * as registration from "./eventRegistration";
+vi.mock("./eventRegistration", () => ({ consume: vi.fn() }));
 import { readFileSync } from "node:fs";
 vi.mock("./eventOtp", async importOriginal => ({
   ...(await importOriginal<typeof import("./eventOtp")>()),
@@ -155,6 +157,7 @@ describe("standalone events.createSession", () => {
             age: 40,
             sex: "male",
             phone: "0501234567",
+            city: "Jeddah",
             consent: true,
             consentVersion: "events-service-2026-10-05",
           })
@@ -193,6 +196,41 @@ describe("standalone events.createSession", () => {
     expect(createCareSnapshot).toHaveBeenCalledWith(eventSession.id);
   });
 
+  it("allows registration with OTP off only when a city is supplied", async () => {
+    vi.mocked(requireOpenEvent).mockResolvedValue({
+      questionnaireIds: ["lifestyle"], closed: 0, otpRequired: 0,
+    } as never);
+    mockedDb.createEventParticipantSession.mockResolvedValue(eventSession);
+    const caller = appRouter.createCaller(anonymousContext);
+    const input = {
+      age: 30, sex: "male", phone: "0501234567", consent: true,
+      consentVersion: "events-service-2026-10-05",
+    } as const;
+    await expect(caller.events.createSession({ ...input, city: "  " })).rejects.toThrow();
+    await expect(caller.events.createSession({ ...input, city: " جدة " })).resolves.toHaveProperty("accessToken");
+    expect(otp.consumeEventOtp).not.toHaveBeenCalled();
+    expect(mockedDb.createEventParticipantSession).toHaveBeenCalledWith(
+      expect.objectContaining({ city: "جدة" })
+    );
+  });
+
+  it("requires an approved manual request bound to the phone and track", async () => {
+    const consume = vi.mocked(registration.consume);
+    consume.mockRejectedValueOnce(new Error("pending"));
+    mockedDb.createEventParticipantSession.mockResolvedValue(eventSession);
+    const caller = appRouter.createCaller(anonymousContext);
+    const input = {
+      age: 30, sex: "male", phone: "0501234567", city: "Jeddah", consent: true,
+      consentVersion: "events-service-2026-10-05", manualToken: "m".repeat(43),
+    } as const;
+    await expect(caller.events.createSession(input)).rejects.toThrow("pending");
+    expect(mockedDb.createEventParticipantSession).not.toHaveBeenCalled();
+    consume.mockResolvedValueOnce(undefined);
+    await expect(caller.events.createSession(input)).resolves.toHaveProperty("accessToken");
+    expect(consume).toHaveBeenLastCalledWith("+966501234567", 1, input.manualToken);
+    expect(otp.consumeEventOtp).not.toHaveBeenCalled();
+  });
+
   it("rejects a stale consent text version instead of recording ambiguous consent", async () => {
     const caller = appRouter.createCaller(anonymousContext);
     await expect(
@@ -200,6 +238,7 @@ describe("standalone events.createSession", () => {
         age: 30,
         sex: "male",
         phone: "0501234567",
+        city: "Jeddah",
         consent: true,
         consentVersion: "old-version" as "events-service-2026-10-05",
       })
@@ -215,6 +254,7 @@ describe("standalone events.createSession", () => {
         age: 30,
         sex: "male",
         phone: "0501234567",
+        city: "Jeddah",
         consent: true,
         consentVersion: "events-service-2026-10-05",
       })
@@ -237,6 +277,7 @@ describe("standalone events.createSession", () => {
         age: 30,
         sex: "male",
         phone: "0501234567",
+        city: "Jeddah",
         consent: true,
         consentVersion: "events-service-2026-10-05",
       });
@@ -251,6 +292,7 @@ describe("standalone events.createSession", () => {
         age: 30,
         sex: "male",
         phone: "0123456789",
+        city: "Jeddah",
         consent: true,
         consentVersion: "events-service-2026-10-05",
       })

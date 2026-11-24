@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, mediumtext, text, timestamp, varchar, decimal, json, date, uniqueIndex } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, mediumtext, text, timestamp, varchar, decimal, json, date, index, uniqueIndex } from "drizzle-orm/mysql-core";
 
 export const eventOtpChallenges = mysqlTable("event_otp_challenges", {
   phoneHash: varchar("phoneHash", { length: 64 }).primaryKey(),
@@ -14,6 +14,14 @@ export const eventOtpLimits = mysqlTable("event_otp_limits", {
   lastAt: timestamp("lastAt").notNull(),
 });
 
+export const eventRegistrationRequests = mysqlTable("event_registration_requests", {
+  tokenHash: varchar("tokenHash", { length: 64 }).primaryKey(),
+  phoneHash: varchar("phoneHash", { length: 64 }).notNull(),
+  trackId: int("trackId").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  approved: int("approved").notNull().default(0),
+}, t => [index("event_registration_phone_track").on(t.phoneHash, t.trackId, t.expiresAt)]);
+
 export const eventProfiles = mysqlTable("event_profiles", {
   eventCode: varchar("eventCode", { length: 64 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull().default("فعالية ليم"),
@@ -23,6 +31,7 @@ export const eventProfiles = mysqlTable("event_profiles", {
   organizer: varchar("organizer", { length: 255 }).notNull().default(""),
   poster: mediumtext("poster"),
   questionnaireIds: json("questionnaireIds").$type<string[]>().notNull(),
+  otpRequired: int("otpRequired").notNull().default(1),
   closed: int("closed").notNull().default(0),
 });
 
@@ -42,7 +51,7 @@ export const eventStaff = mysqlTable("event_staff", {
   name: varchar("name", { length: 255 }),
   codeHash: varchar("codeHash", { length: 64 }).unique("event_staff_code_unique"),
   credentialVersion: int("credentialVersion").notNull().default(1),
-  duty: mysqlEnum("duty", ["nurse", "doctor"]).notNull(),
+  duty: mysqlEnum("duty", ["nurse", "doctor", "registration"]).notNull(),
   active: int("active").notNull().default(1),
 }, t => [uniqueIndex("event_staff_user_unique").on(t.eventCode, t.userId)]);
 export const eventTracks = mysqlTable("event_tracks", {

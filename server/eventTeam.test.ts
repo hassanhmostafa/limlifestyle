@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eventTeamRouter } from "./routers/eventTeam";
 import { eventsRouter } from "./routers/events";
 import * as store from "./eventCareDb";
+import * as registration from "./eventRegistration";
+vi.mock("./eventRegistration", () => ({ find: vi.fn(), approve: vi.fn() }));
+vi.mock("./eventAdminDb", () => ({ requireOpenEvent: vi.fn() }));
 import * as db from "./db";
 import * as tracks from "./eventTracksDb";
 import { hashApiKey } from "./lib/apiSecurity";
@@ -94,14 +97,14 @@ beforeEach(() => {
         ? 7
         : hash === hashApiKey("8".repeat(43))
           ? 8
-          : 0;
+          : hash === hashApiKey("6".repeat(43)) ? 6 : 0;
     return id
       ? ({
           staff: {
             id,
             userId: null,
             name: "موظف تجريبي",
-            duty: id === 7 ? "nurse" : "doctor",
+            duty: id === 7 ? "nurse" : id === 8 ? "doctor" : "registration",
             trackId: 1,
             active: 1,
             credentialVersion: 1,
@@ -137,6 +140,26 @@ beforeEach(() => {
   automaticGeneration.mockResolvedValue({ state: "generated", mode: "automatic" });
   physicianDraftGeneration.mockResolvedValue({ advice: "مسودة مقيدة", revision: 2, recommendationMeta: {}, model: "gpt-5-mini" });
 });
+describe("registration staff permissions", () => {
+  it("permits manual activation only for the registration role and scopes it to the assigned track", async () => {
+    const requestId = "a".repeat(64);
+    const phone = "0501234567";
+    vi.mocked(registration.find).mockResolvedValue({ requestId, phone });
+    vi.mocked(registration.approve).mockResolvedValue({ success: true });
+
+    const agent = eventTeamRouter.createCaller(ctx(6));
+    const nurse = eventTeamRouter.createCaller(ctx(7));
+    await expect(nurse.registrationLookup({ phone })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(nurse.activateRegistration({ phone, requestId })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(agent.record({ sessionId: 1, confirmed: true })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(agent.registrationLookup({ phone })).resolves.toEqual({ requestId, phone });
+    await expect(agent.activateRegistration({ phone, requestId })).resolves.toEqual({ success: true });
+    expect(registration.find).toHaveBeenCalledWith(phone, 1);
+    expect(registration.approve).toHaveBeenCalledWith(phone, 1, requestId);
+    expect(store.findSession).not.toHaveBeenCalled();
+  });
+});
+
 describe("event basic care cycle", () => {
   it("blocks record reads and both writes for a visit in another track even with a known ID", async () => {
     vi.mocked(store.findSession).mockResolvedValue({

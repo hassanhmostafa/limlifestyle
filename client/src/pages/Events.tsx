@@ -91,7 +91,7 @@ const emptyRegistration: Registration = {
   age: "",
   sex: "",
   phone: "",
-  city: "جدة",
+  city: "",
   consent: false,
 };
 const phonePattern = /^((\+966)|(00966)|(966)|(0))5\d{8}$/;
@@ -122,7 +122,8 @@ export default function Events() {
   const { t, language, direction } = useEventLocale();
   const otpStatus = trpc.events.otpStatus.useQuery(undefined, {
     retry: false,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000,
   });
   const [otpChallenge, setOtpChallenge] = useState<{
     token: string;
@@ -142,10 +143,20 @@ export default function Events() {
       ? Number(trackParam)
       : undefined;
   const [screen, setScreen] = useState<Screen>("register");
-  const [registration, setRegistration] = useState<Registration>(() => ({
-    ...emptyRegistration,
-    city: language === "en" ? "Jeddah" : "جدة",
-  }));
+  const [registration, setRegistration] = useState<Registration>(emptyRegistration);
+  const [manualRequest, setManualRequest] = useState<{ token: string; phone: string } | null>(null);
+  const manualStatus = trpc.events.manualRegistrationStatus.useQuery(
+    { token: manualRequest?.token ?? "" },
+    { enabled: screen === "register" && Boolean(manualRequest), refetchInterval: 2500 }
+  );
+  const manual = trpc.events.requestManualRegistration.useMutation({
+    onSuccess: ({ token }, { phone }) => setManualRequest({ token, phone }),
+  });
+  const manualToken = manualStatus.data?.approved && manualRequest?.phone === registration.phone
+    ? manualRequest.token : undefined;
+  const otpChallengeToken = otpChallenge?.phone === registration.phone ? otpChallenge?.token : undefined;
+  const registrationBlocked = !otpStatus.data ||
+    (otpStatus.data.required !== false && !manualToken && !otpChallengeToken);
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem(storageKey)
   );
@@ -202,25 +213,19 @@ export default function Events() {
     setOtpChallenge(null);
   }, [registration.phone]);
   const registerParticipant = () => {
-    if (
-      !registration.sex ||
-      !otpStatus.data?.enabled ||
-      otpChallenge?.phone !== registration.phone ||
-      !otpChallenge?.token
-    )
-      return;
-    const otpChallengeToken = otpChallenge.token;
+    if (!registration.sex || !registration.city.trim() || registrationBlocked) return;
     setError("");
     createSession.mutate({
       firstName: registration.firstName.trim() || undefined,
       age: Number(registration.age),
       sex: registration.sex,
       phone: registration.phone,
-      city: registration.city.trim() || undefined,
+      city: registration.city.trim(),
       consent: true,
       consentVersion: EVENT_CONSENT_VERSION,
       trackId,
       otpChallengeToken,
+      manualToken: otpChallengeToken ? undefined : manualToken,
     });
   };
   const saveLifestyle = trpc.events.saveLifestyle.useMutation({
@@ -707,6 +712,7 @@ export default function Events() {
       Number(registration.age) >= 18 &&
       Boolean(registration.sex) &&
       phonePattern.test(registration.phone.replace(/\s/g, "")) &&
+      Boolean(registration.city.trim()) &&
       registration.consent,
     [registration]
   );
@@ -715,6 +721,7 @@ export default function Events() {
     localStorage.removeItem(storageKey);
     setAccessToken(null);
     setRegistration(emptyRegistration);
+    setManualRequest(null);
     setAnswers({ importance: 5, confidence: 5 });
     setLifestyleIndex(0);
     setError("");
@@ -780,7 +787,7 @@ export default function Events() {
                   </button>
                 </p>
               )}
-              {otpStatus.data?.enabled === false && (
+              {otpStatus.data?.required !== false && otpStatus.data?.enabled === false && (
                 <p role="alert" className="m-5 rounded-xl bg-amber-50 p-4">
                   {t(
                     "التحقق بالجوال غير متاح حاليًا. يرجى التواصل مع منظم الفعالية لإكمال التسجيل."
@@ -791,16 +798,13 @@ export default function Events() {
                 form={registration}
                 setForm={setRegistration}
                 error={error}
-                blocked={
-                  !otpStatus.data?.enabled ||
-                  otpChallenge?.phone !== registration.phone ||
-                  !otpChallenge?.token
-                }
+                blocked={registrationBlocked}
                 saving={createSession.isPending}
                 onSubmit={() => {
                   if (canRegister) registerParticipant();
                 }}
-                otp={
+                otp={otpStatus.data?.required !== false && !manualToken && (
+                  <>
                   <EventOtpVerification
                     key={`${registration.phone}:${otpVersion}`}
                     phone={registration.phone}
@@ -813,7 +817,22 @@ export default function Events() {
                       );
                     }}
                   />
-                }
+                  {!otpChallengeToken && !manualToken && (
+                    <div className="space-y-2">
+                      {manualRequest?.phone === registration.phone && !manualStatus.data?.expired ? (
+                        <p role="status">{t("راجع موظف التسجيل وأعطه رقم جوالك لتفعيل التسجيل.")}</p>
+                      ) : (
+                        <button type="button" className="underline disabled:opacity-50"
+                          disabled={manual.isPending || !phonePattern.test(registration.phone.replace(/\s/g, ""))}
+                          onClick={() => manual.mutate({ phone: registration.phone, trackId })}>
+                          {t("لم يصلك الرمز؟ اطلب مساعدة موظف التسجيل")}
+                        </button>
+                      )}
+                      {manual.error && <p role="alert">{manual.error.message}</p>}
+                    </div>
+                  )}
+                  </>
+                )}
               />
             </>
           )
@@ -1153,6 +1172,7 @@ function RegistrationView({
     Number(form.age) >= 18 &&
     Boolean(form.sex) &&
     phonePattern.test(phone) &&
+    Boolean(form.city.trim()) &&
     form.consent;
   return (
     <section className="px-5 pb-12 pt-7">
@@ -1222,13 +1242,16 @@ function RegistrationView({
             className="text-left"
           />
         </Field>
-        {t(otp)}
-        <Field label={t("المدينة (اختياري)")}>
+        <Field label={t("المدينة (مطلوب)")}>
           <Input
+            required
+            maxLength={128}
+            placeholder={t("أدخل مدينتك")}
             value={form.city}
             onChange={event => update("city", event.target.value)}
           />
         </Field>
+        {t(otp)}
         <div
           className={`rounded-2xl border-2 p-4 transition ${form.consent ? "border-[#197f6f] bg-[#e7f6f1]" : "border-[#d0a400] bg-[#fff9db]"}`}
         >
